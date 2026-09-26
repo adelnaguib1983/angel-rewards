@@ -207,27 +207,39 @@ export type Database = {
       }
       profiles: {
         Row: {
+          academic_year: string | null
+          address: string | null
           avatar: string
+          birth_date: string | null
           class_name: string | null
           created_at: string
           full_name: string
           id: string
+          phone: string | null
           status: string
         }
         Insert: {
+          academic_year?: string | null
+          address?: string | null
           avatar?: string
+          birth_date?: string | null
           class_name?: string | null
           created_at?: string
           full_name?: string
           id: string
+          phone?: string | null
           status?: string
         }
         Update: {
+          academic_year?: string | null
+          address?: string | null
           avatar?: string
+          birth_date?: string | null
           class_name?: string | null
           created_at?: string
           full_name?: string
           id?: string
+          phone?: string | null
           status?: string
         }
         Relationships: []
@@ -343,9 +355,29 @@ export type Database = {
       my_stats: { Args: never; Returns: Json }
       points_of: { Args: { _uid: string }; Returns: number }
       redeem_gift: { Args: { _gift_id: string }; Returns: undefined }
+      update_my_contact: {
+        Args: {
+          _academic_year: string
+          _address: string
+          _birth_date: string
+          _name: string
+          _phone: string
+        }
+        Returns: undefined
+      }
       update_my_profile: {
         Args: { _avatar: string; _class: string; _name: string }
         Returns: undefined
+      }
+      weekly_leaderboard: {
+        Args: { _offset?: number }
+        Returns: {
+          activities: number
+          avatar: string
+          full_name: string
+          id: string
+          points: number
+        }[]
       }
     }
     Enums: {

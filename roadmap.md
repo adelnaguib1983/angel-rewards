@@ -6,3 +6,5 @@
 - [ ] Admin weekly summary (completed activities, points, top members)
 - [ ] Redemption statuses: pending/approved/delivered/rejected (decided)
 - [ ] Weekly summary = Sunday–Saturday, Africa/Cairo (decided)
+- [ ] Weekly top ranking (Sun–Sat Cairo)
+- [ ] Member academic year + contact info (name, birth date, mobile, address)

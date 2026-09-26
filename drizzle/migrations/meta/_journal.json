@@ -8,6 +8,13 @@
       "when": 1790457867384,
       "tag": "0000_sunday_school_core",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790458035071,
+      "tag": "0001_contact_info_weekly_board",
+      "breakpoints": true
     }
   ]
 }
