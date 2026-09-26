@@ -377,6 +377,7 @@ export type Database = {
           full_name: string
           id: string
           points: number
+          rank: number
         }[]
       }
     }

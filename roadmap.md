@@ -8,3 +8,6 @@
 - [ ] Weekly summary = Sunday–Saturday, Africa/Cairo (decided)
 - [ ] Weekly top ranking (Sun–Sat Cairo)
 - [ ] Member academic year + contact info (name, birth date, mobile, address)
+- [ ] Weekly summary CSV export
+- [ ] Weekly ranking rules: ties share rank (1,1,3), tiebreak display by activities; resets Sunday 00:00 Cairo
+- [ ] Validate mobile (Egypt 01xxxxxxxxx) + birth date; contact info visible to self + admins only
