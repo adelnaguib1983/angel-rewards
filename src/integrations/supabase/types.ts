@@ -14,16 +14,342 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      activity_logs: {
+        Row: {
+          activity: string
+          admin_note: string | null
+          created_at: string
+          id: string
+          month: number
+          points: number
+          status: string
+          user_id: string
+          verse: string | null
+          week: number
+          year: number
+        }
+        Insert: {
+          activity: string
+          admin_note?: string | null
+          created_at?: string
+          id?: string
+          month: number
+          points?: number
+          status?: string
+          user_id: string
+          verse?: string | null
+          week: number
+          year: number
+        }
+        Update: {
+          activity?: string
+          admin_note?: string | null
+          created_at?: string
+          id?: string
+          month?: number
+          points?: number
+          status?: string
+          user_id?: string
+          verse?: string | null
+          week?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_activity_fkey"
+            columns: ["activity"]
+            isOneToOne: false
+            referencedRelation: "activity_settings"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
+      activity_settings: {
+        Row: {
+          emoji: string
+          key: string
+          label: string
+          points: number
+          sort: number
+        }
+        Insert: {
+          emoji: string
+          key: string
+          label: string
+          points?: number
+          sort?: number
+        }
+        Update: {
+          emoji?: string
+          key?: string
+          label?: string
+          points?: number
+          sort?: number
+        }
+        Relationships: []
+      }
+      badges: {
+        Row: {
+          created_at: string
+          description: string | null
+          emoji: string
+          id: string
+          name: string
+          threshold: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          emoji?: string
+          id?: string
+          name: string
+          threshold?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          emoji?: string
+          id?: string
+          name?: string
+          threshold?: number
+        }
+        Relationships: []
+      }
+      gifts: {
+        Row: {
+          active: boolean
+          cost: number
+          created_at: string
+          description: string | null
+          emoji: string
+          id: string
+          name: string
+          stock: number
+        }
+        Insert: {
+          active?: boolean
+          cost?: number
+          created_at?: string
+          description?: string | null
+          emoji?: string
+          id?: string
+          name: string
+          stock?: number
+        }
+        Update: {
+          active?: boolean
+          cost?: number
+          created_at?: string
+          description?: string | null
+          emoji?: string
+          id?: string
+          name?: string
+          stock?: number
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          id: string
+          kind: string
+          message: string
+          read: boolean
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          message: string
+          read?: boolean
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          message?: string
+          read?: boolean
+        }
+        Relationships: []
+      }
+      point_adjustments: {
+        Row: {
+          admin_id: string | null
+          amount: number
+          created_at: string
+          id: string
+          log_id: string | null
+          reason: string
+          user_id: string
+        }
+        Insert: {
+          admin_id?: string | null
+          amount: number
+          created_at?: string
+          id?: string
+          log_id?: string | null
+          reason: string
+          user_id: string
+        }
+        Update: {
+          admin_id?: string | null
+          amount?: number
+          created_at?: string
+          id?: string
+          log_id?: string | null
+          reason?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar: string
+          class_name: string | null
+          created_at: string
+          full_name: string
+          id: string
+          status: string
+        }
+        Insert: {
+          avatar?: string
+          class_name?: string | null
+          created_at?: string
+          full_name?: string
+          id: string
+          status?: string
+        }
+        Update: {
+          avatar?: string
+          class_name?: string | null
+          created_at?: string
+          full_name?: string
+          id?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      redemptions: {
+        Row: {
+          admin_note: string | null
+          cost: number
+          created_at: string
+          gift_id: string
+          id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_note?: string | null
+          cost: number
+          created_at?: string
+          gift_id: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_note?: string | null
+          cost?: number
+          created_at?: string
+          gift_id?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "redemptions_gift_id_fkey"
+            columns: ["gift_id"]
+            isOneToOne: false
+            referencedRelation: "gifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      admin_members: {
+        Args: never
+        Returns: {
+          avatar: string
+          balance: number
+          class_name: string
+          created_at: string
+          full_name: string
+          id: string
+          points: number
+          status: string
+        }[]
+      }
+      admin_review_log: {
+        Args: {
+          _log_id: string
+          _points: number
+          _reason: string
+          _status: string
+        }
+        Returns: undefined
+      }
+      admin_set_redemption: {
+        Args: { _id: string; _note: string; _status: string }
+        Returns: undefined
+      }
+      balance_of: { Args: { _uid: string }; Returns: number }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_approved: { Args: { _uid: string }; Returns: boolean }
+      leaderboard: {
+        Args: never
+        Returns: {
+          avatar: string
+          full_name: string
+          id: string
+          points: number
+        }[]
+      }
+      my_stats: { Args: never; Returns: Json }
+      points_of: { Args: { _uid: string }; Returns: number }
+      redeem_gift: { Args: { _gift_id: string }; Returns: undefined }
+      update_my_profile: {
+        Args: { _avatar: string; _class: string; _name: string }
+        Returns: undefined
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +476,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
