@@ -88,6 +88,27 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_permissions: {
+        Row: {
+          can_view_contacts: boolean
+          is_owner: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          can_view_contacts?: boolean
+          is_owner?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          can_view_contacts?: boolean
+          is_owner?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       badges: {
         Row: {
           created_at: string
@@ -112,6 +133,27 @@ export type Database = {
           id?: string
           name?: string
           threshold?: number
+        }
+        Relationships: []
+      }
+      contact_access_log: {
+        Row: {
+          admin_id: string
+          created_at: string
+          id: string
+          member_id: string
+        }
+        Insert: {
+          admin_id: string
+          created_at?: string
+          id?: string
+          member_id: string
+        }
+        Update: {
+          admin_id?: string
+          created_at?: string
+          id?: string
+          member_id?: string
         }
         Relationships: []
       }
@@ -311,6 +353,7 @@ export type Database = {
       admin_members: {
         Args: never
         Returns: {
+          academic_year: string
           avatar: string
           balance: number
           class_name: string
@@ -335,6 +378,7 @@ export type Database = {
         Returns: undefined
       }
       balance_of: { Args: { _uid: string }; Returns: number }
+      can_view_contacts: { Args: { _uid: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -343,6 +387,7 @@ export type Database = {
         Returns: boolean
       }
       is_approved: { Args: { _uid: string }; Returns: boolean }
+      is_owner: { Args: { _uid: string }; Returns: boolean }
       leaderboard: {
         Args: never
         Returns: {
@@ -352,7 +397,31 @@ export type Database = {
           points: number
         }[]
       }
+      my_contact: {
+        Args: never
+        Returns: {
+          address: string
+          birth_date: string
+          phone: string
+        }[]
+      }
+      my_permissions: { Args: never; Returns: Json }
       my_stats: { Args: never; Returns: Json }
+      owner_list_staff: {
+        Args: never
+        Returns: {
+          avatar: string
+          can_view_contacts: boolean
+          full_name: string
+          is_admin: boolean
+          is_owner: boolean
+          user_id: string
+        }[]
+      }
+      owner_set_staff: {
+        Args: { _can_view: boolean; _is_admin: boolean; _user: string }
+        Returns: undefined
+      }
       points_of: { Args: { _uid: string }; Returns: number }
       redeem_gift: { Args: { _gift_id: string }; Returns: undefined }
       update_my_contact: {
@@ -368,6 +437,14 @@ export type Database = {
       update_my_profile: {
         Args: { _avatar: string; _class: string; _name: string }
         Returns: undefined
+      }
+      view_contact: {
+        Args: { _member: string }
+        Returns: {
+          address: string
+          birth_date: string
+          phone: string
+        }[]
       }
       weekly_leaderboard: {
         Args: { _offset?: number }

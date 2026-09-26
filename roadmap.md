@@ -11,3 +11,7 @@
 - [ ] Weekly summary CSV export
 - [ ] Weekly ranking rules: ties share rank (1,1,3), tiebreak display by activities; resets Sunday 00:00 Cairo
 - [ ] Validate mobile (Egypt 01xxxxxxxxx) + birth date; contact info visible to self + admins only
+- [ ] Filter ranking/summary by academic year
+- [ ] Contact-info access: owner grants/revokes permission; audit log of views (filters date/admin, CSV)
+- [ ] CSV: week dates, shared ranks, tie indicator
+- [ ] Weekly archive of past rankings + chart comparing academic-year groups across weeks
