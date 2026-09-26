@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
@@ -378,10 +378,14 @@ function ContactDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o
   const p = me?.profile;
   const [f, setF] = useState({ full_name: "", academic_year: "", birth_date: "", phone: "", address: "" });
   const [loaded, setLoaded] = useState(false);
-  if (open && p && !loaded) {
-    setF({ full_name: p.full_name ?? "", academic_year: p.academic_year ?? "", birth_date: p.birth_date ?? "", phone: p.phone ?? "", address: p.address ?? "" });
+  useEffect(() => {
+    if (!open || !p || loaded) return;
     setLoaded(true);
-  }
+    supabase.rpc("my_contact").then(({ data }) => {
+      const c = data?.[0];
+      setF({ full_name: p.full_name ?? "", academic_year: p.academic_year ?? "", birth_date: c?.birth_date ?? "", phone: c?.phone ?? "", address: c?.address ?? "" });
+    });
+  }, [open, p, loaded]);
   async function save() {
     const bad = validateContact(f) || (!f.full_name.trim() ? "الاسم مطلوب" : null);
     if (bad) return toast.error(bad);

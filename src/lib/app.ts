@@ -37,7 +37,7 @@ export function useMe() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
       const [{ data: profile }, { data: roles }] = await Promise.all([
-        supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
+        supabase.from("profiles").select("id, full_name, class_name, avatar, status, created_at, academic_year").eq("id", user.id).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", user.id),
       ]);
       return { user, profile, isAdmin: !!roles?.some((r) => r.role === "admin") };
@@ -76,6 +76,7 @@ export async function signOut(queryClient: { cancelQueries: () => Promise<void>;
   await supabase.auth.signOut();
 }
 
+export const PROFILE_COLS = "id, full_name, class_name, avatar, status, created_at, academic_year";
 export const PHONE_RE = /^01[0125][0-9]{8}$/;
 export function validateContact(v: { phone?: string; birth_date?: string }) {
   if (v.phone && !PHONE_RE.test(v.phone)) return "رقم الموبايل غير صحيح (مثال: 01012345678)";
