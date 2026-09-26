@@ -8,3 +8,6 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Data access uses the browser client + RLS/security-definer RPCs; contact columns (phone/address/birth_date) are column-revoked and read only via `view_contact` (audited) or `my_contact` — why: restrict PII to authorized admins.
+- First signup becomes owner admin via `handle_new_user` trigger — why: bootstraps admin without manual SQL.

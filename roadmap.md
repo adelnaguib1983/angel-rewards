@@ -1,17 +1,17 @@
 # Roadmap
-- [ ] Database: profiles/approval, roles, activities, badges, gifts, redemptions, point adjustments log, notifications
-- [ ] Auth (email + Google) with admin approval gate
-- [ ] Kid app: weekly tracker (4 weeks), verse, points, levels, badges, gift catalog + redemption status, leaderboard
-- [ ] Admin: approvals, activity review + edit points, adjustments log with reason, notifications, gifts/badges management, redemption status
-- [ ] Admin weekly summary (completed activities, points, top members)
-- [ ] Redemption statuses: pending/approved/delivered/rejected (decided)
-- [ ] Weekly summary = Sunday–Saturday, Africa/Cairo (decided)
-- [ ] Weekly top ranking (Sun–Sat Cairo)
-- [ ] Member academic year + contact info (name, birth date, mobile, address)
-- [ ] Weekly summary CSV export
-- [ ] Weekly ranking rules: ties share rank (1,1,3), tiebreak display by activities; resets Sunday 00:00 Cairo
-- [ ] Validate mobile (Egypt 01xxxxxxxxx) + birth date; contact info visible to self + admins only
-- [ ] Filter ranking/summary by academic year
-- [ ] Contact-info access: owner grants/revokes permission; audit log of views (filters date/admin, CSV)
-- [ ] CSV: week dates, shared ranks, tie indicator
-- [ ] Weekly archive of past rankings + chart comparing academic-year groups across weeks
+- [x] Database: profiles/approval, roles, activities, badges, gifts, redemptions, point adjustments log, notifications
+- [x] Auth (email + Google) with admin approval gate
+- [x] Kid app: weekly tracker (4 weeks), verse, points, levels, badges, gift catalog + redemption status, leaderboard
+- [x] Admin: approvals, activity review + edit points, adjustments log with reason, notifications, gifts/badges management, redemption status
+- [x] Admin weekly summary (completed activities, points, top members)
+- [x] Redemption statuses: pending/approved/delivered/rejected (decided)
+- [x] Weekly summary = Sunday–Saturday, Africa/Cairo (decided)
+- [x] Weekly top ranking (Sun–Sat Cairo)
+- [x] Member academic year + contact info (name, birth date, mobile, address)
+- [x] Weekly summary CSV export
+- [x] Weekly ranking rules: ties share rank (1,1,3), tiebreak display by activities; resets Sunday 00:00 Cairo
+- [x] Validate mobile (Egypt 01xxxxxxxxx) + birth date; contact info visible to self + admins only
+- [x] Filter ranking/summary by academic year
+- [x] Contact-info access: owner grants/revokes permission; audit log of views (filters date/admin, CSV)
+- [x] CSV: week dates, shared ranks, tie indicator
+- [x] Weekly archive of past rankings + chart comparing academic-year groups across weeks
