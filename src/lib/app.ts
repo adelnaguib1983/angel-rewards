@@ -75,3 +75,14 @@ export async function signOut(queryClient: { cancelQueries: () => Promise<void>;
   queryClient.clear();
   await supabase.auth.signOut();
 }
+
+export const PHONE_RE = /^01[0125][0-9]{8}$/;
+export function validateContact(v: { phone?: string; birth_date?: string }) {
+  if (v.phone && !PHONE_RE.test(v.phone)) return "رقم الموبايل غير صحيح (مثال: 01012345678)";
+  if (v.birth_date) {
+    const d = new Date(v.birth_date); const age = (Date.now() - d.getTime()) / (365.25 * 864e5);
+    if (isNaN(age) || age < 5 || age > 30) return "تاريخ الميلاد غير صحيح";
+  }
+  return null;
+}
+export const ACADEMIC_YEARS = ["خامسة ابتدائي","سادسة ابتدائي","أولى إعدادي","ثانية إعدادي","ثالثة إعدادي","أولى ثانوي"];

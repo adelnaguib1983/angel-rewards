@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ACADEMIC_YEARS, validateContact } from "@/lib/app";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -26,6 +27,10 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [cls, setCls] = useState("");
+  const [year, setYear] = useState("");
+  const [birth, setBirth] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const navigate = useNavigate();
@@ -35,9 +40,11 @@ function AuthPage() {
     setBusy(true);
     try {
       if (mode === "up") {
+        const bad = validateContact({ phone, birth_date: birth });
+        if (bad) throw new Error(bad);
         const { error } = await supabase.auth.signUp({
           email, password,
-          options: { emailRedirectTo: window.location.origin, data: { full_name: name, class_name: cls } },
+          options: { emailRedirectTo: window.location.origin, data: { full_name: name.trim(), class_name: cls, academic_year: year, birth_date: birth, phone: phone.trim(), address: address.trim() } },
         });
         if (error) throw error;
         setSent(true);
@@ -76,7 +83,19 @@ function AuthPage() {
             {mode === "up" && (
               <>
                 <div><Label>الاسم</Label><Input required value={name} onChange={(e) => setName(e.target.value)} /></div>
-                <div><Label>الفصل / المرحلة</Label><Input value={cls} onChange={(e) => setCls(e.target.value)} placeholder="مثال: أولى إعدادي" /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label>العام الدراسي</Label>
+                    <select required value={year} onChange={(e) => setYear(e.target.value)} className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
+                      <option value="" className="bg-card">اختر</option>
+                      {ACADEMIC_YEARS.map((y) => <option key={y} className="bg-card">{y}</option>)}
+                    </select></div>
+                  <div><Label>الفصل</Label><Input value={cls} onChange={(e) => setCls(e.target.value)} placeholder="اسم الفصل" /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label>تاريخ الميلاد</Label><Input type="date" required value={birth} onChange={(e) => setBirth(e.target.value)} /></div>
+                  <div><Label>الموبايل</Label><Input dir="ltr" inputMode="numeric" required maxLength={11} value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))} placeholder="01012345678" /></div>
+                </div>
+                <div><Label>العنوان</Label><Input required maxLength={200} value={address} onChange={(e) => setAddress(e.target.value)} /></div>
               </>
             )}
             <div><Label>البريد الإلكتروني</Label><Input type="email" dir="ltr" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>

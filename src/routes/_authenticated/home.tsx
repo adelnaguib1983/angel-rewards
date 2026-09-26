@@ -4,10 +4,12 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
-import { AVATARS, MONTHS, REDEEM_STATUS, currentWeek, levelOf, useMe, useSettings } from "@/lib/app";
+import { ACADEMIC_YEARS, validateContact, AVATARS, MONTHS, REDEEM_STATUS, currentWeek, levelOf, useMe, useSettings } from "@/lib/app";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/_authenticated/home")({
   head: () => ({
@@ -83,6 +85,7 @@ function StatsHero({ name, avatar }: { name: string; avatar: string }) {
   const { data } = useStats();
   const qc = useQueryClient();
   const [pick, setPick] = useState(false);
+  const [edit, setEdit] = useState(false);
   const pts = data?.points ?? 0;
   const lv = levelOf(pts);
   return (
@@ -91,7 +94,7 @@ function StatsHero({ name, avatar }: { name: string; avatar: string }) {
         <button onClick={() => setPick(true)} className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-secondary text-5xl" title="غيّر الشخصية">{avatar}</button>
         <div className="flex-1">
           <div className="text-sm text-muted-foreground">المستوى {lv.index}</div>
-          <h2 className="text-2xl font-extrabold">{name} · {lv.emoji} {lv.name}</h2>
+          <h2 className="text-2xl font-extrabold">{name} · {lv.emoji} {lv.name} <button onClick={() => setEdit(true)} className="align-middle text-sm font-bold text-primary">✏️ بياناتي</button></h2>
           <Progress value={lv.progress} className="mt-3 h-3" />
           <div className="mt-1 text-xs text-muted-foreground">{lv.next ? `باقي ${lv.next.min - pts} نقطة للوصول إلى ${lv.next.name}` : "وصلت لأعلى مستوى! 👑"}</div>
         </div>
@@ -106,6 +109,7 @@ function StatsHero({ name, avatar }: { name: string; avatar: string }) {
           <div className="font-display text-4xl font-extrabold">{data?.balance ?? 0}</div>
         </div>
       </div>
+      <ContactDialog open={edit} onOpenChange={setEdit} />
       <Dialog open={pick} onOpenChange={setPick}>
         <DialogContent>
           <DialogHeader><DialogTitle>اختر شخصيتك</DialogTitle></DialogHeader>
@@ -324,21 +328,32 @@ function Shop() {
 }
 
 function Board({ myId }: { myId: string }) {
+  const [mode, setMode] = useState<"week" | "last" | "all">("week");
   const { data } = useQuery({
-    queryKey: ["leaderboard"],
-    queryFn: async () => (await supabase.rpc("leaderboard")).data ?? [],
+    queryKey: ["leaderboard", mode],
+    queryFn: async () => {
+      if (mode === "all") return ((await supabase.rpc("leaderboard")).data ?? []).map((r, i, a) => ({ ...r, rank: a.findIndex((x) => x.points === r.points) + 1 }));
+      return (await supabase.rpc("weekly_leaderboard", { _offset: mode === "week" ? 0 : 1 })).data ?? [];
+    },
   });
   const medals = ["🥇", "🥈", "🥉"];
   const top = data?.slice(0, 3) ?? [];
   return (
     <div>
+      <div className="mb-4 flex justify-center gap-2">
+        {([["week", "أوائل هذا الأسبوع"], ["last", "الأسبوع الماضي"], ["all", "الترتيب العام"]] as const).map(([k, l]) => (
+          <button key={k} onClick={() => setMode(k)} className={`rounded-xl px-3 py-1.5 text-sm font-bold ${mode === k ? "bg-secondary text-secondary-foreground" : "bg-card"}`}>{l}</button>
+        ))}
+      </div>
+      {mode !== "all" && <p className="mb-4 text-center text-xs text-muted-foreground">الأسبوع من الأحد إلى السبت ويبدأ الترتيب من جديد كل أحد. المتساوون في النقاط يأخذون نفس المركز.</p>}
+      {!data?.length && <p className="text-center text-muted-foreground">لا توجد إنجازات بعد — كن الأول! 🚀</p>}
       <div className="mb-6 flex items-end justify-center gap-3">
         {[1, 0, 2].map((i) => top[i] && (
           <div key={top[i].id} className="text-center">
             <div className="text-5xl">{top[i].avatar}</div>
             <div className="font-bold">{top[i].full_name}</div>
             <div className={`pop mt-2 grid w-24 place-items-center rounded-t-2xl ${i === 0 ? "h-32 bg-primary text-primary-foreground" : i === 1 ? "h-24 bg-sky text-primary-foreground" : "h-16 bg-secondary text-secondary-foreground"}`}>
-              <div className="text-3xl">{medals[i]}</div><div className="font-extrabold">{top[i].points}</div>
+              <div className="text-3xl">{medals[top[i].rank - 1] ?? top[i].rank}</div><div className="font-extrabold">{top[i].points}</div>
             </div>
           </div>
         ))}
@@ -346,7 +361,7 @@ function Board({ myId }: { myId: string }) {
       <ol className="space-y-2">
         {data?.map((r, i) => (
           <li key={r.id} className={`flex items-center gap-3 rounded-2xl p-3 ${r.id === myId ? "bg-primary/20 ring-2 ring-primary" : "bg-card"}`}>
-            <span className="w-8 text-center font-display text-xl font-extrabold">{medals[i] ?? i + 1}</span>
+            <span className="w-8 text-center font-display text-xl font-extrabold">{medals[r.rank - 1] ?? r.rank}</span>
             <span className="text-2xl">{r.avatar}</span>
             <span className="flex-1 font-bold">{r.full_name}</span>
             <span className="font-display text-xl font-extrabold text-primary">{r.points}</span>
@@ -354,5 +369,46 @@ function Board({ myId }: { myId: string }) {
         ))}
       </ol>
     </div>
+  );
+}
+
+function ContactDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+  const { data: me } = useMe();
+  const qc = useQueryClient();
+  const p = me?.profile;
+  const [f, setF] = useState({ full_name: "", academic_year: "", birth_date: "", phone: "", address: "" });
+  const [loaded, setLoaded] = useState(false);
+  if (open && p && !loaded) {
+    setF({ full_name: p.full_name ?? "", academic_year: p.academic_year ?? "", birth_date: p.birth_date ?? "", phone: p.phone ?? "", address: p.address ?? "" });
+    setLoaded(true);
+  }
+  async function save() {
+    const bad = validateContact(f) || (!f.full_name.trim() ? "الاسم مطلوب" : null);
+    if (bad) return toast.error(bad);
+    const { error } = await supabase.rpc("update_my_contact", { _name: f.full_name, _academic_year: f.academic_year, _birth_date: (f.birth_date || null) as string, _phone: f.phone, _address: f.address });
+    if (error) return toast.error(error.message);
+    toast.success("تم حفظ بياناتك"); qc.invalidateQueries({ queryKey: ["me"] }); onOpenChange(false); setLoaded(false);
+  }
+  return (
+    <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) setLoaded(false); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>بيانات التواصل</DialogTitle></DialogHeader>
+        <p className="text-xs text-muted-foreground">🔒 لا يرى هذه البيانات إلا أنت والخدام المشرفون.</p>
+        <div className="space-y-3">
+          <div><Label>الاسم</Label><Input value={f.full_name} maxLength={80} onChange={(e) => setF({ ...f, full_name: e.target.value })} /></div>
+          <div><Label>العام الدراسي</Label>
+            <select value={f.academic_year} onChange={(e) => setF({ ...f, academic_year: e.target.value })} className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
+              <option value="" className="bg-card">اختر</option>
+              {ACADEMIC_YEARS.map((y) => <option key={y} className="bg-card">{y}</option>)}
+            </select></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><Label>تاريخ الميلاد</Label><Input type="date" value={f.birth_date} onChange={(e) => setF({ ...f, birth_date: e.target.value })} /></div>
+            <div><Label>الموبايل</Label><Input dir="ltr" maxLength={11} value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value.replace(/\D/g, "") })} /></div>
+          </div>
+          <div><Label>العنوان</Label><Input maxLength={200} value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} /></div>
+        </div>
+        <button onClick={save} className="pop rounded-2xl bg-primary py-3 font-extrabold text-primary-foreground">حفظ</button>
+      </DialogContent>
+    </Dialog>
   );
 }
