@@ -23,7 +23,7 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
-  const [mode, setMode] = useState<"in" | "up">("in");
+  const [mode, setMode] = useState<"in" | "up" | "admin" | "forgot">("in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -33,7 +33,7 @@ function AuthPage() {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [busy, setBusy] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [sent, setSent] = useState<"" | "signup" | "reset">("");
   const navigate = useNavigate();
 
   async function submit(e: React.FormEvent) {
@@ -48,11 +48,22 @@ function AuthPage() {
           options: { emailRedirectTo: window.location.origin, data: { full_name: name.trim(), class_name: cls, academic_year: year, birth_date: birth, phone: phone.trim(), address: address.trim() } },
         });
         if (error) throw error;
-        setSent(true);
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        setSent("signup");
+      } else if (mode === "forgot") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
         if (error) throw error;
-        navigate({ to: "/home" });
+        setSent("reset");
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        if (mode === "admin") {
+          const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", data.user.id);
+          if (!roles?.some((r) => r.role === "admin")) {
+            await supabase.auth.signOut();
+            throw new Error("هذا الحساب ليس لديه صلاحية مشرف");
+          }
+          navigate({ to: "/admin" });
+        } else navigate({ to: "/home" });
       }
     } catch (err) {
       toast.error((err as Error).message);
@@ -68,16 +79,29 @@ function AuthPage() {
     navigate({ to: "/home" });
   }
 
+  const titles = { in: "أهلاً يا بطل 👋", up: "انضم للأبطال ⚡", admin: "دخول المشرف 🛡️", forgot: "نسيت كلمة المرور؟ 🔑" };
+  const switchTo = (m: typeof mode) => { setMode(m); setSent(""); };
+
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-10">
       <div className="pop w-full max-w-md rounded-3xl border-2 border-border bg-card p-7">
         <Link to="/" className="text-sm text-muted-foreground">← الرئيسية</Link>
-        <h1 className="mt-2 text-3xl font-extrabold">{mode === "in" ? "أهلاً يا بطل 👋" : "انضم للأبطال ⚡"}</h1>
+        {(mode === "in" || mode === "admin") && (
+          <div className="mt-3 grid grid-cols-2 gap-2 rounded-2xl bg-muted p-1">
+            <button onClick={() => switchTo("in")} className={`rounded-xl py-2 text-sm font-bold ${mode === "in" ? "bg-card pop" : ""}`}>مشترك</button>
+            <button onClick={() => switchTo("admin")} className={`rounded-xl py-2 text-sm font-bold ${mode === "admin" ? "bg-card pop" : ""}`}>مشرف</button>
+          </div>
+        )}
+        <h1 className="mt-3 text-3xl font-extrabold">{titles[mode]}</h1>
         {sent ? (
           <div className="mt-6 rounded-2xl bg-muted p-5 text-center">
             <div className="text-5xl">📬</div>
-            <p className="mt-3 font-bold">افتح بريدك واضغط رابط التأكيد.</p>
-            <p className="mt-2 text-sm text-muted-foreground">بعدها ينتظر حسابك موافقة الخادم قبل التفعيل.</p>
+            {sent === "signup" ? (
+              <>
+                <p className="mt-3 font-bold">افتح بريدك واضغط رابط التأكيد.</p>
+                <p className="mt-2 text-sm text-muted-foreground">بعدها ينتظر حسابك موافقة الخادم قبل التفعيل.</p>
+              </>
+            ) : <p className="mt-3 font-bold">أرسلنا رابط تغيير كلمة المرور إلى بريدك.</p>}
           </div>
         ) : (
           <form onSubmit={submit} className="mt-6 space-y-4">
@@ -100,17 +124,27 @@ function AuthPage() {
               </>
             )}
             <div><Label>البريد الإلكتروني</Label><Input type="email" dir="ltr" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-            <div><Label>كلمة المرور</Label><Input type="password" dir="ltr" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+            {mode !== "forgot" && (
+              <div>
+                <div className="flex items-center justify-between">
+                  <Label>كلمة المرور</Label>
+                  {mode !== "up" && <button type="button" onClick={() => switchTo("forgot")} className="text-xs font-bold text-primary">نسيت كلمة المرور؟</button>}
+                </div>
+                <Input type="password" dir="ltr" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
+              </div>
+            )}
             <button disabled={busy} className="pop w-full rounded-2xl bg-primary py-3 text-lg font-extrabold text-primary-foreground disabled:opacity-60">
-              {busy ? "..." : mode === "in" ? "دخول" : "إرسال طلب التسجيل"}
+              {busy ? "..." : { in: "دخول", admin: "دخول كمشرف", up: "إرسال طلب التسجيل", forgot: "أرسل رابط التغيير" }[mode]}
             </button>
-            <button type="button" onClick={google} className="w-full rounded-2xl border-2 border-border py-3 font-bold hover:bg-muted">
-              المتابعة بحساب Google
-            </button>
+            {(mode === "in" || mode === "up") && (
+              <button type="button" onClick={google} className="w-full rounded-2xl border-2 border-border py-3 font-bold hover:bg-muted">
+                المتابعة بحساب Google
+              </button>
+            )}
           </form>
         )}
-        <button onClick={() => { setMode(mode === "in" ? "up" : "in"); setSent(false); }} className="mt-5 w-full text-center text-sm font-bold text-primary">
-          {mode === "in" ? "ليس لديك حساب؟ سجّل الآن" : "لديك حساب؟ ادخل"}
+        <button onClick={() => switchTo(mode === "in" ? "up" : "in")} className="mt-5 w-full text-center text-sm font-bold text-primary">
+          {mode === "in" ? "ليس لديك حساب؟ سجّل الآن" : mode === "up" ? "لديك حساب؟ ادخل" : "رجوع لتسجيل الدخول"}
         </button>
       </div>
     </main>

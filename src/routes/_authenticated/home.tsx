@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CalendarView, StreakBadges, StreakCard, WeeklyCoach } from "@/components/HomeExtras";
 
 export const Route = createFileRoute("/_authenticated/home")({
   head: () => ({
@@ -27,7 +28,7 @@ export const Route = createFileRoute("/_authenticated/home")({
 });
 
 const TABS = [
-  ["track", "🗓️ إنجازاتي"], ["badges", "🏅 الأوسمة"], ["shop", "🎁 الهدايا"], ["board", "🏆 لوحة الشرف"],
+  ["track", "🗓️ إنجازاتي"], ["cal", "📅 التقويم"], ["coach", "✨ مرشدي"], ["badges", "🏅 الأوسمة"], ["shop", "🎁 الهدايا"], ["board", "🏆 لوحة الشرف"],
 ] as const;
 
 function Home() {
@@ -62,8 +63,10 @@ function Home() {
             </button>
           ))}
         </nav>
-        {tab === "track" && <Tracker userId={me.user.id} />}
-        {tab === "badges" && <Badges />}
+        {tab === "track" && <><StreakCard /><Tracker userId={me.user.id} /></>}
+        {tab === "cal" && <CalendarView />}
+        {tab === "coach" && <WeeklyCoach />}
+        {tab === "badges" && <><Badges /><StreakBadges /></>}
         {tab === "shop" && <Shop />}
         {tab === "board" && <Board myId={me.user.id} />}
       </main>
