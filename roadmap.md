@@ -21,5 +21,5 @@
 - [x] Forgot password + reset page
 - [x] Admin login entry
 
-- [ ] Admin-managed announcements board for activities/trips
-- [ ] Six-item mobile bottom navigation for member sections
+- [x] Admin-managed announcements board for activities/trips
+- [x] Six-item mobile bottom navigation for member sections

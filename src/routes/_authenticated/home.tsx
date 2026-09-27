@@ -28,7 +28,7 @@ export const Route = createFileRoute("/_authenticated/home")({
 });
 
 const TABS = [
-  ["track", "🗓️ إنجازاتي"], ["cal", "📅 التقويم"], ["coach", "✨ مرشدي"], ["badges", "🏅 الأوسمة"], ["shop", "🎁 الهدايا"], ["board", "🏆 لوحة الشرف"],
+  ["track", "🗓️", "إنجازاتي"], ["cal", "📅", "التقويم"], ["coach", "✨", "مرشدي"], ["badges", "🏅", "الأوسمة"], ["shop", "🎁", "الهدايا"], ["board", "🏆", "الشرف"],
 ] as const;
 
 function Home() {
@@ -51,15 +51,18 @@ function Home() {
   }
 
   return (
-    <div className="pb-16">
+    <div className="pb-28 md:pb-16">
       <AppHeader name={p.full_name} avatar={p.avatar} isAdmin={me.isAdmin} />
       <main className="mx-auto max-w-6xl px-4">
+        <AnnouncementsBoard />
         <StatsHero name={p.full_name} avatar={p.avatar} />
-        <nav className="my-6 flex gap-2 overflow-x-auto">
-          {TABS.map(([k, l]) => (
+        <nav aria-label="أقسام التطبيق" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t-2 border-border bg-card/95 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-2xl backdrop-blur md:static md:my-6 md:flex md:gap-2 md:overflow-x-auto md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none">
+          {TABS.map(([k, icon, label]) => (
             <button key={k} onClick={() => setTab(k)}
-              className={`whitespace-nowrap rounded-2xl border-2 px-4 py-2 font-bold transition ${tab === k ? "border-primary bg-primary text-primary-foreground pop" : "border-border bg-card hover:bg-muted"}`}>
-              {l}
+              aria-current={tab === k ? "page" : undefined}
+              className={`flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-1 text-[10px] font-bold leading-tight transition md:flex-row md:gap-2 md:whitespace-nowrap md:rounded-2xl md:border-2 md:px-4 md:py-2 md:text-base ${tab === k ? "bg-primary text-primary-foreground md:border-primary md:pop" : "text-muted-foreground hover:bg-muted md:border-border md:bg-card md:text-foreground"}`}>
+              <span aria-hidden="true" className="text-xl leading-none md:text-base">{icon}</span>
+              <span className="w-full truncate text-center">{label}</span>
             </button>
           ))}
         </nav>
@@ -71,6 +74,42 @@ function Home() {
         {tab === "board" && <Board myId={me.user.id} />}
       </main>
     </div>
+  );
+}
+
+function AnnouncementsBoard() {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["announcements", "published"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("announcements").select("id,title,body,event_date,created_at").eq("published", true).order("created_at", { ascending: false }).limit(10);
+      if (error) throw error;
+      return data;
+    },
+  });
+  if (isLoading) return <section className="mb-5 h-32 animate-pulse rounded-3xl bg-card" aria-label="جاري تحميل الإعلانات" />;
+  if (isError) return <section className="mb-5 rounded-3xl border-2 border-destructive bg-card p-4 text-sm">تعذّر تحميل الإعلانات الآن.</section>;
+  return (
+    <section className="mb-5 overflow-hidden rounded-3xl border-2 border-primary bg-card pop" aria-labelledby="announcements-heading">
+      <div className="flex items-center gap-3 bg-primary px-4 py-3 text-primary-foreground">
+        <span className="text-3xl" aria-hidden="true">📣</span>
+        <div className="min-w-0"><h1 id="announcements-heading" className="text-xl font-extrabold">لوحة الإعلانات</h1><p className="text-xs font-bold opacity-80">أحدث الأنشطة والرحلات</p></div>
+      </div>
+      {!data?.length ? (
+        <div className="px-4 py-6 text-center text-sm text-muted-foreground">لا توجد إعلانات جديدة حاليًا.</div>
+      ) : (
+        <div className="divide-y divide-border">
+          {data.map((item) => (
+            <article key={item.id} className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 px-4 py-4">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-secondary text-2xl" aria-hidden="true">📌</div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-extrabold">{item.title}</h2>{item.event_date && <time className="rounded-full bg-muted px-2 py-1 text-xs font-bold">📅 {item.event_date}</time>}</div>
+                <p className="mt-1 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{item.body}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

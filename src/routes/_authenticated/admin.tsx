@@ -37,7 +37,7 @@ function useMembers() {
 }
 
 const TABS = [
-  ["summary", "📊 الملخص الأسبوعي"], ["requests", "📝 طلبات التسجيل"], ["members", "👥 المشتركون"],
+  ["summary", "📊 الملخص الأسبوعي"], ["announcements", "📣 الإعلانات"], ["requests", "📝 طلبات التسجيل"], ["members", "👥 المشتركون"],
   ["activities", "✅ الأنشطة"], ["redeem", "🎁 طلبات الهدايا"], ["log", "📒 سجل النقاط"],
   ["archive", "🗂️ الأرشيف والمقارنة"], ["gifts", "🛍️ الهدايا"], ["badges", "🏅 الأوسمة والنقاط"], ["notif", "🔔 الإشعارات"],
   ["audit", "🕵️ سجل التدقيق"], ["staff", "🔑 الصلاحيات"],
@@ -88,6 +88,7 @@ function Admin() {
           ))}
         </nav>
         {tab === "summary" && <Summary />}
+        {tab === "announcements" && <Announcements />}
         {tab === "requests" && <Requests />}
         {tab === "members" && <Members />}
         {tab === "activities" && <Activities />}
@@ -109,6 +110,78 @@ function Dot({ n }: { n: number }) {
 }
 const card = "rounded-3xl border-2 border-border bg-card p-4";
 const nameMap = (m?: Member[]) => Object.fromEntries((m ?? []).map((x) => [x.id, x]));
+
+/* ---------- Announcements ---------- */
+function Announcements() {
+  const qc = useQueryClient();
+  const empty = { title: "", body: "", event_date: "", published: true };
+  const [form, setForm] = useState(empty);
+  const [editing, setEditing] = useState<string | null>(null);
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-announcements"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("announcements").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+  const save = async () => {
+    if (!form.title.trim() || !form.body.trim()) return toast.error("اكتب عنوان الإعلان وتفاصيله");
+    const payload = { title: form.title.trim(), body: form.body.trim(), event_date: form.event_date || null, published: form.published };
+    if (editing) {
+      const { error } = await supabase.from("announcements").update({ ...payload, updated_at: new Date().toISOString() }).eq("id", editing);
+      if (error) return toast.error(error.message);
+      toast.success("تم تحديث الإعلان");
+    } else {
+      const { data: auth } = await supabase.auth.getUser();
+      const userId = auth.user?.id;
+      if (!userId) return toast.error("سجّل الدخول مرة أخرى");
+      const { error } = await supabase.from("announcements").insert({ ...payload, created_by: userId });
+      if (error) return toast.error(error.message);
+      toast.success("تم نشر الإعلان");
+    }
+    setForm(empty); setEditing(null); qc.invalidateQueries({ queryKey: ["admin-announcements"] }); qc.invalidateQueries({ queryKey: ["announcements"] });
+  };
+  const edit = (item: { id: string; title: string; body: string; event_date: string | null; published: boolean }) => {
+    setEditing(item.id); setForm({ title: item.title, body: item.body, event_date: item.event_date ?? "", published: item.published }); window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const toggle = async (id: string, published: boolean) => {
+    const { error } = await supabase.from("announcements").update({ published, updated_at: new Date().toISOString() }).eq("id", id);
+    if (error) return toast.error(error.message);
+    qc.invalidateQueries({ queryKey: ["admin-announcements"] }); qc.invalidateQueries({ queryKey: ["announcements"] });
+  };
+  const remove = async (id: string) => {
+    if (!confirm("حذف هذا الإعلان نهائيًا؟")) return;
+    const { error } = await supabase.from("announcements").delete().eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success("تم حذف الإعلان"); qc.invalidateQueries({ queryKey: ["admin-announcements"] }); qc.invalidateQueries({ queryKey: ["announcements"] });
+  };
+  return (
+    <div className="space-y-5">
+      <section className={card}>
+        <h2 className="mb-3 text-xl font-extrabold">{editing ? "تعديل الإعلان" : "إعلان جديد"}</h2>
+        <div className="grid gap-3 md:grid-cols-2">
+          <label className="text-sm font-bold">العنوان<Input className="mt-1" maxLength={120} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="مثال: رحلة الدير" /></label>
+          <label className="text-sm font-bold">تاريخ النشاط أو الرحلة (اختياري)<Input className="mt-1" type="date" value={form.event_date} onChange={(e) => setForm({ ...form, event_date: e.target.value })} /></label>
+          <label className="text-sm font-bold md:col-span-2">التفاصيل<textarea className="mt-1 min-h-28 w-full rounded-xl border border-input bg-transparent px-3 py-2 text-sm" maxLength={1500} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="اكتب المكان والموعد وأي تفاصيل مهمة" /></label>
+          <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={form.published} onChange={(e) => setForm({ ...form, published: e.target.checked })} /> ظاهر للمشتركين</label>
+          <div className="flex gap-2 md:justify-end"><button onClick={save} className="rounded-xl bg-primary px-5 py-2 font-extrabold text-primary-foreground">{editing ? "حفظ التعديل" : "نشر الإعلان"}</button>{editing && <button onClick={() => { setEditing(null); setForm(empty); }} className="rounded-xl bg-muted px-4 py-2 font-bold">إلغاء</button>}</div>
+        </div>
+      </section>
+      <section>
+        <h2 className="mb-3 text-xl font-extrabold">الإعلانات السابقة</h2>
+        {isLoading && <p className="text-muted-foreground">جاري التحميل...</p>}
+        {!isLoading && !data?.length && <p className="text-muted-foreground">لا توجد إعلانات بعد.</p>}
+        <div className="space-y-3">{data?.map((item) => (
+          <article key={item.id} className={`${card} grid grid-cols-[minmax(0,1fr)_auto] gap-3`}>
+            <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-extrabold">📌 {item.title}</h3><span className={`rounded-full px-2 py-0.5 text-xs font-bold ${item.published ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"}`}>{item.published ? "ظاهر" : "مخفي"}</span>{item.event_date && <span className="text-xs text-muted-foreground">📅 {item.event_date}</span>}</div><p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{item.body}</p></div>
+            <div className="flex shrink-0 flex-col gap-2"><button onClick={() => edit(item)} className="rounded-xl bg-secondary px-3 py-1.5 text-sm font-bold text-secondary-foreground">تعديل</button><button onClick={() => toggle(item.id, !item.published)} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold">{item.published ? "إخفاء" : "إظهار"}</button><button onClick={() => remove(item.id)} className="rounded-xl bg-destructive px-3 py-1.5 text-sm font-bold text-destructive-foreground">حذف</button></div>
+          </article>
+        ))}</div>
+      </section>
+    </div>
+  );
+}
 
 /* ---------- Weekly summary ---------- */
 function Summary({ initialOffset = 0 }: { initialOffset?: number }) {
