@@ -79,7 +79,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "أبطال الإيمان" },
+      { title: "E3DADY_BANIN_ELMALAK" },
       { name: "description", content: "تطبيق تحفيزي لمدارس الأحد" },
       { name: "theme-color", content: "#0f1a2e" },
       { property: "og:type", content: "website" },
