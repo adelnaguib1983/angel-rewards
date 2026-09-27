@@ -20,3 +20,6 @@
 - [x] AI weekly encouragement + next-week goal (AI Gateway)
 - [x] Forgot password + reset page
 - [x] Admin login entry
+
+- [ ] Admin-managed announcements board for activities/trips
+- [ ] Six-item mobile bottom navigation for member sections
