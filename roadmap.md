@@ -15,3 +15,8 @@
 - [x] Contact-info access: owner grants/revokes permission; audit log of views (filters date/admin, CSV)
 - [x] CSV: week dates, shared ranks, tie indicator
 - [x] Weekly archive of past rankings + chart comparing academic-year groups across weeks
+- [ ] Streak rewards: bonus badges for consecutive active weeks + progress to next
+- [ ] Interactive monthly calendar of done/remaining activities
+- [ ] AI weekly encouragement + next-week goal (AI Gateway)
+- [ ] Forgot password + reset page
+- [ ] Admin login entry
