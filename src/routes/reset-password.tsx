@@ -24,7 +24,7 @@ function ResetPassword() {
   const [pw2, setPw2] = useState("");
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
-  async function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent): Promise<unknown> {
     e.preventDefault();
     if (pw !== pw2) return toast.error("كلمتا المرور غير متطابقتين");
     setBusy(true);
