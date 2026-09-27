@@ -24,13 +24,19 @@ function ResetPassword() {
   const [pw2, setPw2] = useState("");
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
-  async function submit(e: React.FormEvent): Promise<unknown> {
+  async function submit(e: React.FormEvent): Promise<void> {
     e.preventDefault();
-    if (pw !== pw2) return toast.error("كلمتا المرور غير متطابقتين");
+    if (pw !== pw2) {
+      toast.error("كلمتا المرور غير متطابقتين");
+      return;
+    }
     setBusy(true);
     const { error } = await supabase.auth.updateUser({ password: pw });
     setBusy(false);
-    if (error) return toast.error("انتهت صلاحية الرابط، اطلب رابطًا جديدًا");
+    if (error) {
+      toast.error("انتهت صلاحية الرابط، اطلب رابطًا جديدًا");
+      return;
+    }
     toast.success("تم تغيير كلمة المرور");
     navigate({ to: "/home" });
   }
