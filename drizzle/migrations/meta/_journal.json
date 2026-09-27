@@ -29,6 +29,13 @@
       "when": 1790458228209,
       "tag": "0003_contact_permissions_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790488814012,
+      "tag": "0004_create_announcements",
+      "breakpoints": true
     }
   ]
 }
