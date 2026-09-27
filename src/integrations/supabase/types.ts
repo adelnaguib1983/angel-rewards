@@ -109,6 +109,39 @@ export type Database = {
         }
         Relationships: []
       }
+      announcements: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string
+          event_date: string | null
+          id: string
+          published: boolean
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by: string
+          event_date?: string | null
+          id?: string
+          published?: boolean
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string
+          event_date?: string | null
+          id?: string
+          published?: boolean
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       badges: {
         Row: {
           created_at: string
