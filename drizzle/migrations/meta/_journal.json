@@ -36,6 +36,13 @@
       "when": 1790488814012,
       "tag": "0004_create_announcements",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790556657161,
+      "tag": "0005_signups_quizzes_photos_locks",
+      "breakpoints": true
     }
   ]
 }

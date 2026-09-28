@@ -109,6 +109,35 @@ export type Database = {
         }
         Relationships: []
       }
+      announcement_signups: {
+        Row: {
+          announcement_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          announcement_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          announcement_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_signups_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "announcements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       announcements: {
         Row: {
           body: string
@@ -116,6 +145,7 @@ export type Database = {
           created_by: string
           event_date: string | null
           id: string
+          image_url: string | null
           published: boolean
           title: string
           updated_at: string
@@ -126,6 +156,7 @@ export type Database = {
           created_by: string
           event_date?: string | null
           id?: string
+          image_url?: string | null
           published?: boolean
           title: string
           updated_at?: string
@@ -136,6 +167,7 @@ export type Database = {
           created_by?: string
           event_date?: string | null
           id?: string
+          image_url?: string | null
           published?: boolean
           title?: string
           updated_at?: string
@@ -223,6 +255,41 @@ export type Database = {
         }
         Relationships: []
       }
+      member_notifications: {
+        Row: {
+          announcement_id: string | null
+          created_at: string
+          id: string
+          message: string
+          read: boolean
+          user_id: string
+        }
+        Insert: {
+          announcement_id?: string | null
+          created_at?: string
+          id?: string
+          message: string
+          read?: boolean
+          user_id: string
+        }
+        Update: {
+          announcement_id?: string | null
+          created_at?: string
+          id?: string
+          message?: string
+          read?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_notifications_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "announcements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           actor_id: string | null
@@ -291,6 +358,7 @@ export type Database = {
           full_name: string
           id: string
           phone: string | null
+          photo_url: string | null
           status: string
         }
         Insert: {
@@ -303,6 +371,7 @@ export type Database = {
           full_name?: string
           id: string
           phone?: string | null
+          photo_url?: string | null
           status?: string
         }
         Update: {
@@ -315,7 +384,105 @@ export type Database = {
           full_name?: string
           id?: string
           phone?: string | null
+          photo_url?: string | null
           status?: string
+        }
+        Relationships: []
+      }
+      quiz_attempts: {
+        Row: {
+          created_at: string
+          id: string
+          max_score: number
+          quiz_id: string
+          score: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          max_score: number
+          quiz_id: string
+          score: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          max_score?: number
+          quiz_id?: string
+          score?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_attempts_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_questions: {
+        Row: {
+          correct: number
+          id: string
+          options: string[]
+          points: number
+          question: string
+          quiz_id: string
+          sort: number
+        }
+        Insert: {
+          correct: number
+          id?: string
+          options: string[]
+          points?: number
+          question: string
+          quiz_id: string
+          sort?: number
+        }
+        Update: {
+          correct?: number
+          id?: string
+          options?: string[]
+          points?: number
+          question?: string
+          quiz_id?: string
+          sort?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_questions_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quizzes: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          published: boolean
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          published?: boolean
+          title: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          published?: boolean
+          title?: string
         }
         Relationships: []
       }
@@ -397,6 +564,16 @@ export type Database = {
           status: string
         }[]
       }
+      admin_quiz_results: {
+        Args: { _quiz: string }
+        Returns: {
+          academic_year: string
+          created_at: string
+          full_name: string
+          max_score: number
+          score: number
+        }[]
+      }
       admin_review_log: {
         Args: {
           _log_id: string
@@ -410,6 +587,15 @@ export type Database = {
         Args: { _id: string; _note: string; _status: string }
         Returns: undefined
       }
+      admin_signups: {
+        Args: { _ann: string }
+        Returns: {
+          academic_year: string
+          created_at: string
+          full_name: string
+          user_id: string
+        }[]
+      }
       balance_of: { Args: { _uid: string }; Returns: number }
       can_view_contacts: { Args: { _uid: string }; Returns: boolean }
       has_role: {
@@ -420,6 +606,10 @@ export type Database = {
         Returns: boolean
       }
       is_approved: { Args: { _uid: string }; Returns: boolean }
+      is_current_week: {
+        Args: { _m: number; _w: number; _y: number }
+        Returns: boolean
+      }
       is_owner: { Args: { _uid: string }; Returns: boolean }
       leaderboard: {
         Args: never
@@ -456,7 +646,24 @@ export type Database = {
         Returns: undefined
       }
       points_of: { Args: { _uid: string }; Returns: number }
+      quiz_questions_for: {
+        Args: { _quiz: string }
+        Returns: {
+          id: string
+          options: string[]
+          points: number
+          question: string
+        }[]
+      }
       redeem_gift: { Args: { _gift_id: string }; Returns: undefined }
+      signup_counts: {
+        Args: never
+        Returns: {
+          announcement_id: string
+          n: number
+        }[]
+      }
+      submit_quiz: { Args: { _answers: Json; _quiz: string }; Returns: Json }
       update_my_contact: {
         Args: {
           _academic_year: string
@@ -467,6 +674,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_my_photo: { Args: { _photo: string }; Returns: undefined }
       update_my_profile: {
         Args: { _avatar: string; _class: string; _name: string }
         Returns: undefined
