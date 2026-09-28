@@ -1,25 +1,21 @@
 # Roadmap
 - [x] Database: profiles/approval, roles, activities, badges, gifts, redemptions, point adjustments log, notifications
 - [x] Auth (email + Google) with admin approval gate
-- [x] Kid app: weekly tracker (4 weeks), verse, points, levels, badges, gift catalog + redemption status, leaderboard
-- [x] Admin: approvals, activity review + edit points, adjustments log with reason, notifications, gifts/badges management, redemption status
-- [x] Admin weekly summary (completed activities, points, top members)
-- [x] Redemption statuses: pending/approved/delivered/rejected (decided)
-- [x] Weekly summary = Sunday–Saturday, Africa/Cairo (decided)
-- [x] Weekly top ranking (Sun–Sat Cairo)
-- [x] Member academic year + contact info (name, birth date, mobile, address)
-- [x] Weekly summary CSV export
-- [x] Weekly ranking rules: ties share rank (1,1,3), tiebreak display by activities; resets Sunday 00:00 Cairo
-- [x] Validate mobile (Egypt 01xxxxxxxxx) + birth date; contact info visible to self + admins only
-- [x] Filter ranking/summary by academic year
-- [x] Contact-info access: owner grants/revokes permission; audit log of views (filters date/admin, CSV)
-- [x] CSV: week dates, shared ranks, tie indicator
-- [x] Weekly archive of past rankings + chart comparing academic-year groups across weeks
-- [x] Streak rewards: bonus badges for consecutive active weeks + progress to next
-- [x] Interactive monthly calendar of done/remaining activities
-- [x] AI weekly encouragement + next-week goal (AI Gateway)
-- [x] Forgot password + reset page
-- [x] Admin login entry
+- [x] Kid app: weekly tracker, verse, points, levels, badges, gift catalog, leaderboard
+- [x] Admin: approvals, activity review, adjustments log, notifications, gifts/badges, redemptions
+- [x] Weekly summary, ranking, archive, CSV, contact access + audit
+- [x] Streaks, calendar, AI coach, forgot password, admin login entry
+- [x] Announcements board + six-item mobile bottom navigation
 
-- [x] Admin-managed announcements board for activities/trips
-- [x] Six-item mobile bottom navigation for member sections
+- [ ] Sign up for trips/activities from announcements + registrant list for admin
+- [ ] Member alert on new announcement, opens it directly
+- [ ] Admin adds new activities with points
+- [ ] Photos: member profile photo + announcement image
+- [ ] Signup requires all basic data (name, birth date, mobile, address, academic year) + admin approval
+- [ ] Weekly summary: clickable cards (completed activities by member, points per member, approved members list)
+- [ ] Show "أهلا يا بطل" instead of "المستوى 1" above member name
+- [ ] Remove "لوحتي"/"لوحة المشرف" header links; keep خروج; role chosen from login page
+- [ ] Admin can remove members
+- [ ] Keep app installable with same icon/look
+- [ ] Weekly competitions graded with points
+- [ ] Members cannot edit past activities or log outside the current week
