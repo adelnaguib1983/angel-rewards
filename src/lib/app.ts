@@ -38,7 +38,7 @@ export function useMe() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
       const [{ data: profile }, { data: roles }] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, class_name, avatar, status, created_at, academic_year").eq("id", user.id).maybeSingle(),
+        supabase.from("profiles").select("id, full_name, class_name, avatar, photo_url, status, created_at, academic_year").eq("id", user.id).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", user.id),
       ]);
       return { user, profile, isAdmin: !!roles?.some((r) => r.role === "admin") };
@@ -88,3 +88,22 @@ export function validateContact(v: { phone?: string; birth_date?: string }) {
   return null;
 }
 export const ACADEMIC_YEARS = ["خامسة ابتدائي","سادسة ابتدائي","أولى إعدادي","ثانية إعدادي","ثالثة إعدادي","أولى ثانوي"];
+
+/** Resize an image file into a compact JPEG data URL (stored directly with the record). */
+export function fileToDataUrl(file: File, max = 480, quality = 0.8): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith("image/")) return reject(new Error("اختر ملف صورة"));
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const s = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+      c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => reject(new Error("تعذر قراءة الصورة"));
+    img.src = url;
+  });
+}
