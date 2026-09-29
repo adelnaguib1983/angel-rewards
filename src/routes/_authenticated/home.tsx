@@ -37,7 +37,7 @@ function Home() {
   if (isLoading || !me) return <div className="p-10 text-center">...</div>;
   const p = me.profile;
 
-  if (!p || p.status !== "approved") {
+  if (!me.isAdmin && (!p || p.status !== "approved")) {
     return (
       <>
         <AppHeader name={p?.full_name} avatar={p?.avatar} />
@@ -52,10 +52,10 @@ function Home() {
 
   return (
     <div className="pb-28 md:pb-16">
-      <AppHeader name={p.full_name} avatar={p.avatar} isAdmin={me.isAdmin} />
+      <AppHeader name={p?.full_name} avatar={p?.avatar} isAdmin={me.isAdmin} />
       <main className="mx-auto max-w-6xl px-4">
         <AnnouncementsBoard />
-        <StatsHero name={p.full_name} avatar={p.avatar} />
+        <StatsHero name={p?.full_name ?? ""} avatar={p?.avatar ?? "🦁"} />
         <nav aria-label="أقسام التطبيق" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t-2 border-border bg-card/95 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-2xl backdrop-blur md:static md:my-6 md:flex md:gap-2 md:overflow-x-auto md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none">
           {TABS.map(([k, icon, label]) => (
             <button key={k} onClick={() => setTab(k)}
