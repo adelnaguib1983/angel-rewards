@@ -215,6 +215,8 @@ function Summary({ initialOffset = 0 }: { initialOffset?: number }) {
   const names = nameMap(members);
   const perActivity = settings?.map((s) => ({ ...s, n: logs.filter((l) => l.activity === s.key).length ?? 0 })) ?? [];
   const total = logs.reduce((a, l) => a + l.points, 0);
+  const [detail, setDetail] = useState<null | "acts" | "points" | "approved">(null);
+  const approvedList = (members ?? []).filter((m) => m.status === "approved" && (!year || m.academic_year === year));
 
   function exportCsv() {
     const head = ["من تاريخ", "إلى تاريخ", "المركز", "تعادل", "الاسم", "العام الدراسي", "الفصل", "النقاط", "عدد الأنشطة", ...(settings?.map((s) => s.label) ?? [])];
@@ -241,11 +243,26 @@ function Summary({ initialOffset = 0 }: { initialOffset?: number }) {
         <button onClick={exportCsv} className="pop rounded-2xl bg-accent px-4 py-2 font-extrabold text-accent-foreground">⬇️ تصدير CSV</button>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="أنشطة مكتملة" v={logs.length} cls="bg-primary text-primary-foreground" />
-        <Stat label="نقاط مكتسبة" v={total} cls="bg-secondary text-secondary-foreground" />
-        <Stat label="أعضاء مشاركون" v={byMember.length} cls="bg-accent text-accent-foreground" />
-        <Stat label="إجمالي المفعّلين" v={members?.filter((m) => m.status === "approved" && (!year || m.academic_year === year)).length ?? 0} cls="bg-sky text-primary-foreground" />
+        <Stat label="أنشطة مكتملة" v={logs.length} cls="bg-primary text-primary-foreground" onClick={() => setDetail("acts")} />
+        <Stat label="نقاط مكتسبة" v={total} cls="bg-secondary text-secondary-foreground" onClick={() => setDetail("points")} />
+        <Stat label="أعضاء مشاركون" v={byMember.length} cls="bg-accent text-accent-foreground" onClick={() => setDetail("points")} />
+        <Stat label="إجمالي المفعّلين" v={approvedList.length} cls="bg-sky text-primary-foreground" onClick={() => setDetail("approved")} />
       </div>
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent className="max-h-[80vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{detail === "acts" ? "الأنشطة المكتملة" : detail === "points" ? "النقاط لكل مشترك" : "المشتركون المفعّلون"}</DialogTitle></DialogHeader>
+          {detail === "acts" && (logs.length ? [...logs].sort((a, b) => b.created_at.localeCompare(a.created_at)).map((l) => {
+            const s = settings?.find((x) => x.key === l.activity);
+            return <div key={l.id} className="flex items-center gap-2 border-b border-border py-2 text-sm last:border-0"><span>{s?.emoji}</span><span className="flex-1">{s?.label ?? l.activity}</span><b>{names[l.user_id]?.full_name ?? "—"}</b><span className="text-xs text-muted-foreground">{cairoDate(l.created_at)}</span></div>;
+          }) : <p className="text-muted-foreground">لا توجد أنشطة.</p>)}
+          {detail === "points" && (byMember.length ? byMember.map((r) => (
+            <div key={r.id} className="flex items-center gap-2 border-b border-border py-2 text-sm last:border-0"><b className="w-8">{r.tied ? `=${r.rank}` : r.rank}</b><span>{names[r.id]?.avatar}</span><span className="flex-1">{names[r.id]?.full_name}</span><span className="text-xs text-muted-foreground">{r.count} نشاط</span><b className="text-primary">{r.points}</b></div>
+          )) : <p className="text-muted-foreground">لا توجد نقاط.</p>)}
+          {detail === "approved" && approvedList.map((m) => (
+            <div key={m.id} className="flex items-center gap-2 border-b border-border py-2 text-sm last:border-0"><span>{m.avatar}</span><span className="flex-1">{m.full_name}</span><span className="text-xs text-muted-foreground">{m.academic_year ?? ""}</span></div>
+          ))}
+        </DialogContent>
+      </Dialog>
       <div className="grid gap-4 md:grid-cols-2">
         <div className={card}>
           <h3 className="mb-3 font-extrabold">الأنشطة المكتملة</h3>
@@ -270,8 +287,8 @@ function Summary({ initialOffset = 0 }: { initialOffset?: number }) {
     </div>
   );
 }
-function Stat({ label, v, cls }: { label: string; v: number; cls: string }) {
-  return <div className={`pop rounded-3xl p-4 ${cls}`}><div className="text-sm font-bold">{label}</div><div className="font-display text-3xl font-extrabold">{v}</div></div>;
+function Stat({ label, v, cls, onClick }: { label: string; v: number; cls: string; onClick?: () => void }) {
+  return <button type="button" onClick={onClick} className={`pop rounded-3xl p-4 text-right transition hover:scale-[1.02] ${cls}`}><div className="text-sm font-bold">{label} ›</div><div className="font-display text-3xl font-extrabold">{v}</div></button>;
 }
 
 /* ---------- Requests ---------- */
@@ -374,6 +391,12 @@ function Members() {
               <div className="text-center"><div className="text-xs text-muted-foreground">الرصيد</div><b>{m.balance}</b></div>
               <button onClick={() => setOpen(open === m.id ? null : m.id)} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold">التفاصيل</button>
               <button onClick={() => { setAdj(m); setAmount(10); }} className="rounded-xl bg-secondary px-3 py-1.5 text-sm font-bold text-secondary-foreground">± تعديل النقاط</button>
+              <button onClick={async () => {
+                if (!confirm(`إزالة ${m.full_name} نهائيًا من البرنامج؟ سيتم حذف كل بياناته.`)) return;
+                const { error } = await supabase.rpc("admin_remove_member", { _member: m.id });
+                if (error) return toast.error(error.message);
+                toast.success("تمت إزالة المشترك"); qc.invalidateQueries();
+              }} className="rounded-xl bg-destructive px-3 py-1.5 text-sm font-bold text-destructive-foreground">🗑️ إزالة</button>
             </div>
             {open === m.id && pmap[m.id] && <Contact p={pmap[m.id]} />}
           </div>
