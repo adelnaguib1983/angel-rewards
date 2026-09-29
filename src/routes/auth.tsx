@@ -43,11 +43,12 @@ function AuthPage() {
       if (mode === "up") {
         const bad = validateContact({ phone, birth_date: birth });
         if (bad) throw new Error(bad);
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email, password,
           options: { emailRedirectTo: window.location.origin, data: { full_name: name.trim(), class_name: cls, academic_year: year, birth_date: birth, phone: phone.trim(), address: address.trim() } },
         });
         if (error) throw error;
+        if (data.session) { navigate({ to: "/home" }); return; }
         setSent("signup");
       } else if (mode === "forgot") {
         const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
@@ -98,8 +99,8 @@ function AuthPage() {
             <div className="text-5xl">📬</div>
             {sent === "signup" ? (
               <>
-                <p className="mt-3 font-bold">افتح بريدك واضغط رابط التأكيد.</p>
-                <p className="mt-2 text-sm text-muted-foreground">بعدها ينتظر حسابك موافقة الخادم قبل التفعيل.</p>
+                <p className="mt-3 font-bold">تم إرسال طلب التسجيل.</p>
+                <p className="mt-2 text-sm text-muted-foreground">سجّل دخولك، وسيتم تفعيل حسابك بعد موافقة المشرف.</p>
               </>
             ) : <p className="mt-3 font-bold">أرسلنا رابط تغيير كلمة المرور إلى بريدك.</p>}
           </div>
