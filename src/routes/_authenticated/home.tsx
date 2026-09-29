@@ -36,6 +36,7 @@ const TABS = [
 function Home() {
   const { data: me, isLoading } = useMe();
   const [tab, setTab] = useState<(typeof TABS)[number][0]>("track");
+  const [fill, setFill] = useState(false);
   if (isLoading || !me) return <div className="p-10 text-center">...</div>;
   const p = me.profile;
 
@@ -47,6 +48,8 @@ function Home() {
           <div className="text-6xl">{p?.status === "rejected" ? "🚫" : "⏳"}</div>
           <h1 className="mt-4 text-2xl font-extrabold">{p?.status === "rejected" ? "لم تتم الموافقة على الحساب" : "طلبك قيد المراجعة"}</h1>
           <p className="mt-2 text-muted-foreground">{p?.status === "rejected" ? "تواصل مع خادم الفصل." : "سيتم تفعيل حسابك بعد موافقة الخادم. ارجع قريبًا!"}</p>
+          {p?.status !== "rejected" && <button onClick={() => setFill(true)} className="pop mt-4 rounded-2xl bg-primary px-5 py-2 font-extrabold text-primary-foreground">📝 {p?.academic_year ? "مراجعة بياناتي" : "أكمل بياناتك الأساسية"}</button>}
+          <ContactDialog open={fill || (!!p && !p.academic_year && fill !== null)} onOpenChange={(o) => setFill(o ? true : null)} />
         </div>
       </>
     );
