@@ -43,6 +43,13 @@
       "when": 1790556657161,
       "tag": "0005_signups_quizzes_photos_locks",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790640821729,
+      "tag": "0006_profile_photo_grant_remove_member",
+      "breakpoints": true
     }
   ]
 }

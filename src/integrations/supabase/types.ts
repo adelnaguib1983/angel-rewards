@@ -574,6 +574,7 @@ export type Database = {
           score: number
         }[]
       }
+      admin_remove_member: { Args: { _member: string }; Returns: undefined }
       admin_review_log: {
         Args: {
           _log_id: string
