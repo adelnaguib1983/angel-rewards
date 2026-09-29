@@ -7,15 +7,15 @@
 - [x] Streaks, calendar, AI coach, forgot password, admin login entry
 - [x] Announcements board + six-item mobile bottom navigation
 
-- [ ] Sign up for trips/activities from announcements + registrant list for admin
-- [ ] Member alert on new announcement, opens it directly
-- [ ] Admin adds new activities with points
-- [ ] Photos: member profile photo + announcement image
-- [ ] Signup requires all basic data (name, birth date, mobile, address, academic year) + admin approval
-- [ ] Weekly summary: clickable cards (completed activities by member, points per member, approved members list)
-- [ ] Show "أهلا يا بطل" instead of "المستوى 1" above member name
-- [ ] Remove "لوحتي"/"لوحة المشرف" header links; keep خروج; role chosen from login page
-- [ ] Admin can remove members
-- [ ] Keep app installable with same icon/look
-- [ ] Weekly competitions graded with points
-- [ ] Members cannot edit past activities or log outside the current week
+- [x] Sign up for trips/activities from announcements + registrant list for admin
+- [x] Member alert on new announcement, opens it directly
+- [x] Admin adds new activities with points
+- [x] Photos: member profile photo + announcement image
+- [x] Signup requires all basic data (name, birth date, mobile, address, academic year) + admin approval
+- [x] Weekly summary: clickable cards (completed activities by member, points per member, approved members list)
+- [x] Show "أهلا يا بطل" instead of "المستوى 1" above member name
+- [x] Remove "لوحتي"/"لوحة المشرف" header links; keep خروج; role chosen from login page
+- [x] Admin can remove members
+- [x] Keep app installable with same icon/look
+- [x] Weekly competitions graded with points
+- [x] Members cannot edit past activities or log outside the current week

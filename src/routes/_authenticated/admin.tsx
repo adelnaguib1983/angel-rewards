@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
-import { PROFILE_COLS, ACADEMIC_YEARS, MONTHS, REDEEM_STATUS, cairoDate, cairoWeek, useMe, useSettings } from "@/lib/app";
+import { PROFILE_COLS, ACADEMIC_YEARS, MONTHS, REDEEM_STATUS, cairoDate, cairoWeek, useMe, useSettings, fileToDataUrl } from "@/lib/app";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -39,7 +39,7 @@ function useMembers() {
 const TABS = [
   ["summary", "📊 الملخص الأسبوعي"], ["announcements", "📣 الإعلانات"], ["requests", "📝 طلبات التسجيل"], ["members", "👥 المشتركون"],
   ["activities", "✅ الأنشطة"], ["redeem", "🎁 طلبات الهدايا"], ["log", "📒 سجل النقاط"],
-  ["archive", "🗂️ الأرشيف والمقارنة"], ["gifts", "🛍️ الهدايا"], ["badges", "🏅 الأوسمة والنقاط"], ["notif", "🔔 الإشعارات"],
+  ["archive", "🗂️ الأرشيف والمقارنة"], ["gifts", "🛍️ الهدايا"], ["badges", "🏅 الأوسمة والنقاط"], ["notif", "🔔 الإشعارات"], ["quiz", "🧠 المسابقات"],
   ["audit", "🕵️ سجل التدقيق"], ["staff", "🔑 الصلاحيات"],
 ] as const;
 type Tab = (typeof TABS)[number][0];
@@ -97,6 +97,7 @@ function Admin() {
         {tab === "gifts" && <Gifts />}
         {tab === "badges" && <BadgesAndPoints />}
         {tab === "notif" && <Notifications />}
+        {tab === "quiz" && <AdminQuizzes />}
         {tab === "archive" && <Archive />}
         {tab === "audit" && perms?.owner && <Audit />}
         {tab === "staff" && perms?.owner && <Staff />}
@@ -114,7 +115,9 @@ const nameMap = (m?: Member[]) => Object.fromEntries((m ?? []).map((x) => [x.id,
 /* ---------- Announcements ---------- */
 function Announcements() {
   const qc = useQueryClient();
-  const empty = { title: "", body: "", event_date: "", published: true };
+  const empty = { title: "", body: "", event_date: "", published: true, image_url: "" };
+  const [signupsFor, setSignupsFor] = useState<{ id: string; title: string } | null>(null);
+  const { data: signups } = useQuery({ queryKey: ["admin-signups", signupsFor?.id], enabled: !!signupsFor, queryFn: async () => (await supabase.rpc("admin_signups", { _ann: signupsFor.id })).data ?? [] });
   const [form, setForm] = useState(empty);
   const [editing, setEditing] = useState<string | null>(null);
   const { data, isLoading } = useQuery({
@@ -127,7 +130,7 @@ function Announcements() {
   });
   const save = async () => {
     if (!form.title.trim() || !form.body.trim()) return toast.error("اكتب عنوان الإعلان وتفاصيله");
-    const payload = { title: form.title.trim(), body: form.body.trim(), event_date: form.event_date || null, published: form.published };
+    const payload = { title: form.title.trim(), body: form.body.trim(), event_date: form.event_date || null, published: form.published, image_url: form.image_url || null };
     if (editing) {
       const { error } = await supabase.from("announcements").update({ ...payload, updated_at: new Date().toISOString() }).eq("id", editing);
       if (error) return toast.error(error.message);
@@ -143,7 +146,7 @@ function Announcements() {
     setForm(empty); setEditing(null); qc.invalidateQueries({ queryKey: ["admin-announcements"] }); qc.invalidateQueries({ queryKey: ["announcements"] });
   };
   const edit = (item: { id: string; title: string; body: string; event_date: string | null; published: boolean }) => {
-    setEditing(item.id); setForm({ title: item.title, body: item.body, event_date: item.event_date ?? "", published: item.published }); window.scrollTo({ top: 0, behavior: "smooth" });
+    setEditing(item.id); setForm({ title: item.title, body: item.body, event_date: item.event_date ?? "", published: item.published, image_url: item.image_url ?? "" }); window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const toggle = async (id: string, published: boolean) => {
     const { error } = await supabase.from("announcements").update({ published, updated_at: new Date().toISOString() }).eq("id", id);
@@ -164,6 +167,11 @@ function Announcements() {
           <label className="text-sm font-bold">العنوان<Input className="mt-1" maxLength={120} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="مثال: رحلة الدير" /></label>
           <label className="text-sm font-bold">تاريخ النشاط أو الرحلة (اختياري)<Input className="mt-1" type="date" value={form.event_date} onChange={(e) => setForm({ ...form, event_date: e.target.value })} /></label>
           <label className="text-sm font-bold md:col-span-2">التفاصيل<textarea className="mt-1 min-h-28 w-full rounded-xl border border-input bg-transparent px-3 py-2 text-sm" maxLength={1500} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="اكتب المكان والموعد وأي تفاصيل مهمة" /></label>
+          <div className="md:col-span-2 flex flex-wrap items-center gap-3">
+            <label className="cursor-pointer rounded-xl border-2 border-dashed border-border px-4 py-2 text-sm font-bold hover:bg-muted">📷 {form.image_url ? "تغيير الصورة" : "إضافة صورة"}
+              <input type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; try { setForm({ ...form, image_url: await fileToDataUrl(f, 1000, 0.75) }); } catch (err) { toast.error((err as Error).message); } }} /></label>
+            {form.image_url && <><img src={form.image_url} alt="" className="h-16 rounded-xl object-cover" /><button onClick={() => setForm({ ...form, image_url: "" })} className="text-sm text-destructive">إزالة</button></>}
+          </div>
           <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={form.published} onChange={(e) => setForm({ ...form, published: e.target.checked })} /> ظاهر للمشتركين</label>
           <div className="flex gap-2 md:justify-end"><button onClick={save} className="rounded-xl bg-primary px-5 py-2 font-extrabold text-primary-foreground">{editing ? "حفظ التعديل" : "نشر الإعلان"}</button>{editing && <button onClick={() => { setEditing(null); setForm(empty); }} className="rounded-xl bg-muted px-4 py-2 font-bold">إلغاء</button>}</div>
         </div>
@@ -174,11 +182,20 @@ function Announcements() {
         {!isLoading && !data?.length && <p className="text-muted-foreground">لا توجد إعلانات بعد.</p>}
         <div className="space-y-3">{data?.map((item) => (
           <article key={item.id} className={`${card} grid grid-cols-[minmax(0,1fr)_auto] gap-3`}>
-            <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-extrabold">📌 {item.title}</h3><span className={`rounded-full px-2 py-0.5 text-xs font-bold ${item.published ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"}`}>{item.published ? "ظاهر" : "مخفي"}</span>{item.event_date && <span className="text-xs text-muted-foreground">📅 {item.event_date}</span>}</div><p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{item.body}</p></div>
-            <div className="flex shrink-0 flex-col gap-2"><button onClick={() => edit(item)} className="rounded-xl bg-secondary px-3 py-1.5 text-sm font-bold text-secondary-foreground">تعديل</button><button onClick={() => toggle(item.id, !item.published)} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold">{item.published ? "إخفاء" : "إظهار"}</button><button onClick={() => remove(item.id)} className="rounded-xl bg-destructive px-3 py-1.5 text-sm font-bold text-destructive-foreground">حذف</button></div>
+            <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-extrabold">📌 {item.title}</h3><span className={`rounded-full px-2 py-0.5 text-xs font-bold ${item.published ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"}`}>{item.published ? "ظاهر" : "مخفي"}</span>{item.event_date && <span className="text-xs text-muted-foreground">📅 {item.event_date}</span>}</div>{item.image_url && <img src={item.image_url} alt="" className="mt-2 max-h-40 rounded-xl object-cover" />}<p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{item.body}</p></div>
+            <div className="flex shrink-0 flex-col gap-2"><button onClick={() => setSignupsFor({ id: item.id, title: item.title })} className="rounded-xl bg-primary px-3 py-1.5 text-sm font-bold text-primary-foreground">🙋 المسجلون</button><button onClick={() => edit(item)} className="rounded-xl bg-secondary px-3 py-1.5 text-sm font-bold text-secondary-foreground">تعديل</button><button onClick={() => toggle(item.id, !item.published)} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold">{item.published ? "إخفاء" : "إظهار"}</button><button onClick={() => remove(item.id)} className="rounded-xl bg-destructive px-3 py-1.5 text-sm font-bold text-destructive-foreground">حذف</button></div>
           </article>
         ))}</div>
       </section>
+      <Dialog open={!!signupsFor} onOpenChange={(o) => !o && setSignupsFor(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>المسجلون في: {signupsFor?.title} ({signups?.length ?? 0})</DialogTitle></DialogHeader>
+          <div className="max-h-96 space-y-1 overflow-y-auto">
+            {!signups?.length && <p className="text-muted-foreground">لا يوجد مسجلون بعد.</p>}
+            {signups?.map((r, i) => <div key={r.user_id} className="flex justify-between gap-2 rounded-xl bg-muted p-2 text-sm"><span className="font-bold">{i + 1}. {r.full_name}</span><span className="text-muted-foreground">{r.academic_year ?? ""} · {new Date(r.created_at).toLocaleString("ar-EG")}</span></div>)}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -601,6 +618,14 @@ function BadgesAndPoints() {
   const { data: settings } = useSettings();
   const { data: badges } = useQuery({ queryKey: ["badges"], queryFn: async () => (await supabase.from("badges").select("*").order("threshold")).data ?? [] });
   const [f, setF] = useState({ name: "", emoji: "🏅", description: "", threshold: 100 });
+  const [na, setNa] = useState({ label: "", emoji: "⭐", points: 10 });
+  const addActivity = async () => {
+    if (!na.label.trim()) return toast.error("اكتب اسم النشاط");
+    const key = "a_" + Date.now().toString(36);
+    const { error } = await supabase.from("activity_settings").insert({ key, label: na.label.trim(), emoji: na.emoji || "⭐", points: na.points, sort: (settings?.length ?? 0) + 1 });
+    if (error) return toast.error(error.message);
+    toast.success("تمت إضافة النشاط"); setNa({ label: "", emoji: "⭐", points: 10 }); qc.invalidateQueries({ queryKey: ["settings"] });
+  };
   const addBadge = async () => {
     if (!f.name.trim()) return;
     const { error } = await supabase.from("badges").insert(f);
@@ -622,6 +647,13 @@ function BadgesAndPoints() {
           </div>
         ))}
         <p className="text-xs text-muted-foreground">التغيير يطبق على التسجيلات الجديدة فقط.</p>
+        <h4 className="mt-4 mb-2 font-extrabold">➕ نشاط جديد</h4>
+        <div className="grid grid-cols-6 gap-2">
+          <Input value={na.emoji} onChange={(e) => setNa({ ...na, emoji: e.target.value })} />
+          <Input className="col-span-3" value={na.label} onChange={(e) => setNa({ ...na, label: e.target.value })} placeholder="اسم النشاط" />
+          <Input type="number" value={na.points} onChange={(e) => setNa({ ...na, points: +e.target.value })} title="النقاط" />
+          <button onClick={addActivity} className="rounded-xl bg-primary font-bold text-primary-foreground">إضافة</button>
+        </div>
       </div>
       <div className={card}>
         <h3 className="mb-3 font-extrabold">الأوسمة</h3>
@@ -827,6 +859,67 @@ function Staff() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/* ---------- Quizzes ---------- */
+function AdminQuizzes() {
+  const qc = useQueryClient();
+  const blank = () => ({ question: "", options: ["", "", "", ""], correct: 0, points: 5 });
+  const [title, setTitle] = useState("");
+  const [qs, setQs] = useState([blank()]);
+  const [results, setResults] = useState<{ id: string; title: string } | null>(null);
+  const { data: quizzes } = useQuery({ queryKey: ["admin-quizzes"], queryFn: async () => (await supabase.from("quizzes").select("*").order("created_at", { ascending: false })).data ?? [] });
+  const { data: res } = useQuery({ queryKey: ["quiz-res", results?.id], enabled: !!results, queryFn: async () => (await supabase.rpc("admin_quiz_results", { _quiz: results.id })).data ?? [] });
+  const upd = (i, patch) => setQs(qs.map((q, j) => (j === i ? { ...q, ...patch } : q)));
+  const create = async () => {
+    if (!title.trim()) return toast.error("اكتب عنوان المسابقة");
+    const clean = qs.map((q) => ({ ...q, options: q.options.map((o) => o.trim()).filter(Boolean) }));
+    if (clean.some((q) => !q.question.trim() || q.options.length < 2 || q.correct >= q.options.length)) return toast.error("كل سؤال يحتاج نصًا واختيارين على الأقل وإجابة صحيحة");
+    const { data: auth } = await supabase.auth.getUser();
+    const { data: z, error } = await supabase.from("quizzes").insert({ title: title.trim(), created_by: auth.user.id }).select("id").single();
+    if (error) return toast.error(error.message);
+    const { error: e2 } = await supabase.from("quiz_questions").insert(clean.map((q, i) => ({ quiz_id: z.id, question: q.question.trim(), options: q.options, correct: q.correct, points: q.points, sort: i })));
+    if (e2) return toast.error(e2.message);
+    toast.success("تم نشر المسابقة"); setTitle(""); setQs([blank()]); qc.invalidateQueries({ queryKey: ["admin-quizzes"] });
+  };
+  return (
+    <div className="space-y-5">
+      <section className={card}>
+        <h2 className="mb-3 text-xl font-extrabold">مسابقة جديدة</h2>
+        <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="عنوان المسابقة (مثال: مسابقة الأسبوع الأول)" />
+        {qs.map((q, i) => (
+          <div key={i} className="mt-3 rounded-2xl bg-muted p-3">
+            <div className="flex gap-2"><Input value={q.question} onChange={(e) => upd(i, { question: e.target.value })} placeholder={`السؤال ${i + 1}`} />
+              <Input type="number" className="w-20" value={q.points} onChange={(e) => upd(i, { points: +e.target.value })} title="الدرجة" />
+              {qs.length > 1 && <button onClick={() => setQs(qs.filter((_, j) => j !== i))} className="text-destructive">✕</button>}</div>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">{q.options.map((o, k) => (
+              <label key={k} className="flex items-center gap-2"><input type="radio" checked={q.correct === k} onChange={() => upd(i, { correct: k })} title="الإجابة الصحيحة" />
+                <Input value={o} onChange={(e) => upd(i, { options: q.options.map((x, m) => (m === k ? e.target.value : x)) })} placeholder={`اختيار ${k + 1}`} /></label>
+            ))}</div>
+            <p className="mt-1 text-xs text-muted-foreground">حدد الدائرة بجوار الإجابة الصحيحة.</p>
+          </div>
+        ))}
+        <div className="mt-3 flex gap-2"><button onClick={() => setQs([...qs, blank()])} className="rounded-xl bg-muted px-4 py-2 font-bold">+ سؤال</button>
+          <button onClick={create} className="rounded-xl bg-primary px-5 py-2 font-extrabold text-primary-foreground">نشر المسابقة</button></div>
+      </section>
+      <section className="space-y-2">{quizzes?.map((z) => (
+        <div key={z.id} className={`${card} flex flex-wrap items-center justify-between gap-2`}>
+          <span className="font-extrabold">🧠 {z.title} <span className="text-xs text-muted-foreground">{new Date(z.created_at).toLocaleDateString("ar-EG")}</span></span>
+          <div className="flex gap-2"><button onClick={() => setResults({ id: z.id, title: z.title })} className="rounded-xl bg-secondary px-3 py-1.5 text-sm font-bold text-secondary-foreground">النتائج</button>
+            <button onClick={async () => { await supabase.from("quizzes").update({ published: !z.published }).eq("id", z.id); qc.invalidateQueries({ queryKey: ["admin-quizzes"] }); }} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold">{z.published ? "إخفاء" : "إظهار"}</button></div>
+        </div>
+      ))}</section>
+      <Dialog open={!!results} onOpenChange={(o) => !o && setResults(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>نتائج: {results?.title}</DialogTitle></DialogHeader>
+          <div className="max-h-96 space-y-1 overflow-y-auto">
+            {!res?.length && <p className="text-muted-foreground">لم يشارك أحد بعد.</p>}
+            {res?.map((r, i) => <div key={i} className="flex justify-between rounded-xl bg-muted p-2 text-sm"><span className="font-bold">{i + 1}. {r.full_name}</span><span>{r.score} / {r.max_score}</span></div>)}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

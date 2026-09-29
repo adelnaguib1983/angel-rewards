@@ -11,6 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AnnouncementsBoard, NotificationsBell, Quizzes, openAnnouncement } from "@/components/MemberExtras";
+import { fileToDataUrl } from "@/lib/app";
 import { CalendarView, StreakBadges, StreakCard, WeeklyCoach } from "@/components/HomeExtras";
 
 export const Route = createFileRoute("/_authenticated/home")({
@@ -28,12 +30,13 @@ export const Route = createFileRoute("/_authenticated/home")({
 });
 
 const TABS = [
-  ["track", "🗓️", "إنجازاتي"], ["cal", "📅", "التقويم"], ["coach", "✨", "مرشدي"], ["badges", "🏅", "الأوسمة"], ["shop", "🎁", "الهدايا"], ["board", "🏆", "الشرف"],
+  ["track", "🗓️", "إنجازاتي"], ["cal", "📅", "التقويم"], ["coach", "✨", "مرشدي"], ["badges", "🏅", "الأوسمة"], ["shop", "🎁", "الهدايا"], ["board", "🏆", "الشرف"], ["quiz", "🧠", "المسابقة"],
 ] as const;
 
 function Home() {
   const { data: me, isLoading } = useMe();
   const [tab, setTab] = useState<(typeof TABS)[number][0]>("track");
+  const [fill, setFill] = useState(false);
   if (isLoading || !me) return <div className="p-10 text-center">...</div>;
   const p = me.profile;
 
@@ -45,6 +48,8 @@ function Home() {
           <div className="text-6xl">{p?.status === "rejected" ? "🚫" : "⏳"}</div>
           <h1 className="mt-4 text-2xl font-extrabold">{p?.status === "rejected" ? "لم تتم الموافقة على الحساب" : "طلبك قيد المراجعة"}</h1>
           <p className="mt-2 text-muted-foreground">{p?.status === "rejected" ? "تواصل مع خادم الفصل." : "سيتم تفعيل حسابك بعد موافقة الخادم. ارجع قريبًا!"}</p>
+          {p?.status !== "rejected" && <button onClick={() => setFill(true)} className="pop mt-4 rounded-2xl bg-primary px-5 py-2 font-extrabold text-primary-foreground">📝 {p?.academic_year ? "مراجعة بياناتي" : "أكمل بياناتك الأساسية"}</button>}
+          <ContactDialog open={fill || (!!p && !p.academic_year && fill !== null)} onOpenChange={(o) => setFill(o ? true : null)} />
         </div>
       </>
     );
@@ -52,11 +57,11 @@ function Home() {
 
   return (
     <div className="pb-28 md:pb-16">
-      <AppHeader name={p?.full_name} avatar={p?.avatar} isAdmin={me.isAdmin} />
+      <AppHeader name={p?.full_name} avatar={p?.avatar} photo={p?.photo_url}><NotificationsBell onOpen={openAnnouncement} /></AppHeader>
       <main className="mx-auto max-w-6xl px-4">
-        <AnnouncementsBoard />
-        <StatsHero name={p?.full_name ?? ""} avatar={p?.avatar ?? "🦁"} />
-        <nav aria-label="أقسام التطبيق" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t-2 border-border bg-card/95 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-2xl backdrop-blur md:static md:my-6 md:flex md:gap-2 md:overflow-x-auto md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none">
+        <AnnouncementsBoard userId={me.user.id} />
+        <StatsHero name={p?.full_name ?? ""} avatar={p?.avatar ?? "🦁"} photo={p?.photo_url} />
+        <nav aria-label="أقسام التطبيق" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-7 border-t-2 border-border bg-card/95 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-2xl backdrop-blur md:static md:my-6 md:flex md:gap-2 md:overflow-x-auto md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none">
           {TABS.map(([k, icon, label]) => (
             <button key={k} onClick={() => setTab(k)}
               aria-current={tab === k ? "page" : undefined}
@@ -72,44 +77,9 @@ function Home() {
         {tab === "badges" && <><Badges /><StreakBadges /></>}
         {tab === "shop" && <Shop />}
         {tab === "board" && <Board myId={me.user.id} />}
+        {tab === "quiz" && <Quizzes />}
       </main>
     </div>
-  );
-}
-
-function AnnouncementsBoard() {
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["announcements", "published"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("announcements").select("id,title,body,event_date,created_at").eq("published", true).order("created_at", { ascending: false }).limit(10);
-      if (error) throw error;
-      return data;
-    },
-  });
-  if (isLoading) return <section className="mb-5 h-32 animate-pulse rounded-3xl bg-card" aria-label="جاري تحميل الإعلانات" />;
-  if (isError) return <section className="mb-5 rounded-3xl border-2 border-destructive bg-card p-4 text-sm">تعذّر تحميل الإعلانات الآن.</section>;
-  return (
-    <section className="mb-5 overflow-hidden rounded-3xl border-2 border-primary bg-card pop" aria-labelledby="announcements-heading">
-      <div className="flex items-center gap-3 bg-primary px-4 py-3 text-primary-foreground">
-        <span className="text-3xl" aria-hidden="true">📣</span>
-        <div className="min-w-0"><h1 id="announcements-heading" className="text-xl font-extrabold">لوحة الإعلانات</h1><p className="text-xs font-bold opacity-80">أحدث الأنشطة والرحلات</p></div>
-      </div>
-      {!data?.length ? (
-        <div className="px-4 py-6 text-center text-sm text-muted-foreground">لا توجد إعلانات جديدة حاليًا.</div>
-      ) : (
-        <div className="divide-y divide-border">
-          {data.map((item) => (
-            <article key={item.id} className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 px-4 py-4">
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-secondary text-2xl" aria-hidden="true">📌</div>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-extrabold">{item.title}</h2>{item.event_date && <time className="rounded-full bg-muted px-2 py-1 text-xs font-bold">📅 {item.event_date}</time>}</div>
-                <p className="mt-1 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{item.body}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
-    </section>
   );
 }
 
@@ -124,7 +94,7 @@ function useStats() {
   });
 }
 
-function StatsHero({ name, avatar }: { name: string; avatar: string }) {
+function StatsHero({ name, avatar, photo }: { name: string; avatar: string; photo?: string | null }) {
   const { data } = useStats();
   const qc = useQueryClient();
   const [pick, setPick] = useState(false);
@@ -134,9 +104,9 @@ function StatsHero({ name, avatar }: { name: string; avatar: string }) {
   return (
     <section className="grid gap-4 md:grid-cols-3">
       <div className="pop flex items-center gap-4 rounded-3xl border-2 border-border bg-card p-5 md:col-span-2">
-        <button onClick={() => setPick(true)} className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-secondary text-5xl" title="غيّر الشخصية">{avatar}</button>
+        <button onClick={() => setPick(true)} className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-secondary text-5xl" title="غيّر الشخصية">{photo ? <img src={photo} alt="" className="h-full w-full rounded-2xl object-cover" /> : avatar}</button>
         <div className="flex-1">
-          <div className="text-sm text-muted-foreground">المستوى {lv.index}</div>
+          <div className="text-sm font-bold text-primary">أهلا يا بطل 👋</div>
           <h2 className="text-2xl font-extrabold">{name} · {lv.emoji} {lv.name} <button onClick={() => setEdit(true)} className="align-middle text-sm font-bold text-primary">✏️ بياناتي</button></h2>
           <Progress value={lv.progress} className="mt-3 h-3" />
           <div className="mt-1 text-xs text-muted-foreground">{lv.next ? `باقي ${lv.next.min - pts} نقطة للوصول إلى ${lv.next.name}` : "وصلت لأعلى مستوى! 👑"}</div>
@@ -156,6 +126,12 @@ function StatsHero({ name, avatar }: { name: string; avatar: string }) {
       <Dialog open={pick} onOpenChange={setPick}>
         <DialogContent>
           <DialogHeader><DialogTitle>اختر شخصيتك</DialogTitle></DialogHeader>
+          <label className="block cursor-pointer rounded-2xl border-2 border-dashed border-border p-3 text-center font-bold hover:bg-muted">📷 رفع صورتي الشخصية
+            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+              const f = e.target.files?.[0]; if (!f) return;
+              try { const url = await fileToDataUrl(f, 320); const { error } = await supabase.rpc("update_my_photo", { _photo: url }); if (error) throw error; toast.success("تم حفظ الصورة"); qc.invalidateQueries({ queryKey: ["me"] }); setPick(false); } catch (err) { toast.error((err as Error).message); }
+            }} /></label>
+          {photo && <button className="text-sm font-bold text-destructive" onClick={async () => { await supabase.rpc("update_my_photo", { _photo: null }); qc.invalidateQueries({ queryKey: ["me"] }); }}>إزالة الصورة</button>}
           <div className="grid grid-cols-5 gap-3">
             {AVATARS.map((a) => (
               <button key={a} className="rounded-2xl bg-muted p-3 text-4xl hover:bg-primary"
@@ -242,16 +218,18 @@ function Tracker({ userId }: { userId: string }) {
                 {[1, 2, 3, 4].map((w) => {
                   const log = logs?.find((l) => l.activity === s.key && l.week === w);
                   const done = log && log.status === "approved";
+                  const locked = cw !== w;
                   return (
                     <td key={w} className="text-center">
                       <button
                         title={log?.verse ?? log?.admin_note ?? ""}
+                        disabled={locked}
                         onClick={() => {
                           if (log) { if (confirm("إلغاء هذا التسجيل؟")) remove.mutate(log.id); return; }
                           if (s.key === "bible") { setVerse(""); setVerseFor({ week: w }); return; }
                           add.mutate({ activity: s.key, week: w });
                         }}
-                        className={`h-14 w-full rounded-2xl border-2 text-2xl transition-all hover:scale-105 ${done ? `${colors[w - 1]} border-transparent pop` : log ? "border-destructive bg-destructive/20" : "border-dashed border-border hover:bg-muted"}`}>
+                        className={`h-14 w-full rounded-2xl border-2 text-2xl transition-all hover:scale-105 ${locked ? "cursor-not-allowed opacity-50 hover:scale-100 " : ""}${done ? `${colors[w - 1]} border-transparent pop` : log ? "border-destructive bg-destructive/20" : "border-dashed border-border hover:bg-muted"}`}>
                         {done ? "✓" : log ? "✗" : "+"}
                       </button>
                     </td>
@@ -262,6 +240,7 @@ function Tracker({ userId }: { userId: string }) {
           </tbody>
         </table>
       </div>
+      <p className="mt-2 text-center text-xs text-muted-foreground">🔒 يمكنك التسجيل أو الإلغاء في الأسبوع الحالي فقط.</p>
       <Verses logs={logs ?? []} />
       <Dialog open={!!verseFor} onOpenChange={(o) => !o && setVerseFor(null)}>
         <DialogContent>
