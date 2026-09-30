@@ -38,7 +38,7 @@ export function useMe() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
       const [{ data: profile }, { data: roles }] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, class_name, avatar, photo_url, status, created_at, academic_year").eq("id", user.id).maybeSingle(),
+        supabase.from("profiles").select("id, full_name, class_name, avatar, photo_url, status, created_at, academic_year, account_type").eq("id", user.id).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", user.id),
       ]);
       return { user, profile, isAdmin: !!roles?.some((r) => r.role === "admin") };
@@ -87,7 +87,7 @@ export function validateContact(v: { phone?: string; birth_date?: string }) {
   }
   return null;
 }
-export const ACADEMIC_YEARS = ["خامسة ابتدائي","سادسة ابتدائي","أولى إعدادي","ثانية إعدادي","ثالثة إعدادي","أولى ثانوي"];
+export const ACADEMIC_YEARS = ["أولى إعدادي","ثانية إعدادي","ثالثة إعدادي"];
 
 /** Resize an image file into a compact JPEG data URL (stored directly with the record). */
 export function fileToDataUrl(file: File, max = 480, quality = 0.8): Promise<string> {

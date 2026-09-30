@@ -119,3 +119,11 @@
   h1, h2, h3 { font-family: var(--font-display); }
 }
 @utility pop { box-shadow: var(--shadow-pop); }
+
+@keyframes hue-flow { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+@keyframes float-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+@utility stage-bar { background-image: linear-gradient(90deg, var(--stage), var(--sky), var(--accent), var(--secondary), var(--stage)); background-size: 200% 100%; animation: hue-flow 6s linear infinite; }
+@utility float-in { animation: float-in .4s ease-out both; }
+@utility stage-member { --stage: var(--primary); }
+@utility stage-servant { --stage: var(--sky); }
+@utility stage-admin { --stage: var(--secondary); }

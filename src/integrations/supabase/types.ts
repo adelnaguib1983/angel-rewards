@@ -350,6 +350,7 @@ export type Database = {
       profiles: {
         Row: {
           academic_year: string | null
+          account_type: string
           address: string | null
           avatar: string
           birth_date: string | null
@@ -363,6 +364,7 @@ export type Database = {
         }
         Insert: {
           academic_year?: string | null
+          account_type?: string
           address?: string | null
           avatar?: string
           birth_date?: string | null
@@ -376,6 +378,7 @@ export type Database = {
         }
         Update: {
           academic_year?: string | null
+          account_type?: string
           address?: string | null
           avatar?: string
           birth_date?: string | null
@@ -386,6 +389,36 @@ export type Database = {
           phone?: string | null
           photo_url?: string | null
           status?: string
+        }
+        Relationships: []
+      }
+      quiz_answers: {
+        Row: {
+          choice: number
+          correct: boolean
+          created_at: string
+          id: string
+          question_id: string
+          quiz_id: string
+          user_id: string
+        }
+        Insert: {
+          choice: number
+          correct: boolean
+          created_at?: string
+          id?: string
+          question_id: string
+          quiz_id: string
+          user_id: string
+        }
+        Update: {
+          choice?: number
+          correct?: boolean
+          created_at?: string
+          id?: string
+          question_id?: string
+          quiz_id?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -428,6 +461,7 @@ export type Database = {
         Row: {
           correct: number
           id: string
+          image_url: string | null
           options: string[]
           points: number
           question: string
@@ -437,6 +471,7 @@ export type Database = {
         Insert: {
           correct: number
           id?: string
+          image_url?: string | null
           options: string[]
           points?: number
           question: string
@@ -446,6 +481,7 @@ export type Database = {
         Update: {
           correct?: number
           id?: string
+          image_url?: string | null
           options?: string[]
           points?: number
           question?: string
@@ -464,23 +500,32 @@ export type Database = {
       }
       quizzes: {
         Row: {
+          closes_at: string | null
           created_at: string
           created_by: string
           id: string
+          image_url: string | null
+          opens_at: string | null
           published: boolean
           title: string
         }
         Insert: {
+          closes_at?: string | null
           created_at?: string
           created_by: string
           id?: string
+          image_url?: string | null
+          opens_at?: string | null
           published?: boolean
           title: string
         }
         Update: {
+          closes_at?: string | null
           created_at?: string
           created_by?: string
           id?: string
+          image_url?: string | null
+          opens_at?: string | null
           published?: boolean
           title?: string
         }
@@ -527,6 +572,36 @@ export type Database = {
           },
         ]
       }
+      servant_preparations: {
+        Row: {
+          created_at: string
+          id: string
+          images: string[]
+          notes: string
+          updated_at: string
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          images?: string[]
+          notes?: string
+          updated_at?: string
+          user_id?: string
+          week_start?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          images?: string[]
+          notes?: string
+          updated_at?: string
+          user_id?: string
+          week_start?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -545,11 +620,50 @@ export type Database = {
         }
         Relationships: []
       }
+      visitations: {
+        Row: {
+          created_at: string
+          id: string
+          member_id: string
+          method: string
+          note: string
+          servant_id: string
+          week_start: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          member_id: string
+          method?: string
+          note?: string
+          servant_id?: string
+          week_start?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          member_id?: string
+          method?: string
+          note?: string
+          servant_id?: string
+          week_start?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      admin_absence: {
+        Args: { _offset?: number }
+        Returns: {
+          academic_year: string
+          full_name: string
+          id: string
+          visited: boolean
+        }[]
+      }
       admin_members: {
         Args: never
         Returns: {
@@ -562,6 +676,19 @@ export type Database = {
           id: string
           points: number
           status: string
+        }[]
+      }
+      admin_notify_absent: { Args: { _year: string }; Returns: number }
+      admin_prep_status: {
+        Args: { _offset?: number }
+        Returns: {
+          full_name: string
+          images: string[]
+          notes: string
+          submitted: boolean
+          submitted_at: string
+          user_id: string
+          visits: number
         }[]
       }
       admin_quiz_results: {
@@ -584,6 +711,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_set_account_type: {
+        Args: { _member: string; _type: string }
+        Returns: undefined
+      }
       admin_set_redemption: {
         Args: { _id: string; _note: string; _status: string }
         Returns: undefined
@@ -596,6 +727,21 @@ export type Database = {
           full_name: string
           user_id: string
         }[]
+      }
+      admin_visit_report: {
+        Args: { _offset?: number }
+        Returns: {
+          academic_year: string
+          created_at: string
+          member: string
+          method: string
+          note: string
+          servant: string
+        }[]
+      }
+      answer_question: {
+        Args: { _choice: number; _question: string }
+        Returns: Json
       }
       balance_of: { Args: { _uid: string }; Returns: number }
       can_view_contacts: { Args: { _uid: string }; Returns: boolean }
@@ -612,6 +758,7 @@ export type Database = {
         Returns: boolean
       }
       is_owner: { Args: { _uid: string }; Returns: boolean }
+      is_servant: { Args: { _uid: string }; Returns: boolean }
       leaderboard: {
         Args: never
         Returns: {
@@ -621,12 +768,31 @@ export type Database = {
           points: number
         }[]
       }
+      leaderboard_years: {
+        Args: never
+        Returns: {
+          academic_year: string
+          avatar: string
+          full_name: string
+          id: string
+          photo_url: string
+          points: number
+        }[]
+      }
       my_contact: {
         Args: never
         Returns: {
           address: string
           birth_date: string
           phone: string
+        }[]
+      }
+      my_deductions: {
+        Args: never
+        Returns: {
+          amount: number
+          created_at: string
+          reason: string
         }[]
       }
       my_permissions: { Args: never; Returns: Json }
@@ -647,6 +813,7 @@ export type Database = {
         Returns: undefined
       }
       points_of: { Args: { _uid: string }; Returns: number }
+      quiz_open: { Args: { _quiz: string }; Returns: boolean }
       quiz_questions_for: {
         Args: { _quiz: string }
         Returns: {
@@ -656,7 +823,32 @@ export type Database = {
           question: string
         }[]
       }
+      quiz_questions_v2: {
+        Args: { _quiz: string }
+        Returns: {
+          correct: number
+          id: string
+          image_url: string
+          is_correct: boolean
+          my_choice: number
+          options: string[]
+          points: number
+          question: string
+        }[]
+      }
       redeem_gift: { Args: { _gift_id: string }; Returns: undefined }
+      servant_members: {
+        Args: never
+        Returns: {
+          academic_year: string
+          active_this_week: boolean
+          avatar: string
+          full_name: string
+          id: string
+          photo_url: string
+          visited: boolean
+        }[]
+      }
       signup_counts: {
         Args: never
         Returns: {
@@ -688,6 +880,7 @@ export type Database = {
           phone: string
         }[]
       }
+      week_start: { Args: { _offset?: number }; Returns: string }
       weekly_leaderboard: {
         Args: { _offset?: number }
         Returns: {

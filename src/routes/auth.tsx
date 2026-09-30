@@ -24,6 +24,8 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const [mode, setMode] = useState<"in" | "up" | "admin" | "forgot">("in");
+  const [role, setRole] = useState<"member" | "servant">("member");
+  const servant = role === "servant";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -41,14 +43,14 @@ function AuthPage() {
     setBusy(true);
     try {
       if (mode === "up") {
-        const bad = validateContact({ phone, birth_date: birth });
+        const bad = validateContact({ phone, birth_date: servant ? "" : birth });
         if (bad) throw new Error(bad);
         const { data, error } = await supabase.auth.signUp({
           email, password,
-          options: { emailRedirectTo: window.location.origin, data: { full_name: name.trim(), class_name: cls, academic_year: year, birth_date: birth, phone: phone.trim(), address: address.trim() } },
+          options: { emailRedirectTo: window.location.origin, data: servant ? { full_name: name.trim(), phone: phone.trim(), address: address.trim(), account_type: "servant" } : { full_name: name.trim(), class_name: cls, academic_year: year, birth_date: birth, phone: phone.trim(), address: address.trim() } },
         });
         if (error) throw error;
-        if (data.session) { navigate({ to: "/home" }); return; }
+        if (data.session) { navigate({ to: servant ? "/servant" : "/home" }); return; }
         setSent("signup");
       } else if (mode === "forgot") {
         const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
@@ -64,6 +66,16 @@ function AuthPage() {
             throw new Error("هذا الحساب ليس لديه صلاحية مشرف");
           }
           navigate({ to: "/admin" });
+        } else if (servant) {
+          const [{ data: prof }, { data: roles }] = await Promise.all([
+            supabase.from("profiles").select("account_type").eq("id", data.user.id).maybeSingle(),
+            supabase.from("user_roles").select("role").eq("user_id", data.user.id),
+          ]);
+          if (prof?.account_type !== "servant" && !roles?.some((r) => r.role === "admin")) {
+            await supabase.auth.signOut();
+            throw new Error("هذا الحساب ليس حساب خادم");
+          }
+          navigate({ to: "/servant" });
         } else navigate({ to: "/home" });
       }
     } catch (err) {
@@ -80,17 +92,19 @@ function AuthPage() {
     navigate({ to: "/home" });
   }
 
-  const titles = { in: "أهلاً يا بطل 👋", up: "انضم للأبطال ⚡", admin: "دخول المشرف 🛡️", forgot: "نسيت كلمة المرور؟ 🔑" };
+  const titles = { in: servant ? "أهلاً يا خادم 🙏" : "أهلاً يا بطل 👋", up: servant ? "تسجيل خادم جديد 📘" : "انضم للأبطال ⚡", admin: "دخول المشرف 🛡️", forgot: "نسيت كلمة المرور؟ 🔑" };
   const switchTo = (m: typeof mode) => { setMode(m); setSent(""); };
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-10">
-      <div className="pop w-full max-w-md rounded-3xl border-2 border-border bg-card p-7">
+    <main className={`${mode === "admin" ? "stage-admin" : servant ? "stage-servant" : "stage-member"} flex min-h-screen items-center justify-center px-4 py-10`}>
+      <div className="pop float-in w-full max-w-md overflow-hidden rounded-3xl border-2 border-border bg-card p-7">
+        <div className="stage-bar -mx-7 -mt-7 mb-5 h-2" />
         <Link to="/" className="text-sm text-muted-foreground">← الرئيسية</Link>
-        {(mode === "in" || mode === "admin") && (
-          <div className="mt-3 grid grid-cols-2 gap-2 rounded-2xl bg-muted p-1">
-            <button onClick={() => switchTo("in")} className={`rounded-xl py-2 text-sm font-bold ${mode === "in" ? "bg-card pop" : ""}`}>مشترك</button>
-            <button onClick={() => switchTo("admin")} className={`rounded-xl py-2 text-sm font-bold ${mode === "admin" ? "bg-card pop" : ""}`}>مشرف</button>
+        {mode !== "forgot" && (
+          <div className="mt-3 grid grid-cols-3 gap-2 rounded-2xl bg-muted p-1">
+            <button onClick={() => { setRole("member"); switchTo(mode === "admin" ? "in" : mode); }} className={`rounded-xl py-2 text-sm font-bold transition ${mode !== "admin" && !servant ? "bg-primary text-primary-foreground pop" : ""}`}>🦁 مشترك</button>
+            <button onClick={() => { setRole("servant"); switchTo(mode === "admin" ? "in" : mode); }} className={`rounded-xl py-2 text-sm font-bold transition ${mode !== "admin" && servant ? "bg-sky text-primary-foreground pop" : ""}`}>📘 خادم</button>
+            <button onClick={() => switchTo("admin")} className={`rounded-xl py-2 text-sm font-bold transition ${mode === "admin" ? "bg-secondary text-secondary-foreground pop" : ""}`}>🛡️ مشرف</button>
           </div>
         )}
         <h1 className="mt-3 text-3xl font-extrabold">{titles[mode]}</h1>
@@ -109,16 +123,16 @@ function AuthPage() {
             {mode === "up" && (
               <>
                 <div><Label>الاسم</Label><Input required value={name} onChange={(e) => setName(e.target.value)} /></div>
-                <div className="grid grid-cols-2 gap-3">
+                {!servant && <div className="grid grid-cols-2 gap-3">
                   <div><Label>العام الدراسي</Label>
                     <select required value={year} onChange={(e) => setYear(e.target.value)} className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
                       <option value="" className="bg-card">اختر</option>
                       {ACADEMIC_YEARS.map((y) => <option key={y} className="bg-card">{y}</option>)}
                     </select></div>
                   <div><Label>الفصل</Label><Input value={cls} onChange={(e) => setCls(e.target.value)} placeholder="اسم الفصل" /></div>
-                </div>
+                </div>}
                 <div className="grid grid-cols-2 gap-3">
-                  <div><Label>تاريخ الميلاد</Label><Input type="date" required value={birth} onChange={(e) => setBirth(e.target.value)} /></div>
+                  {!servant && <div><Label>تاريخ الميلاد</Label><Input type="date" required value={birth} onChange={(e) => setBirth(e.target.value)} /></div>}
                   <div><Label>الموبايل</Label><Input dir="ltr" inputMode="numeric" required maxLength={11} value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))} placeholder="01012345678" /></div>
                 </div>
                 <div><Label>العنوان</Label><Input required maxLength={200} value={address} onChange={(e) => setAddress(e.target.value)} /></div>
@@ -137,7 +151,7 @@ function AuthPage() {
             <button disabled={busy} className="pop w-full rounded-2xl bg-primary py-3 text-lg font-extrabold text-primary-foreground disabled:opacity-60">
               {busy ? "..." : { in: "دخول", admin: "دخول كمشرف", up: "إرسال طلب التسجيل", forgot: "أرسل رابط التغيير" }[mode]}
             </button>
-            {(mode === "in" || mode === "up") && (
+            {(mode === "in" || mode === "up") && !servant && (
               <button type="button" onClick={google} className="w-full rounded-2xl border-2 border-border py-3 font-bold hover:bg-muted">
                 المتابعة بحساب Google
               </button>
