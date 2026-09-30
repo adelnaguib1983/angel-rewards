@@ -1,5 +1,5 @@
 // @ts-nocheck -- strict index/optional checks relaxed for this screen; runtime guarded
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -57,7 +57,7 @@ function Home() {
   }
 
   return (
-    <div className="pb-28 md:pb-16">
+    <div className="stage-member pb-28 md:pb-16">
       <AppHeader stage="member" isAdmin={me.isAdmin} name={p?.full_name} avatar={p?.avatar} photo={p?.photo_url}><NotificationsBell onOpen={openAnnouncement} /></AppHeader>
       <main className="mx-auto max-w-6xl px-4">
         <AnnouncementsBoard userId={me.user.id} />
