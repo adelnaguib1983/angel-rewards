@@ -120,59 +120,78 @@ export function AnnouncementsBoard({ userId }: { userId: string }) {
 
 export function Quizzes() {
   const qc = useQueryClient();
-  const [active, setActive] = useState<string | null>(null);
-  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [active, setActive] = useState<{ id: string; title: string; image_url?: string } | null>(null);
+  const [busyQ, setBusyQ] = useState<string | null>(null);
   const { data: quizzes } = useQuery({
     queryKey: ["quizzes"],
-    queryFn: async () => (await supabase.from("quizzes").select("id,title,created_at").eq("published", true).order("created_at", { ascending: false })).data ?? [],
+    queryFn: async () => (await supabase.from("quizzes").select("id,title,created_at,opens_at,closes_at,image_url").eq("published", true).order("created_at", { ascending: false })).data ?? [],
   });
   const { data: attempts } = useQuery({
     queryKey: ["myAttempts"],
     queryFn: async () => Object.fromEntries(((await supabase.from("quiz_attempts").select("quiz_id,score,max_score")).data ?? []).map((a) => [a.quiz_id, a])),
   });
   const { data: questions } = useQuery({
-    queryKey: ["quizQ", active],
+    queryKey: ["quizQ", active?.id],
     enabled: !!active,
-    queryFn: async () => (await supabase.rpc("quiz_questions_for", { _quiz: active })).data ?? [],
+    queryFn: async () => (await supabase.rpc("quiz_questions_v2", { _quiz: active.id })).data ?? [],
   });
-  const submit = useMutation({
-    mutationFn: async () => {
-      if (questions?.some((q) => answers[q.id] === undefined)) throw new Error("أجب على كل الأسئلة");
-      const { data, error } = await supabase.rpc("submit_quiz", { _quiz: active, _answers: answers });
-      if (error) throw error; return data;
-    },
-    onSuccess: (r) => { toast.success(`نتيجتك ${r.score} من ${r.max} 🎉`); setActive(null); setAnswers({}); qc.invalidateQueries({ queryKey: ["myAttempts"] }); qc.invalidateQueries({ queryKey: ["stats"] }); },
-    onError: (e) => toast.error((e as Error).message),
-  });
-  if (active) return (
-    <section className="space-y-4">
-      <button onClick={() => setActive(null)} className="text-sm font-bold text-primary">→ رجوع للمسابقات</button>
-      {questions?.map((q, i) => (
-        <div key={q.id} className="rounded-3xl border-2 border-border bg-card p-4 pop">
-          <div className="font-extrabold">{i + 1}. {q.question} <span className="text-xs text-muted-foreground">({q.points} درجة)</span></div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {q.options.map((o, idx) => (
-              <button key={idx} onClick={() => setAnswers({ ...answers, [q.id]: idx })}
-                className={`rounded-2xl border-2 p-3 text-right font-bold ${answers[q.id] === idx ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted"}`}>{o}</button>
-            ))}
-          </div>
-        </div>
-      ))}
-      {!!questions?.length && <button disabled={submit.isPending} onClick={() => submit.mutate()} className="pop w-full rounded-2xl bg-primary py-3 text-lg font-extrabold text-primary-foreground">إرسال الإجابات</button>}
-      {questions && !questions.length && <p className="text-muted-foreground">لا توجد أسئلة بعد.</p>}
-    </section>
-  );
+  const answer = async (qid: string, idx: number) => {
+    setBusyQ(qid);
+    const { data, error } = await supabase.rpc("answer_question", { _question: qid, _choice: idx });
+    setBusyQ(null);
+    if (error) return toast.error(error.message);
+    data.correct ? toast.success(`إجابة صحيحة! +${data.points} نقطة 🎉`) : toast.error("إجابة خاطئة 😔");
+    qc.invalidateQueries({ queryKey: ["quizQ", active?.id] });
+    qc.invalidateQueries({ queryKey: ["myAttempts"] });
+    qc.invalidateQueries({ queryKey: ["stats"] });
+  };
+  const now = Date.now();
+  const state = (z) => z.opens_at && new Date(z.opens_at).getTime() > now ? "soon" : z.closes_at && new Date(z.closes_at).getTime() <= now ? "closed" : "open";
+  const fmt = (d) => new Date(d).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" });
+  if (active) {
+    const done = questions?.filter((q) => q.my_choice !== null).length ?? 0;
+    const score = questions?.filter((q) => q.is_correct).reduce((s, q) => s + q.points, 0) ?? 0;
+    return (
+      <section className="space-y-4">
+        <button onClick={() => setActive(null)} className="text-sm font-bold text-primary">→ رجوع للمسابقات</button>
+        <h2 className="text-2xl font-extrabold">🧠 {active.title}</h2>
+        {active.image_url && <img src={active.image_url} alt="" className="max-h-64 w-full rounded-3xl object-cover" />}
+        {!!questions?.length && <div className="rounded-2xl bg-muted p-3 text-sm font-bold">أجبت {done} من {questions.length} · درجتك {score}. كل سؤال يُجاب مرة واحدة فقط.</div>}
+        {questions?.map((q, i) => {
+          const answered = q.my_choice !== null;
+          return (
+            <div key={q.id} className="float-in rounded-3xl border-2 border-border bg-card p-4 pop">
+              <div className="font-extrabold">{i + 1}. {q.question} <span className="text-xs text-muted-foreground">({q.points} درجة)</span></div>
+              {q.image_url && <img src={q.image_url} alt="" className="mt-2 max-h-56 rounded-2xl object-contain" />}
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {q.options.map((o, idx) => {
+                  const cls = !answered ? "border-border hover:bg-muted" : idx === q.correct ? "border-accent bg-accent text-accent-foreground" : idx === q.my_choice ? "border-destructive bg-destructive text-destructive-foreground" : "border-border opacity-60";
+                  return <button key={idx} disabled={answered || busyQ === q.id} onClick={() => answer(q.id, idx)} className={`rounded-2xl border-2 p-3 text-right font-bold transition ${cls}`}>{o}{answered && idx === q.correct && " ✓"}{answered && idx === q.my_choice && idx !== q.correct && " ✗"}</button>;
+                })}
+              </div>
+            </div>
+          );
+        })}
+        {questions && !questions.length && <p className="text-muted-foreground">المسابقة غير متاحة الآن.</p>}
+      </section>
+    );
+  }
   return (
     <section className="grid gap-4 md:grid-cols-2">
       {!quizzes?.length && <p className="text-muted-foreground">لا توجد مسابقات حاليًا، ترقّب مسابقة الأسبوع! 🧠</p>}
       {quizzes?.map((z) => {
         const a = attempts?.[z.id];
+        const st = state(z);
         return (
-          <div key={z.id} className="pop flex items-center justify-between gap-3 rounded-3xl border-2 border-border bg-card p-5">
-            <div><div className="text-3xl">🧠</div><div className="font-display text-lg font-extrabold">{z.title}</div>
-              <div className="text-xs text-muted-foreground">{new Date(z.created_at).toLocaleDateString("ar-EG")}</div></div>
-            {a ? <span className="rounded-full bg-accent px-3 py-1 text-sm font-bold text-accent-foreground">{a.score} / {a.max_score}</span>
-              : <button onClick={() => { setAnswers({}); setActive(z.id); }} className="rounded-2xl bg-secondary px-4 py-2 font-bold text-secondary-foreground">ابدأ</button>}
+          <div key={z.id} className="pop float-in overflow-hidden rounded-3xl border-2 border-border bg-card">
+            {z.image_url && <img src={z.image_url} alt="" className="h-32 w-full object-cover" />}
+            <div className="flex items-center justify-between gap-3 p-5">
+              <div><div className="font-display text-lg font-extrabold">🧠 {z.title}</div>
+                <div className="text-xs text-muted-foreground">{st === "soon" ? `تفتح ${fmt(z.opens_at)}` : z.closes_at ? `${st === "closed" ? "أُغلقت" : "تُغلق"} ${fmt(z.closes_at)}` : new Date(z.created_at).toLocaleDateString("ar-EG")}</div>
+                {a && <span className="mt-1 inline-block rounded-full bg-accent px-3 py-0.5 text-sm font-bold text-accent-foreground">{a.score} / {a.max_score}</span>}</div>
+              {st === "soon" ? <span className="rounded-2xl bg-muted px-3 py-2 text-sm font-bold">🔒 قريبًا</span>
+                : <button onClick={() => setActive(z)} className="rounded-2xl bg-secondary px-4 py-2 font-bold text-secondary-foreground">{st === "closed" || a ? "عرض" : "ابدأ"}</button>}
+            </div>
           </div>
         );
       })}
