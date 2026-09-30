@@ -40,6 +40,7 @@ function Home() {
   if (isLoading || !me) return <div className="p-10 text-center">...</div>;
   const p = me.profile;
 
+  if (!me.isAdmin && p?.account_type === "servant") return <Navigate to="/servant" />;
   if (!me.isAdmin && (!p || p.status !== "approved")) {
     return (
       <>
@@ -57,7 +58,7 @@ function Home() {
 
   return (
     <div className="pb-28 md:pb-16">
-      <AppHeader name={p?.full_name} avatar={p?.avatar} photo={p?.photo_url}><NotificationsBell onOpen={openAnnouncement} /></AppHeader>
+      <AppHeader stage="member" isAdmin={me.isAdmin} name={p?.full_name} avatar={p?.avatar} photo={p?.photo_url}><NotificationsBell onOpen={openAnnouncement} /></AppHeader>
       <main className="mx-auto max-w-6xl px-4">
         <AnnouncementsBoard userId={me.user.id} />
         <StatsHero name={p?.full_name ?? ""} avatar={p?.avatar ?? "🦁"} photo={p?.photo_url} />
@@ -89,7 +90,7 @@ function useStats() {
     queryFn: async () => {
       const { data, error } = await supabase.rpc("my_stats");
       if (error) throw error;
-      return data as { points: number; balance: number };
+      return data as { points: number; balance: number; deductions: number; spent: number };
     },
   });
 }
@@ -99,6 +100,7 @@ function StatsHero({ name, avatar, photo }: { name: string; avatar: string; phot
   const qc = useQueryClient();
   const [pick, setPick] = useState(false);
   const [edit, setEdit] = useState(false);
+  const [ded, setDed] = useState(false);
   const pts = data?.points ?? 0;
   const lv = levelOf(pts);
   return (
@@ -112,16 +114,21 @@ function StatsHero({ name, avatar, photo }: { name: string; avatar: string; phot
           <div className="mt-1 text-xs text-muted-foreground">{lv.next ? `باقي ${lv.next.min - pts} نقطة للوصول إلى ${lv.next.name}` : "وصلت لأعلى مستوى! 👑"}</div>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="pop rounded-3xl bg-primary p-4 text-primary-foreground">
-          <div className="text-sm font-bold">مجموع النقاط</div>
-          <div className="font-display text-4xl font-extrabold">{pts}</div>
+      <div className="grid grid-cols-3 gap-3">
+        <div className="pop float-in rounded-3xl bg-primary p-3 text-primary-foreground">
+          <div className="text-xs font-bold">⭐ مجموع النقاط</div>
+          <div className="font-display text-3xl font-extrabold">{pts}</div>
         </div>
-        <div className="pop rounded-3xl bg-accent p-4 text-accent-foreground">
-          <div className="text-sm font-bold">رصيد الهدايا</div>
-          <div className="font-display text-4xl font-extrabold">{data?.balance ?? 0}</div>
+        <div className="pop float-in rounded-3xl bg-accent p-3 text-accent-foreground">
+          <div className="text-xs font-bold">🎁 رصيد الهدايا</div>
+          <div className="font-display text-3xl font-extrabold">{data?.balance ?? 0}</div>
         </div>
+        <button onClick={() => setDed(true)} className="pop float-in rounded-3xl bg-destructive p-3 text-right text-destructive-foreground">
+          <div className="text-xs font-bold">➖ الخصومات</div>
+          <div className="font-display text-3xl font-extrabold">{(data?.deductions ?? 0) + (data?.spent ?? 0)}</div>
+        </button>
       </div>
+      <DeductionsDialog open={ded} onOpenChange={setDed} />
       <ContactDialog open={edit} onOpenChange={setEdit} />
       <Dialog open={pick} onOpenChange={setPick}>
         <DialogContent>
@@ -350,10 +357,11 @@ function Shop() {
 }
 
 function Board({ myId }: { myId: string }) {
-  const [mode, setMode] = useState<"week" | "last" | "all">("week");
+  const [mode, setMode] = useState<"week" | "last" | "all" | "years">("week");
   const { data } = useQuery({
     queryKey: ["leaderboard", mode],
     queryFn: async () => {
+      if (mode === "years") return [];
       if (mode === "all") return ((await supabase.rpc("leaderboard")).data ?? []).map((r, i, a) => ({ ...r, rank: a.findIndex((x) => x.points === r.points) + 1 }));
       return (await supabase.rpc("weekly_leaderboard", { _offset: mode === "week" ? 0 : 1 })).data ?? [];
     },
@@ -363,12 +371,13 @@ function Board({ myId }: { myId: string }) {
   return (
     <div>
       <div className="mb-4 flex justify-center gap-2">
-        {([["week", "أوائل هذا الأسبوع"], ["last", "الأسبوع الماضي"], ["all", "الترتيب العام"]] as const).map(([k, l]) => (
+        {([["week", "أوائل هذا الأسبوع"], ["last", "الأسبوع الماضي"], ["all", "الترتيب العام"], ["years", "لوحة كل مرحلة"]] as const).map(([k, l]) => (
           <button key={k} onClick={() => setMode(k)} className={`rounded-xl px-3 py-1.5 text-sm font-bold ${mode === k ? "bg-secondary text-secondary-foreground" : "bg-card"}`}>{l}</button>
         ))}
       </div>
-      {mode !== "all" && <p className="mb-4 text-center text-xs text-muted-foreground">الأسبوع من الأحد إلى السبت ويبدأ الترتيب من جديد كل أحد. المتساوون في النقاط يأخذون نفس المركز.</p>}
-      {!data?.length && <p className="text-center text-muted-foreground">لا توجد إنجازات بعد — كن الأول! 🚀</p>}
+      {mode === "years" && <YearBoards myId={myId} />}
+      {mode !== "all" && mode !== "years" && <p className="mb-4 text-center text-xs text-muted-foreground">الأسبوع من الأحد إلى السبت ويبدأ الترتيب من جديد كل أحد. المتساوون في النقاط يأخذون نفس المركز.</p>}
+      {mode !== "years" && !data?.length && <p className="text-center text-muted-foreground">لا توجد إنجازات بعد — كن الأول! 🚀</p>}
       <div className="mb-6 flex items-end justify-center gap-3">
         {[1, 0, 2].map((i) => top[i] && (
           <div key={top[i].id} className="text-center">
@@ -436,5 +445,47 @@ function ContactDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o
         <button onClick={save} className="pop rounded-2xl bg-primary py-3 font-extrabold text-primary-foreground">حفظ</button>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function DeductionsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+  const { data } = useQuery({ queryKey: ["deductions"], enabled: open, queryFn: async () => (await supabase.rpc("my_deductions")).data ?? [] });
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>➖ الخصومات والاستبدالات</DialogTitle></DialogHeader>
+        <p className="text-xs text-muted-foreground">الخصومات تُطرح تلقائيًا من مجموع النقاط ورصيد الهدايا، واستبدال الهدايا يُطرح من الرصيد.</p>
+        <div className="max-h-96 space-y-1 overflow-y-auto">
+          {!data?.length && <p className="text-muted-foreground">لا توجد خصومات 🎉</p>}
+          {data?.map((d, i) => <div key={i} className="flex justify-between rounded-xl bg-muted p-2 text-sm"><span><b>{d.reason}</b><br /><span className="text-xs text-muted-foreground">{new Date(d.created_at).toLocaleDateString("ar-EG")}</span></span><b className="text-destructive">-{d.amount}</b></div>)}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const YEAR_STYLE = ["from-primary/40", "from-sky/40", "from-accent/40"];
+function YearBoards({ myId }: { myId: string }) {
+  const { data } = useQuery({ queryKey: ["leaderboard-years"], queryFn: async () => (await supabase.rpc("leaderboard_years")).data ?? [] });
+  const medals = ["🥇", "🥈", "🥉"];
+  return (
+    <div className="mb-6 grid gap-4 md:grid-cols-3">
+      {ACADEMIC_YEARS.map((y, yi) => {
+        const rows = (data ?? []).filter((r) => r.academic_year === y).slice(0, 10);
+        return (
+          <section key={y} className={`pop float-in overflow-hidden rounded-3xl border-2 border-border bg-gradient-to-b ${YEAR_STYLE[yi]} to-card p-4`} style={{ animationDelay: `${yi * 0.1}s` }}>
+            <h3 className="mb-3 text-center text-xl font-extrabold">🏆 {y}</h3>
+            {!rows.length && <p className="text-center text-sm text-muted-foreground">لا يوجد أبطال بعد</p>}
+            <ol className="space-y-1.5">{rows.map((r, i) => (
+              <li key={r.id} className={`flex items-center gap-2 rounded-xl p-2 ${r.id === myId ? "bg-primary/30 ring-2 ring-primary" : "bg-card/70"}`}>
+                <span className="w-7 text-center font-extrabold">{medals[i] ?? i + 1}</span>
+                {r.photo_url ? <img src={r.photo_url} alt="" className="h-7 w-7 rounded-full object-cover" /> : <span className="text-xl">{r.avatar}</span>}
+                <span className="flex-1 truncate text-sm font-bold">{r.full_name}</span>
+                <b className="text-primary">{r.points}</b>
+              </li>))}</ol>
+          </section>
+        );
+      })}
+    </div>
   );
 }
