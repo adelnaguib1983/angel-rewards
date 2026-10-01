@@ -39,7 +39,7 @@ function useMembers() {
 const TABS = [
   ["summary", "📊 الملخص الأسبوعي"], ["announcements", "📣 الإعلانات"], ["requests", "📝 طلبات التسجيل"], ["members", "👥 المشتركون"], ["servants", "📘 الخدام والافتقاد"], ["absence", "🚫 الغياب الأسبوعي"],
   ["activities", "✅ الأنشطة"], ["redeem", "🎁 طلبات الهدايا"], ["log", "📒 سجل النقاط"],
-  ["archive", "🗂️ الأرشيف والمقارنة"], ["gifts", "🛍️ الهدايا"], ["badges", "🏅 الأوسمة والنقاط"], ["notif", "🔔 الإشعارات"], ["quiz", "🧠 المسابقات"],
+  ["archive", "🗂️ الأرشيف والمقارنة"], ["gifts", "🛍️ الهدايا"], ["badges", "🏅 الأوسمة والنقاط"], ["notif", "🔔 مركز التنبيهات"], ["quiz", "🧠 المسابقات"],
   ["audit", "🕵️ سجل التدقيق"], ["staff", "🔑 الصلاحيات"],
 ] as const;
 type Tab = (typeof TABS)[number][0];
@@ -680,22 +680,51 @@ function BadgesAndPoints() {
 /* ---------- Notifications ---------- */
 function Notifications() {
   const qc = useQueryClient();
+  const [selected, setSelected] = useState<string | null>(null);
   const { data } = useQuery({ queryKey: ["admin-notif"], queryFn: async () => (await supabase.from("notifications").select("*").order("created_at", { ascending: false }).limit(100)).data ?? [] });
-  const icons: Record<string, string> = { signup: "📝", activity: "✅", redeem: "🎁" };
-  const markAll = async () => { await supabase.from("notifications").update({ read: true }).eq("read", false); qc.invalidateQueries(); };
+  const { data: preps } = useQuery({ queryKey: ["notif-prep-status"], queryFn: async () => (await supabase.rpc("admin_prep_status", { _offset: 0 })).data ?? [] });
+  const { data: memberAbsence } = useQuery({ queryKey: ["notif-member-absence"], queryFn: async () => (await supabase.rpc("admin_absence_by_type", { _offset: 0, _type: "member" })).data ?? [] });
+  const { data: servantAbsence } = useQuery({ queryKey: ["notif-servant-absence"], queryFn: async () => (await supabase.rpc("admin_absence_by_type", { _offset: 0, _type: "servant" })).data ?? [] });
+  const missingPrep = (preps ?? []).filter((p) => !p.submitted);
+  const categories = [
+    { key: "prep", icon: "📘", label: "تحضير الخدام", rows: (data ?? []).filter((n) => n.kind === "prep") },
+    { key: "visitation", icon: "📞", label: "افتقاد الخدام للمشتركين", rows: (data ?? []).filter((n) => n.kind === "visitation") },
+    { key: "activity", icon: "✅", label: "أنشطة المشتركين", rows: (data ?? []).filter((n) => n.kind === "activity") },
+    { key: "signup", icon: "📝", label: "طلبات التسجيل الجديدة", rows: (data ?? []).filter((n) => n.kind === "signup") },
+    { key: "servant_absence", icon: "🚷", label: "غياب الخدام", rows: (servantAbsence ?? []).map((r) => ({ id: `sa-${r.id}`, message: `${r.full_name} غائب هذا الأسبوع`, read: false, created_at: new Date().toISOString(), synthetic: true })) },
+    { key: "member_absence", icon: "🚫", label: "غياب المشتركين", rows: (memberAbsence ?? []).map((r) => ({ id: `ma-${r.id}`, message: `${r.full_name} · ${r.academic_year ?? "بدون مرحلة"}`, read: false, created_at: new Date().toISOString(), synthetic: true })) },
+    { key: "missing_prep", icon: "⏰", label: "لم يرسلوا التحضير", rows: missingPrep.map((r) => ({ id: `mp-${r.user_id}`, message: `${r.full_name} لم يرسل تحضير هذا الأسبوع`, read: false, created_at: new Date().toISOString(), synthetic: true })) },
+  ];
+  const active = categories.find((c) => c.key === selected);
+  const openCategory = async (key: string) => {
+    setSelected(key);
+    if (["prep", "visitation", "activity", "signup"].includes(key)) {
+      await supabase.from("notifications").update({ read: true }).eq("kind", key).eq("read", false);
+      qc.invalidateQueries({ queryKey: ["admin-notif"] });
+      qc.invalidateQueries({ queryKey: ["unread"] });
+    }
+  };
   return (
-    <div>
-      <button onClick={markAll} className="mb-3 rounded-xl bg-muted px-3 py-1.5 text-sm font-bold">تحديد الكل كمقروء</button>
-      <div className="space-y-2">
-        {data?.map((n) => (
-          <div key={n.id} className={`flex items-center gap-3 rounded-2xl p-3 ${n.read ? "bg-card/50" : "bg-card ring-2 ring-primary"}`}>
-            <span className="text-2xl">{icons[n.kind] ?? "🔔"}</span>
-            <span className="flex-1">{n.message}</span>
-            <span className="text-xs text-muted-foreground">{new Date(n.created_at).toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })}</span>
-          </div>
-        ))}
-        {!data?.length && <p className="text-muted-foreground">لا توجد إشعارات.</p>}
+    <div className="space-y-4">
+      <h2 className="text-2xl font-extrabold">التنبيهات حسب النوع</h2>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {categories.map((c) => {
+          const unread = c.rows.filter((r) => !r.read).length;
+          return <button key={c.key} onClick={() => openCategory(c.key)} className="pop relative min-h-32 rounded-2xl border-2 border-border bg-card p-4 text-center transition hover:border-primary hover:bg-muted">
+            <span className="block text-4xl" aria-hidden="true">{c.icon}</span>
+            <span className="mt-2 block text-sm font-extrabold">{c.label}</span>
+            <span className="mt-1 block text-xs text-muted-foreground">{c.rows.length} تنبيه</span>
+            {!!unread && <Dot n={unread} />}
+          </button>;
+        })}
       </div>
+      <Dialog open={!!active} onOpenChange={(o) => !o && setSelected(null)}><DialogContent>
+        <DialogHeader><DialogTitle>{active?.icon} {active?.label}</DialogTitle></DialogHeader>
+        <div className="max-h-[65vh] space-y-2 overflow-y-auto">
+          {!active?.rows.length && <p className="text-muted-foreground">لا توجد تنبيهات في هذا القسم.</p>}
+          {active?.rows.map((n) => <div key={n.id} className="rounded-xl bg-muted p-3 text-sm"><div className="font-bold">{n.message}</div>{!n.synthetic && <div className="mt-1 text-[11px] text-muted-foreground">{new Date(n.created_at).toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })}</div>}</div>)}
+        </div>
+      </DialogContent></Dialog>
     </div>
   );
 }
@@ -988,7 +1017,8 @@ function ServantsTab() {
 
 function AbsenceTab() {
   const [off, setOff] = useState(0);
-  const { data } = useQuery({ queryKey: ["admin-absence", off], queryFn: async () => { const { data, error } = await supabase.rpc("admin_absence", { _offset: off }); if (error) throw error; return data; } });
+  const [type, setType] = useState<"member" | "servant">("member");
+  const { data } = useQuery({ queryKey: ["admin-absence", off, type], queryFn: async () => { const { data, error } = await supabase.rpc("admin_absence_by_type", { _offset: off, _type: type }); if (error) throw error; return data; } });
   const notify = async (y: string) => {
     const { data: n, error } = await supabase.rpc("admin_notify_absent", { _year: y });
     if (error) return toast.error(error.message);
@@ -997,20 +1027,21 @@ function AbsenceTab() {
   return (
     <div className="space-y-4">
       <WeekPicker off={off} setOff={setOff} />
-      <p className="text-xs text-muted-foreground">الغائب = مشترك معتمد لم يسجّل أي نشاط (قداس، خدمة، ...) خلال الأسبوع من الأحد إلى السبت.</p>
-      <div className="grid gap-4 md:grid-cols-3">{ACADEMIC_YEARS.map((y, i) => {
-        const rows = (data ?? []).filter((r) => r.academic_year === y);
+      <div className="flex gap-2"><button onClick={() => setType("member")} className={`rounded-xl px-4 py-2 font-bold ${type === "member" ? "bg-primary text-primary-foreground" : "bg-card"}`}>👥 غياب المشتركين</button><button onClick={() => setType("servant")} className={`rounded-xl px-4 py-2 font-bold ${type === "servant" ? "bg-sky text-primary-foreground" : "bg-card"}`}>📘 غياب الخدام</button></div>
+      <p className="text-xs text-muted-foreground">{type === "member" ? "الغائب = مشترك معتمد لم يسجّل أي نشاط خلال الأسبوع من الأحد إلى السبت." : "الغائب = خادم معتمد لم يرسل تحضيرًا ولم يسجّل افتقادًا خلال الأسبوع."}</p>
+      <div className={`grid gap-4 ${type === "member" ? "md:grid-cols-3" : "md:grid-cols-2"}`}>{(type === "member" ? ACADEMIC_YEARS : ["الخدام"]).map((y, i) => {
+        const rows = type === "member" ? (data ?? []).filter((r) => r.academic_year === y) : (data ?? []);
         return (
           <section key={y} className={card} style={{ animationDelay: `${i * 0.08}s` }}>
             <div className="mb-2 flex items-center justify-between"><h3 className="text-lg font-extrabold">{y}</h3><span className="rounded-full bg-destructive px-2 py-0.5 text-xs font-bold text-destructive-foreground">{rows.length} غائب</span></div>
             <div className="max-h-72 space-y-1 overflow-y-auto">{rows.map((r) => (
               <div key={r.id} className="flex justify-between rounded-xl bg-muted p-2 text-sm"><span className="font-bold">{r.full_name}</span><span className="text-xs">{r.visited ? "✅ تم افتقاده" : "⏳ بدون افتقاد"}</span></div>
             ))}{!rows.length && <p className="text-sm text-muted-foreground">لا يوجد غياب 🎉</p>}</div>
-            {off === 0 && !!rows.length && <button onClick={() => notify(y)} className="mt-3 w-full rounded-xl bg-secondary py-2 text-sm font-bold text-secondary-foreground">🔔 إرسال إشعار الغياب</button>}
+             {type === "member" && off === 0 && !!rows.length && <button onClick={() => notify(y)} className="mt-3 w-full rounded-xl bg-secondary py-2 text-sm font-bold text-secondary-foreground">🔔 إرسال إشعار الغياب</button>}
           </section>
         );
       })}</div>
-      {(data ?? []).some((r) => !ACADEMIC_YEARS.includes(r.academic_year)) && <p className="text-xs text-muted-foreground">يوجد {(data ?? []).filter((r) => !ACADEMIC_YEARS.includes(r.academic_year)).length} غائب بدون مرحلة محددة أو بمرحلة قديمة.</p>}
+      {type === "member" && (data ?? []).some((r) => !ACADEMIC_YEARS.includes(r.academic_year)) && <p className="text-xs text-muted-foreground">يوجد {(data ?? []).filter((r) => !ACADEMIC_YEARS.includes(r.academic_year)).length} غائب بدون مرحلة محددة أو بمرحلة قديمة.</p>}
     </div>
   );
 }
