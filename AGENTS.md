@@ -13,3 +13,4 @@
 - First signup becomes owner admin via `handle_new_user` trigger — why: bootstraps admin without manual SQL.
 
 - Announcements use a public `announcements` table with authenticated approved-member reads and admin-only writes enforced by RLS — why: the member board stays live while publishing remains restricted.
+- Notification categories use persisted kinds for events and live weekly RPC results for absence/missing-preparation alerts — why: event history stays auditable while weekly status never becomes stale.
