@@ -35,6 +35,7 @@ const TABS = [
 
 function Home() {
   const { data: me, isLoading } = useMe();
+  const qc = useQueryClient();
   const [tab, setTab] = useState<(typeof TABS)[number][0]>("track");
   const [fill, setFill] = useState(false);
   const { data: quizAlerts } = useQuery({
@@ -49,7 +50,6 @@ function Home() {
     qc.invalidateQueries({ queryKey: ["myNotifs"] });
     setTimeout(() => document.getElementById("member-quizzes")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
-  const qc = useQueryClient();
   if (isLoading || !me) return <div className="p-10 text-center">...</div>;
   const p = me.profile;
 
@@ -375,11 +375,10 @@ function Shop() {
 }
 
 function Board({ myId }: { myId: string }) {
-  const [mode, setMode] = useState<"week" | "last" | "all" | "years">("week");
+  const [mode, setMode] = useState<"week" | "last" | "all">("week");
   const { data } = useQuery({
     queryKey: ["leaderboard", mode],
     queryFn: async () => {
-      if (mode === "years") return [];
       if (mode === "all") return ((await supabase.rpc("leaderboard")).data ?? []).map((r, i, a) => ({ ...r, rank: a.findIndex((x) => x.points === r.points) + 1 }));
       return (await supabase.rpc("weekly_leaderboard", { _offset: mode === "week" ? 0 : 1 })).data ?? [];
     },
@@ -388,14 +387,16 @@ function Board({ myId }: { myId: string }) {
   const top = data?.slice(0, 5) ?? [];
   return (
     <div>
+      <h2 className="mb-3 text-center text-2xl font-extrabold">أوائل كل مرحلة</h2>
+      <YearBoards myId={myId} />
+      <h2 className="mb-3 text-center text-2xl font-extrabold">لوحة الشرف المجمعة</h2>
       <div className="mb-4 flex justify-center gap-2">
-        {([["week", "أوائل هذا الأسبوع"], ["last", "الأسبوع الماضي"], ["all", "الترتيب العام"], ["years", "لوحة كل مرحلة"]] as const).map(([k, l]) => (
+        {([["week", "أوائل هذا الأسبوع"], ["last", "الأسبوع الماضي"], ["all", "الترتيب العام"]] as const).map(([k, l]) => (
           <button key={k} onClick={() => setMode(k)} className={`rounded-xl px-3 py-1.5 text-sm font-bold ${mode === k ? "bg-secondary text-secondary-foreground" : "bg-card"}`}>{l}</button>
         ))}
       </div>
-      {mode === "years" && <YearBoards myId={myId} />}
-      {mode !== "all" && mode !== "years" && <p className="mb-4 text-center text-xs text-muted-foreground">الأسبوع من الأحد إلى السبت ويبدأ الترتيب من جديد كل أحد. المتساوون في النقاط يأخذون نفس المركز.</p>}
-      {mode !== "years" && !data?.length && <p className="text-center text-muted-foreground">لا توجد إنجازات بعد — كن الأول! 🚀</p>}
+      {mode !== "all" && <p className="mb-4 text-center text-xs text-muted-foreground">الأسبوع من الأحد إلى السبت ويبدأ الترتيب من جديد كل أحد. المتساوون في النقاط يأخذون نفس المركز.</p>}
+      {!data?.length && <p className="text-center text-muted-foreground">لا توجد إنجازات بعد — كن الأول! 🚀</p>}
       <div className="mb-6 grid grid-cols-5 items-end gap-2 overflow-x-auto rounded-2xl bg-card p-3">
         {top.map((r, i) => (
           <div key={r.id} className="min-w-16 text-center">
@@ -412,7 +413,7 @@ function Board({ myId }: { myId: string }) {
           <li key={r.id} className={`flex items-center gap-3 rounded-2xl p-3 ${r.id === myId ? "bg-primary/20 ring-2 ring-primary" : "bg-card"}`}>
             <span className="w-8 text-center font-display text-xl font-extrabold">{medals[r.rank - 1] ?? r.rank}</span>
             <span className="text-2xl">{r.avatar}</span>
-            <span className="flex-1 font-bold">{r.full_name}</span>
+            <span className="name-shimmer flex-1 font-bold">{r.full_name}</span>
             <span className="font-display text-xl font-extrabold text-primary">{r.points}</span>
           </li>
         ))}
@@ -483,6 +484,7 @@ function DeductionsDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
 }
 
 const YEAR_STYLE = ["from-primary/40", "from-sky/40", "from-accent/40"];
+const BAR_STYLE = ["h-28 bg-primary text-primary-foreground", "h-24 bg-sky text-primary-foreground", "h-20 bg-secondary text-secondary-foreground", "h-16 bg-accent text-accent-foreground", "h-12 bg-muted"];
 function YearBoards({ myId }: { myId: string }) {
   const { data } = useQuery({ queryKey: ["leaderboard-years"], queryFn: async () => (await supabase.rpc("leaderboard_years")).data ?? [] });
   const medals = ["🥇", "🥈", "🥉"];
@@ -495,7 +497,7 @@ function YearBoards({ myId }: { myId: string }) {
             <h3 className="mb-3 text-center text-xl font-extrabold">🏆 {y}</h3>
             {!rows.length && <p className="text-center text-sm text-muted-foreground">لا يوجد أبطال بعد</p>}
             <div className="mb-3 grid h-40 grid-cols-5 items-end gap-1 rounded-xl bg-card/60 p-2">{rows.slice(0, 5).map((r, i) => (
-              <div key={r.id} className="min-w-0 text-center"><div className="truncate text-[10px] font-bold name-shimmer">{r.full_name}</div><div className={`mt-1 grid place-items-center rounded-t-md bg-chart-${(i % 5) + 1} text-xs font-extrabold text-primary-foreground`} style={{ height: `${Math.max(30, 105 - i * 14)}px` }}>{i + 1}<br />{r.points}</div></div>
+              <div key={r.id} className="min-w-0 text-center"><div className="name-shimmer truncate text-[10px] font-bold">{r.full_name}</div><div className={`mt-1 grid place-items-center rounded-t-md text-xs font-extrabold ${BAR_STYLE[i]}`}>{i + 1}<br />{r.points}</div></div>
             ))}</div>
             <ol className="space-y-1.5">{rows.map((r, i) => (
               <li key={r.id} className={`flex items-center gap-2 rounded-xl p-2 ${r.id === myId ? "bg-primary/30 ring-2 ring-primary" : "bg-card/70"}`}>
