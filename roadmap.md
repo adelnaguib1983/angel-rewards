@@ -19,3 +19,9 @@
 - [x] Keep app installable with same icon/look
 - [x] Weekly competitions graded with points
 - [x] Members cannot edit past activities or log outside the current week
+- [ ] Separate admin notification icons and category drawers
+- [ ] Split weekly absence into members and servants
+- [ ] Reorder member home: profile, quizzes, announcements
+- [ ] Add unresolved quiz badge to bottom navigation
+- [ ] Five-person formal charts for stage and overall leaderboards
+- [ ] Add continuous member and leader name effects
