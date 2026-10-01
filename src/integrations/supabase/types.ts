@@ -260,7 +260,9 @@ export type Database = {
           announcement_id: string | null
           created_at: string
           id: string
+          kind: string
           message: string
+          quiz_id: string | null
           read: boolean
           user_id: string
         }
@@ -268,7 +270,9 @@ export type Database = {
           announcement_id?: string | null
           created_at?: string
           id?: string
+          kind?: string
           message: string
+          quiz_id?: string | null
           read?: boolean
           user_id: string
         }
@@ -276,7 +280,9 @@ export type Database = {
           announcement_id?: string | null
           created_at?: string
           id?: string
+          kind?: string
           message?: string
+          quiz_id?: string | null
           read?: boolean
           user_id?: string
         }
@@ -286,6 +292,13 @@ export type Database = {
             columns: ["announcement_id"]
             isOneToOne: false
             referencedRelation: "announcements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_notifications_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
             referencedColumns: ["id"]
           },
         ]
@@ -657,6 +670,15 @@ export type Database = {
     Functions: {
       admin_absence: {
         Args: { _offset?: number }
+        Returns: {
+          academic_year: string
+          full_name: string
+          id: string
+          visited: boolean
+        }[]
+      }
+      admin_absence_by_type: {
+        Args: { _offset?: number; _type?: string }
         Returns: {
           academic_year: string
           full_name: string

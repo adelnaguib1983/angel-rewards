@@ -57,6 +57,13 @@
       "when": 1790808992373,
       "tag": "0007_servants_absence_quiz_timing",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790813160941,
+      "tag": "0008_separate_notifications_and_absence",
+      "breakpoints": true
     }
   ]
 }
