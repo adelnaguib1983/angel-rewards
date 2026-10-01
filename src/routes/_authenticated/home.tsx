@@ -37,6 +37,19 @@ function Home() {
   const { data: me, isLoading } = useMe();
   const [tab, setTab] = useState<(typeof TABS)[number][0]>("track");
   const [fill, setFill] = useState(false);
+  const { data: quizAlerts } = useQuery({
+    queryKey: ["quiz-alert-count"],
+    enabled: !!me,
+    queryFn: async () => (await supabase.from("member_notifications").select("id", { count: "exact", head: true }).eq("kind", "quiz").eq("read", false)).count ?? 0,
+  });
+  const openQuiz = async () => {
+    setTab("quiz");
+    await supabase.from("member_notifications").update({ read: true }).eq("kind", "quiz").eq("read", false);
+    qc.invalidateQueries({ queryKey: ["quiz-alert-count"] });
+    qc.invalidateQueries({ queryKey: ["myNotifs"] });
+    setTimeout(() => document.getElementById("member-quizzes")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
+  const qc = useQueryClient();
   if (isLoading || !me) return <div className="p-10 text-center">...</div>;
   const p = me.profile;
 
@@ -58,17 +71,22 @@ function Home() {
 
   return (
     <div className="stage-member pb-28 md:pb-16">
-      <AppHeader stage="member" isAdmin={me.isAdmin} name={p?.full_name} avatar={p?.avatar} photo={p?.photo_url}><NotificationsBell onOpen={openAnnouncement} /></AppHeader>
+      <AppHeader stage="member" isAdmin={me.isAdmin} name={p?.full_name} avatar={p?.avatar} photo={p?.photo_url}><NotificationsBell onOpen={openAnnouncement} onQuiz={openQuiz} /></AppHeader>
       <main className="mx-auto max-w-6xl px-4">
-        <AnnouncementsBoard userId={me.user.id} />
         <StatsHero name={p?.full_name ?? ""} avatar={p?.avatar ?? "🦁"} photo={p?.photo_url} />
+        <section id="member-quizzes" className="scroll-mt-4 py-6" aria-labelledby="member-quizzes-heading">
+          <h2 id="member-quizzes-heading" className="mb-3 text-2xl font-extrabold">🧠 المسابقات</h2>
+          <Quizzes />
+        </section>
+        <AnnouncementsBoard userId={me.user.id} />
         <nav aria-label="أقسام التطبيق" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-7 border-t-2 border-border bg-card/95 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-2xl backdrop-blur md:static md:my-6 md:flex md:gap-2 md:overflow-x-auto md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none">
           {TABS.map(([k, icon, label]) => (
-            <button key={k} onClick={() => setTab(k)}
+            <button key={k} onClick={() => k === "quiz" ? openQuiz() : setTab(k)}
               aria-current={tab === k ? "page" : undefined}
-              className={`flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-1 text-[10px] font-bold leading-tight transition md:flex-row md:gap-2 md:whitespace-nowrap md:rounded-2xl md:border-2 md:px-4 md:py-2 md:text-base ${tab === k ? "bg-primary text-primary-foreground md:border-primary md:pop" : "text-muted-foreground hover:bg-muted md:border-border md:bg-card md:text-foreground"}`}>
+              className={`relative flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-1 text-[10px] font-bold leading-tight transition md:flex-row md:gap-2 md:whitespace-nowrap md:rounded-2xl md:border-2 md:px-4 md:py-2 md:text-base ${tab === k ? "bg-primary text-primary-foreground md:border-primary md:pop" : "text-muted-foreground hover:bg-muted md:border-border md:bg-card md:text-foreground"}`}>
               <span aria-hidden="true" className="text-xl leading-none md:text-base">{icon}</span>
               <span className="w-full truncate text-center">{label}</span>
+              {k === "quiz" && !!quizAlerts && <span className="absolute -left-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-destructive px-1 text-[10px] text-destructive-foreground">{quizAlerts}</span>}
             </button>
           ))}
         </nav>
@@ -78,7 +96,7 @@ function Home() {
         {tab === "badges" && <><Badges /><StreakBadges /></>}
         {tab === "shop" && <Shop />}
         {tab === "board" && <Board myId={me.user.id} />}
-        {tab === "quiz" && <Quizzes />}
+        {tab === "quiz" && <p className="py-2 text-center text-sm text-muted-foreground">المسابقات ظاهرة أعلى الصفحة.</p>}
       </main>
     </div>
   );
@@ -109,7 +127,7 @@ function StatsHero({ name, avatar, photo }: { name: string; avatar: string; phot
         <button onClick={() => setPick(true)} className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-secondary text-5xl" title="غيّر الشخصية">{photo ? <img src={photo} alt="" className="h-full w-full rounded-2xl object-cover" /> : avatar}</button>
         <div className="flex-1">
           <div className="text-sm font-bold text-primary">أهلا يا بطل 👋</div>
-          <h2 className="text-2xl font-extrabold">{name} · {lv.emoji} {lv.name} <button onClick={() => setEdit(true)} className="align-middle text-sm font-bold text-primary">✏️ بياناتي</button></h2>
+          <h2 className="text-2xl font-extrabold"><span className="name-shimmer">{name}</span> · {lv.emoji} {lv.name} <button onClick={() => setEdit(true)} className="align-middle text-sm font-bold text-primary">✏️ بياناتي</button></h2>
           <Progress value={lv.progress} className="mt-3 h-3" />
           <div className="mt-1 text-xs text-muted-foreground">{lv.next ? `باقي ${lv.next.min - pts} نقطة للوصول إلى ${lv.next.name}` : "وصلت لأعلى مستوى! 👑"}</div>
         </div>
@@ -367,7 +385,7 @@ function Board({ myId }: { myId: string }) {
     },
   });
   const medals = ["🥇", "🥈", "🥉"];
-  const top = data?.slice(0, 3) ?? [];
+  const top = data?.slice(0, 5) ?? [];
   return (
     <div>
       <div className="mb-4 flex justify-center gap-2">
@@ -378,12 +396,12 @@ function Board({ myId }: { myId: string }) {
       {mode === "years" && <YearBoards myId={myId} />}
       {mode !== "all" && mode !== "years" && <p className="mb-4 text-center text-xs text-muted-foreground">الأسبوع من الأحد إلى السبت ويبدأ الترتيب من جديد كل أحد. المتساوون في النقاط يأخذون نفس المركز.</p>}
       {mode !== "years" && !data?.length && <p className="text-center text-muted-foreground">لا توجد إنجازات بعد — كن الأول! 🚀</p>}
-      <div className="mb-6 flex items-end justify-center gap-3">
-        {[1, 0, 2].map((i) => top[i] && (
-          <div key={top[i].id} className="text-center">
-            <div className="text-5xl">{top[i].avatar}</div>
-            <div className="font-bold">{top[i].full_name}</div>
-            <div className={`pop mt-2 grid w-24 place-items-center rounded-t-2xl ${i === 0 ? "h-32 bg-primary text-primary-foreground" : i === 1 ? "h-24 bg-sky text-primary-foreground" : "h-16 bg-secondary text-secondary-foreground"}`}>
+      <div className="mb-6 grid grid-cols-5 items-end gap-2 overflow-x-auto rounded-2xl bg-card p-3">
+        {top.map((r, i) => (
+          <div key={r.id} className="min-w-16 text-center">
+            <div className="text-3xl md:text-5xl">{r.avatar}</div>
+            <div className="name-shimmer truncate text-xs font-bold md:text-sm">{r.full_name}</div>
+            <div className={`pop mt-2 grid min-w-16 place-items-center rounded-t-lg md:rounded-t-2xl ${i === 0 ? "h-32 bg-primary text-primary-foreground" : i === 1 ? "h-24 bg-sky text-primary-foreground" : i === 2 ? "h-20 bg-secondary text-secondary-foreground" : i === 3 ? "h-16 bg-accent text-accent-foreground" : "h-12 bg-muted"}`}>
               <div className="text-3xl">{medals[top[i].rank - 1] ?? top[i].rank}</div><div className="font-extrabold">{top[i].points}</div>
             </div>
           </div>
@@ -476,11 +494,14 @@ function YearBoards({ myId }: { myId: string }) {
           <section key={y} className={`pop float-in overflow-hidden rounded-3xl border-2 border-border bg-gradient-to-b ${YEAR_STYLE[yi]} to-card p-4`} style={{ animationDelay: `${yi * 0.1}s` }}>
             <h3 className="mb-3 text-center text-xl font-extrabold">🏆 {y}</h3>
             {!rows.length && <p className="text-center text-sm text-muted-foreground">لا يوجد أبطال بعد</p>}
+            <div className="mb-3 grid h-40 grid-cols-5 items-end gap-1 rounded-xl bg-card/60 p-2">{rows.slice(0, 5).map((r, i) => (
+              <div key={r.id} className="min-w-0 text-center"><div className="truncate text-[10px] font-bold name-shimmer">{r.full_name}</div><div className={`mt-1 grid place-items-center rounded-t-md bg-chart-${(i % 5) + 1} text-xs font-extrabold text-primary-foreground`} style={{ height: `${Math.max(30, 105 - i * 14)}px` }}>{i + 1}<br />{r.points}</div></div>
+            ))}</div>
             <ol className="space-y-1.5">{rows.map((r, i) => (
               <li key={r.id} className={`flex items-center gap-2 rounded-xl p-2 ${r.id === myId ? "bg-primary/30 ring-2 ring-primary" : "bg-card/70"}`}>
                 <span className="w-7 text-center font-extrabold">{medals[i] ?? i + 1}</span>
                 {r.photo_url ? <img src={r.photo_url} alt="" className="h-7 w-7 rounded-full object-cover" /> : <span className="text-xl">{r.avatar}</span>}
-                <span className="flex-1 truncate text-sm font-bold">{r.full_name}</span>
+                 <span className="name-shimmer flex-1 truncate text-sm font-bold">{r.full_name}</span>
                 <b className="text-primary">{r.points}</b>
               </li>))}</ol>
           </section>

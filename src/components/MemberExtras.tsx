@@ -13,19 +13,20 @@ export function openAnnouncement(id: string) {
   setTimeout(() => el.classList.remove("ring-4", "ring-primary"), 2500);
 }
 
-export function NotificationsBell({ onOpen }: { onOpen: (id: string) => void }) {
+export function NotificationsBell({ onOpen, onQuiz }: { onOpen: (id: string) => void; onQuiz?: () => void }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const { data } = useQuery({
     queryKey: ["myNotifs"],
-    queryFn: async () => (await supabase.from("member_notifications").select("id,message,announcement_id,read,created_at").order("created_at", { ascending: false }).limit(20)).data ?? [],
+    queryFn: async () => (await supabase.from("member_notifications").select("id,message,announcement_id,quiz_id,kind,read,created_at").order("created_at", { ascending: false }).limit(20)).data ?? [],
     refetchInterval: 60000,
   });
   const unread = data?.filter((n) => !n.read).length ?? 0;
   async function click(n) {
     setOpen(false);
     if (!n.read) { await supabase.from("member_notifications").update({ read: true }).eq("id", n.id); qc.invalidateQueries({ queryKey: ["myNotifs"] }); }
-    if (n.announcement_id) onOpen(n.announcement_id);
+    if (n.quiz_id || n.kind === "quiz") onQuiz?.();
+    else if (n.announcement_id) onOpen(n.announcement_id);
   }
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -38,7 +39,7 @@ export function NotificationsBell({ onOpen }: { onOpen: (id: string) => void }) 
         <div className="max-h-80 space-y-1 overflow-y-auto">
           {data?.map((n) => (
             <button key={n.id} onClick={() => click(n)} className={`w-full rounded-xl p-2 text-right text-sm hover:bg-muted ${n.read ? "text-muted-foreground" : "bg-muted/50 font-bold"}`}>
-              {n.message}<div className="text-[10px] font-normal text-muted-foreground">{new Date(n.created_at).toLocaleString("ar-EG")}</div>
+              <span className="ml-1" aria-hidden="true">{n.kind === "quiz" ? "🧠" : "📣"}</span>{n.message}<div className="text-[10px] font-normal text-muted-foreground">{new Date(n.created_at).toLocaleString("ar-EG")}</div>
             </button>
           ))}
         </div>

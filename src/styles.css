@@ -127,3 +127,14 @@
 @utility stage-member { --stage: var(--primary); }
 @utility stage-servant { --stage: var(--sky); }
 @utility stage-admin { --stage: var(--secondary); }
+
+@keyframes name-shimmer {
+  0%, 100% { color: var(--color-foreground); text-shadow: 0 0 0 transparent; }
+  35% { color: var(--color-primary); text-shadow: 0 0 12px color-mix(in oklch, var(--color-primary) 65%, transparent); }
+  70% { color: var(--color-sky); text-shadow: 0 0 12px color-mix(in oklch, var(--color-sky) 55%, transparent); }
+}
+@utility name-shimmer { animation: name-shimmer 5s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .name-shimmer, .stage-bar { animation: none; }
+}
