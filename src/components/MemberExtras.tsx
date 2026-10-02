@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { NotificationDetail } from "@/components/StaffMemberExtras";
 
 export function openAnnouncement(id: string) {
   const el = document.getElementById(`ann-${id}`);
@@ -13,22 +14,26 @@ export function openAnnouncement(id: string) {
   setTimeout(() => el.classList.remove("ring-4", "ring-primary"), 2500);
 }
 
-export function NotificationsBell({ onOpen, onQuiz }: { onOpen: (id: string) => void; onQuiz?: () => void }) {
+export function NotificationsBell({ onOpen, onQuiz }: { onOpen?: (id: string) => void; onQuiz?: () => void }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState(null);
   const { data } = useQuery({
     queryKey: ["myNotifs"],
-    queryFn: async () => (await supabase.from("member_notifications").select("id,message,announcement_id,quiz_id,kind,read,created_at").order("created_at", { ascending: false }).limit(20)).data ?? [],
+    queryFn: async () => (await supabase.from("member_notifications").select("id,message,announcement_id,quiz_id,ref_id,kind,read,created_at").order("created_at", { ascending: false }).limit(30)).data ?? [],
     refetchInterval: 60000,
   });
   const unread = data?.filter((n) => !n.read).length ?? 0;
   async function click(n) {
     setOpen(false);
     if (!n.read) { await supabase.from("member_notifications").update({ read: true }).eq("id", n.id); qc.invalidateQueries({ queryKey: ["myNotifs"] }); }
-    if (n.quiz_id || n.kind === "quiz") onQuiz?.();
-    else if (n.announcement_id) onOpen(n.announcement_id);
+    if ((n.quiz_id || n.kind === "quiz") && onQuiz) onQuiz();
+    else if (n.announcement_id && onOpen) onOpen(n.announcement_id);
+    else setDetail(n);
   }
+  const icon = { quiz: "🧠", suggestion: "💡", absence: "🚫", announcement: "📣" };
   return (
+    <>
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger aria-label="التنبيهات" className="relative rounded-xl border-2 border-border px-3 py-2 text-lg leading-none hover:bg-muted">
         🔔{unread > 0 && <span className="absolute -left-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">{unread}</span>}
@@ -39,12 +44,14 @@ export function NotificationsBell({ onOpen, onQuiz }: { onOpen: (id: string) => 
         <div className="max-h-80 space-y-1 overflow-y-auto">
           {data?.map((n) => (
             <button key={n.id} onClick={() => click(n)} className={`w-full rounded-xl p-2 text-right text-sm hover:bg-muted ${n.read ? "text-muted-foreground" : "bg-muted/50 font-bold"}`}>
-              <span className="ml-1" aria-hidden="true">{n.kind === "quiz" ? "🧠" : "📣"}</span>{n.message}<div className="text-[10px] font-normal text-muted-foreground">{new Date(n.created_at).toLocaleString("ar-EG")}</div>
+              <span className="ml-1" aria-hidden="true">{icon[n.kind] ?? "🔔"}</span><span className="line-clamp-2">{n.message}</span><div className="text-[10px] font-normal text-muted-foreground">{new Date(n.created_at).toLocaleString("ar-EG")} · اضغط للتفاصيل</div>
             </button>
           ))}
         </div>
       </PopoverContent>
     </Popover>
+    <NotificationDetail n={detail} onClose={() => setDetail(null)} />
+    </>
   );
 }
 
