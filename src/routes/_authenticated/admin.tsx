@@ -8,6 +8,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { PROFILE_COLS, ACADEMIC_YEARS, MONTHS, REDEEM_STATUS, cairoDate, cairoWeek, useMe, useSettings, fileToDataUrl } from "@/lib/app";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { BirthdaysButton, PrepArchive, QuizLeague, ReadingPlanner, SuggestionDetail, VisitArchive, VisitHistoryDialog } from "@/components/StaffMemberExtras";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
@@ -39,7 +40,7 @@ function useMembers() {
 const TABS = [
   ["summary", "📊 الملخص الأسبوعي"], ["announcements", "📣 الإعلانات"], ["requests", "📝 طلبات التسجيل"], ["members", "👥 المشتركون"], ["servants", "📘 الخدام والافتقاد"], ["absence", "🚫 الغياب الأسبوعي"],
   ["activities", "✅ الأنشطة"], ["redeem", "🎁 طلبات الهدايا"], ["log", "📒 سجل النقاط"],
-  ["archive", "🗂️ الأرشيف والمقارنة"], ["gifts", "🛍️ الهدايا"], ["badges", "🏅 الأوسمة والنقاط"], ["notif", "🔔 مركز التنبيهات"], ["quiz", "🧠 المسابقات"],
+  ["archive", "🗂️ الأرشيف والمقارنة"], ["gifts", "🛍️ الهدايا"], ["badges", "🏅 الأوسمة والنقاط"], ["notif", "🔔 مركز التنبيهات"], ["quiz", "🧠 المسابقات"], ["visitarch", "🗂️ أرشيف الافتقاد"], ["read", "📖 القراءات اليومية"],
   ["audit", "🕵️ سجل التدقيق"], ["staff", "🔑 الصلاحيات"],
 ] as const;
 type Tab = (typeof TABS)[number][0];
@@ -76,7 +77,7 @@ function Admin() {
     <div className="stage-admin pb-16">
       <AppHeader stage="admin" name={me.profile?.full_name} avatar={me.profile?.avatar} isAdmin />
       <main className="mx-auto max-w-6xl px-4">
-        <h1 className="text-3xl font-extrabold">لوحة المشرف 🛠️</h1>
+        <div className="flex flex-wrap items-center justify-between gap-2"><h1 className="text-3xl font-extrabold">لوحة المشرف 🛠️</h1><BirthdaysButton /></div>
         <nav className="my-5 flex flex-wrap gap-2">
           {TABS.filter(([k]) => !ownerOnly(k) || perms?.owner).map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)}
@@ -100,6 +101,8 @@ function Admin() {
         {tab === "badges" && <BadgesAndPoints />}
         {tab === "notif" && <Notifications />}
         {tab === "quiz" && <AdminQuizzes />}
+        {tab === "visitarch" && <VisitArchive />}
+        {tab === "read" && <ReadingPlanner />}
         {tab === "archive" && <Archive />}
         {tab === "audit" && perms?.owner && <Audit />}
         {tab === "staff" && perms?.owner && <Staff />}
@@ -375,6 +378,7 @@ function Contact({ p }: { p: P }) {
 
 /* ---------- Members ---------- */
 function Members() {
+  const [hist, setHist] = useState(null);
   const qc = useQueryClient();
   const { data: members } = useMembers();
   const { data: profiles } = useQuery({
@@ -405,7 +409,7 @@ function Members() {
           <div key={m.id} className={card}>
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-3xl">{m.avatar}</span>
-              <div className="flex-1"><b>{m.full_name}</b><div className="text-xs text-muted-foreground">{pmap[m.id]?.academic_year ?? ""} {m.class_name ?? ""}</div></div>
+              <div className="flex-1"><button onClick={() => setHist({ id: m.id, name: m.full_name })} className="font-bold text-primary underline-offset-4 hover:underline" title="سجل الافتقادات">{m.full_name}</button><div className="text-xs text-muted-foreground">{pmap[m.id]?.academic_year ?? ""} {m.class_name ?? ""}</div></div>
               <div className="text-center"><div className="text-xs text-muted-foreground">النقاط</div><b className="text-primary">{m.points}</b></div>
               <div className="text-center"><div className="text-xs text-muted-foreground">الرصيد</div><b>{m.balance}</b></div>
               <button onClick={() => setOpen(open === m.id ? null : m.id)} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold">التفاصيل</button>
@@ -421,6 +425,7 @@ function Members() {
           </div>
         ))}
       </div>
+      <VisitHistoryDialog member={hist} onClose={() => setHist(null)} />
       <Dialog open={!!adj} onOpenChange={(o) => !o && setAdj(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>تعديل نقاط {adj?.full_name}</DialogTitle></DialogHeader>
@@ -681,6 +686,7 @@ function BadgesAndPoints() {
 function Notifications() {
   const qc = useQueryClient();
   const [selected, setSelected] = useState<string | null>(null);
+  const [item, setItem] = useState(null);
   const { data } = useQuery({ queryKey: ["admin-notif"], queryFn: async () => (await supabase.from("notifications").select("*").order("created_at", { ascending: false }).limit(100)).data ?? [] });
   const { data: preps } = useQuery({ queryKey: ["notif-prep-status"], queryFn: async () => (await supabase.rpc("admin_prep_status", { _offset: 0 })).data ?? [] });
   const { data: memberAbsence } = useQuery({ queryKey: ["notif-member-absence"], queryFn: async () => (await supabase.rpc("admin_absence_by_type", { _offset: 0, _type: "member" })).data ?? [] });
@@ -690,6 +696,7 @@ function Notifications() {
     { key: "prep", icon: "📘", label: "تحضير الخدام", rows: (data ?? []).filter((n) => n.kind === "prep") },
     { key: "visitation", icon: "📞", label: "افتقاد الخدام للمشتركين", rows: (data ?? []).filter((n) => n.kind === "visitation") },
     { key: "activity", icon: "✅", label: "أنشطة المشتركين", rows: (data ?? []).filter((n) => n.kind === "activity") },
+    { key: "suggestion", icon: "💡", label: "اقتراحات المشتركين", rows: (data ?? []).filter((n) => n.kind === "suggestion") },
     { key: "signup", icon: "📝", label: "طلبات التسجيل الجديدة", rows: (data ?? []).filter((n) => n.kind === "signup") },
     { key: "servant_absence", icon: "🚷", label: "غياب الخدام", rows: (servantAbsence ?? []).map((r) => ({ id: `sa-${r.id}`, message: `${r.full_name} غائب هذا الأسبوع`, read: false, created_at: new Date().toISOString(), synthetic: true })) },
     { key: "member_absence", icon: "🚫", label: "غياب المشتركين", rows: (memberAbsence ?? []).map((r) => ({ id: `ma-${r.id}`, message: `${r.full_name} · ${r.academic_year ?? "بدون مرحلة"}`, read: false, created_at: new Date().toISOString(), synthetic: true })) },
@@ -698,7 +705,7 @@ function Notifications() {
   const active = categories.find((c) => c.key === selected);
   const openCategory = async (key: string) => {
     setSelected(key);
-    if (["prep", "visitation", "activity", "signup"].includes(key)) {
+    if (["prep", "visitation", "activity", "signup", "suggestion"].includes(key)) {
       await supabase.from("notifications").update({ read: true }).eq("kind", key).eq("read", false);
       qc.invalidateQueries({ queryKey: ["admin-notif"] });
       qc.invalidateQueries({ queryKey: ["unread"] });
@@ -722,9 +729,17 @@ function Notifications() {
         <DialogHeader><DialogTitle>{active?.icon} {active?.label}</DialogTitle></DialogHeader>
         <div className="max-h-[65vh] space-y-2 overflow-y-auto">
           {!active?.rows.length && <p className="text-muted-foreground">لا توجد تنبيهات في هذا القسم.</p>}
-          {active?.rows.map((n) => <div key={n.id} className="rounded-xl bg-muted p-3 text-sm"><div className="font-bold">{n.message}</div>{!n.synthetic && <div className="mt-1 text-[11px] text-muted-foreground">{new Date(n.created_at).toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })}</div>}</div>)}
+          {active?.rows.map((n) => <div key={n.id} role="button" onClick={() => setItem(n)} className="cursor-pointer rounded-xl bg-muted p-3 text-sm hover:ring-2 hover:ring-primary"><div className="font-bold">{n.message}</div>{!n.synthetic && <div className="mt-1 text-[11px] text-muted-foreground">{new Date(n.created_at).toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })}</div>}</div>)}
         </div>
       </DialogContent></Dialog>
+      {item?.kind === "suggestion" && item.ref_id ? <SuggestionDetail id={item.ref_id} onClose={() => setItem(null)} /> : (
+        <Dialog open={!!item} onOpenChange={(o) => !o && setItem(null)}><DialogContent>
+          <DialogHeader><DialogTitle>{active?.icon} تفاصيل التنبيه</DialogTitle></DialogHeader>
+          <p className="whitespace-pre-wrap leading-7">{item?.message}</p>
+          {item && !item.synthetic && <div className="text-xs text-muted-foreground">{new Date(item.created_at).toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })}</div>}
+          {item?.synthetic && <p className="text-xs text-muted-foreground">تنبيه أسبوعي محسوب من بيانات هذا الأسبوع — التفاصيل الكاملة في تبويب «الغياب الأسبوعي» أو «الخدام والافتقاد».</p>}
+        </DialogContent></Dialog>
+      )}
     </div>
   );
 }
@@ -897,7 +912,7 @@ function Staff() {
 /* ---------- Quizzes ---------- */
 function AdminQuizzes() {
   const qc = useQueryClient();
-  const blank = () => ({ question: "", options: ["", "", "", ""], correct: 0, points: 5, image_url: null });
+  const blank = () => ({ question: "", options: ["", "", "", ""], correct: null, points: 5, image_url: null });
   const [opens, setOpens] = useState("");
   const [closes, setCloses] = useState("");
   const [qimg, setQimg] = useState<string | null>(null);
@@ -910,7 +925,9 @@ function AdminQuizzes() {
   const upd = (i, patch) => setQs(qs.map((q, j) => (j === i ? { ...q, ...patch } : q)));
   const create = async () => {
     if (!title.trim()) return toast.error("اكتب عنوان المسابقة");
-    const clean = qs.map((q) => ({ ...q, options: q.options.map((o) => o.trim()).filter(Boolean) }));
+    const missing = qs.findIndex((q) => q.correct === null || q.correct === undefined || !q.options[q.correct]?.trim());
+    if (missing >= 0) return toast.error(`حدد الإجابة الصحيحة يدويًا للسؤال ${missing + 1} قبل النشر`);
+    const clean = qs.map((q) => { const opts = q.options.map((o) => o.trim()); const kept = opts.filter(Boolean); return { ...q, options: kept, correct: kept.indexOf(opts[q.correct]) }; });
     if (opens && closes && new Date(closes) <= new Date(opens)) return toast.error("وقت القفل لازم يكون بعد وقت الفتح");
     if (clean.some((q) => !q.question.trim() || q.options.length < 2 || q.correct >= q.options.length)) return toast.error("كل سؤال يحتاج نصًا واختيارين على الأقل وإجابة صحيحة");
     const { data: auth } = await supabase.auth.getUser();
@@ -942,12 +959,13 @@ function AdminQuizzes() {
               <label key={k} className="flex items-center gap-2"><input type="radio" checked={q.correct === k} onChange={() => upd(i, { correct: k })} title="الإجابة الصحيحة" />
                 <Input value={o} onChange={(e) => upd(i, { options: q.options.map((x, m) => (m === k ? e.target.value : x)) })} placeholder={`اختيار ${k + 1}`} /></label>
             ))}</div>
-            <p className="mt-1 text-xs text-muted-foreground">حدد الدائرة بجوار الإجابة الصحيحة.</p>
+            <p className={`mt-1 text-xs font-bold ${q.correct === null ? "text-destructive" : "text-accent"}`}>{q.correct === null ? "⚠️ لم تحدد الإجابة الصحيحة بعد — اضغط الدائرة بجوارها" : `✓ الإجابة الصحيحة: اختيار ${q.correct + 1}`}</p>
           </div>
         ))}
         <div className="mt-3 flex gap-2"><button onClick={() => setQs([...qs, blank()])} className="rounded-xl bg-muted px-4 py-2 font-bold">+ سؤال</button>
-          <button onClick={create} className="rounded-xl bg-primary px-5 py-2 font-extrabold text-primary-foreground">نشر المسابقة</button></div>
+          <button onClick={create} disabled={qs.some((q) => q.correct === null)} className="rounded-xl bg-primary px-5 py-2 font-extrabold text-primary-foreground disabled:opacity-50">نشر المسابقة</button></div>
       </section>
+      <QuizLeague />
       <section className="space-y-2">{quizzes?.map((z) => (
         <div key={z.id} className={`${card} flex flex-wrap items-center justify-between gap-2`}>
           <span className="font-extrabold">🧠 {z.title} <span className="text-xs text-muted-foreground">{new Date(z.created_at).toLocaleDateString("ar-EG")}{z.opens_at && ` · يفتح ${new Date(z.opens_at).toLocaleString("ar-EG")}`}{z.closes_at && ` · يقفل ${new Date(z.closes_at).toLocaleString("ar-EG")}`}</span></span>
@@ -976,6 +994,7 @@ function WeekPicker({ off, setOff }: { off: number; setOff: (n: number) => void 
 function ServantsTab() {
   const [off, setOff] = useState(0);
   const [view, setView] = useState<string[] | null>(null);
+  const [arch, setArch] = useState(null);
   const { data: preps } = useQuery({ queryKey: ["admin-prep", off], queryFn: async () => { const { data, error } = await supabase.rpc("admin_prep_status", { _offset: off }); if (error) throw error; return data; } });
   const { data: visits } = useQuery({ queryKey: ["admin-visits", off], queryFn: async () => (await supabase.rpc("admin_visit_report", { _offset: off })).data ?? [] });
   const missing = preps?.filter((p) => !p.submitted) ?? [];
@@ -995,7 +1014,7 @@ function ServantsTab() {
       {!preps?.length && <p className="text-muted-foreground">لا يوجد خدام معتمدون بعد. الخادم يسجّل من صفحة الدخول «خادم» ثم توافق عليه من «طلبات التسجيل».</p>}
       <div className="grid gap-3 md:grid-cols-2">{preps?.map((p) => (
         <div key={p.user_id} className={`${card} ${p.submitted ? "" : "ring-2 ring-destructive"}`}>
-          <div className="flex items-center justify-between"><b>📘 {p.full_name}</b>
+          <div className="flex items-center justify-between"><button onClick={() => setArch({ id: p.user_id, name: p.full_name })} className="font-bold text-primary hover:underline" title="أرشيف التحضيرات">📘 {p.full_name}</button>
             <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${p.submitted ? "bg-accent text-accent-foreground" : "bg-destructive text-destructive-foreground"}`}>{p.submitted ? "✓ أرسل التحضير" : "✗ لم يرسل"}</span></div>
           <div className="mt-1 text-xs text-muted-foreground">افتقد {p.visits} مشترك{p.submitted_at && ` · ${new Date(p.submitted_at).toLocaleString("ar-EG")}`}</div>
           {p.notes && <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm">{p.notes}</p>}
@@ -1009,6 +1028,8 @@ function ServantsTab() {
           <div key={i} className="rounded-xl bg-muted p-2 text-sm"><b>{v.member}</b> <span className="text-xs text-muted-foreground">({v.academic_year ?? "—"})</span> ← {v.servant} · {{ call: "📞", visit: "🏠", message: "💬" }[v.method] ?? v.method}{v.note && <div className="text-xs">{v.note}</div>}</div>
         ))}</div>
       </section>
+      <Dialog open={!!arch} onOpenChange={(o) => !o && setArch(null)}><DialogContent className="max-w-2xl"><div className="max-h-[75vh] overflow-y-auto">{arch && <PrepArchive userId={arch.id} name={arch.name} />}</div></DialogContent></Dialog>
+      <p className="text-xs text-muted-foreground">اضغط اسم الخادم لعرض أرشيف تحضيراته كاملًا.</p>
       <Dialog open={!!view} onOpenChange={(o) => !o && setView(null)}><DialogContent><DialogHeader><DialogTitle>صور التحضير</DialogTitle></DialogHeader>
         <div className="max-h-[70vh] space-y-2 overflow-y-auto">{view?.map((s, i) => <img key={i} src={s} alt="" className="w-full rounded-xl" />)}</div></DialogContent></Dialog>
     </div>
@@ -1018,6 +1039,7 @@ function ServantsTab() {
 function AbsenceTab() {
   const [off, setOff] = useState(0);
   const [type, setType] = useState<"member" | "servant">("member");
+  const [hist, setHist] = useState(null);
   const { data } = useQuery({ queryKey: ["admin-absence", off, type], queryFn: async () => { const { data, error } = await supabase.rpc("admin_absence_by_type", { _offset: off, _type: type }); if (error) throw error; return data; } });
   const notify = async (y: string) => {
     const { data: n, error } = await supabase.rpc("admin_notify_absent", { _year: y });
@@ -1035,12 +1057,13 @@ function AbsenceTab() {
           <section key={y} className={card} style={{ animationDelay: `${i * 0.08}s` }}>
             <div className="mb-2 flex items-center justify-between"><h3 className="text-lg font-extrabold">{y}</h3><span className="rounded-full bg-destructive px-2 py-0.5 text-xs font-bold text-destructive-foreground">{rows.length} غائب</span></div>
             <div className="max-h-72 space-y-1 overflow-y-auto">{rows.map((r) => (
-              <div key={r.id} className="flex justify-between rounded-xl bg-muted p-2 text-sm"><span className="font-bold">{r.full_name}</span><span className="text-xs">{r.visited ? "✅ تم افتقاده" : "⏳ بدون افتقاد"}</span></div>
+              <div key={r.id} className="flex justify-between rounded-xl bg-muted p-2 text-sm"><button onClick={() => type === "member" && setHist({ id: r.id, name: r.full_name })} className="font-bold text-primary hover:underline">{r.full_name}</button><span className="text-xs">{r.visited ? "✅ تم افتقاده" : "⏳ بدون افتقاد"}</span></div>
             ))}{!rows.length && <p className="text-sm text-muted-foreground">لا يوجد غياب 🎉</p>}</div>
              {type === "member" && off === 0 && !!rows.length && <button onClick={() => notify(y)} className="mt-3 w-full rounded-xl bg-secondary py-2 text-sm font-bold text-secondary-foreground">🔔 إرسال إشعار الغياب</button>}
           </section>
         );
       })}</div>
+      <VisitHistoryDialog member={hist} onClose={() => setHist(null)} />
       {type === "member" && (data ?? []).some((r) => !ACADEMIC_YEARS.includes(r.academic_year)) && <p className="text-xs text-muted-foreground">يوجد {(data ?? []).filter((r) => !ACADEMIC_YEARS.includes(r.academic_year)).length} غائب بدون مرحلة محددة أو بمرحلة قديمة.</p>}
     </div>
   );
