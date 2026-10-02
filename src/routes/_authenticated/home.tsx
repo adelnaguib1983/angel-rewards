@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AnnouncementsBoard, NotificationsBell, Quizzes, openAnnouncement } from "@/components/MemberExtras";
+import { Birthdays, DailyReadings, QuizLeague, SuggestionForm } from "@/components/StaffMemberExtras";
 import { fileToDataUrl } from "@/lib/app";
 import { CalendarView, StreakBadges, StreakCard, WeeklyCoach } from "@/components/HomeExtras";
 
@@ -30,7 +31,7 @@ export const Route = createFileRoute("/_authenticated/home")({
 });
 
 const TABS = [
-  ["track", "🗓️", "إنجازاتي"], ["cal", "📅", "التقويم"], ["coach", "✨", "مرشدي"], ["badges", "🏅", "الأوسمة"], ["shop", "🎁", "الهدايا"], ["board", "🏆", "الشرف"], ["quiz", "🧠", "المسابقة"],
+  ["track", "🗓️", "إنجازاتي"], ["read", "📖", "قراءات يومية"], ["cal", "📅", "التقويم"], ["coach", "✨", "مرشدي"], ["badges", "🏅", "الأوسمة"], ["shop", "🎁", "الهدايا"], ["board", "🏆", "الشرف"], ["quiz", "🧠", "المسابقة"], ["bday", "🎂", "أعياد الميلاد"], ["suggest", "💡", "اقتراحات"],
 ] as const;
 
 function Home() {
@@ -77,9 +78,10 @@ function Home() {
         <section id="member-quizzes" className="scroll-mt-4 py-6" aria-labelledby="member-quizzes-heading">
           <h2 id="member-quizzes-heading" className="mb-3 text-2xl font-extrabold">🧠 المسابقات</h2>
           <Quizzes />
+          <div className="mt-4"><QuizLeague myId={me.user.id} /></div>
         </section>
         <AnnouncementsBoard userId={me.user.id} />
-        <nav aria-label="أقسام التطبيق" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-7 border-t-2 border-border bg-card/95 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-2xl backdrop-blur md:static md:my-6 md:flex md:gap-2 md:overflow-x-auto md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none">
+        <nav aria-label="أقسام التطبيق" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-border bg-card/95 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-2xl backdrop-blur md:static md:my-6 md:flex md:flex-wrap md:gap-2 md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none">
           {TABS.map(([k, icon, label]) => (
             <button key={k} onClick={() => k === "quiz" ? openQuiz() : setTab(k)}
               aria-current={tab === k ? "page" : undefined}
@@ -91,12 +93,15 @@ function Home() {
           ))}
         </nav>
         {tab === "track" && <><StreakCard /><Tracker userId={me.user.id} /></>}
+        {tab === "read" && <DailyReadings />}
+        {tab === "bday" && <Birthdays />}
+        {tab === "suggest" && <SuggestionForm />}
         {tab === "cal" && <CalendarView />}
         {tab === "coach" && <WeeklyCoach />}
         {tab === "badges" && <><Badges /><StreakBadges /></>}
         {tab === "shop" && <Shop />}
         {tab === "board" && <Board myId={me.user.id} />}
-        {tab === "quiz" && <p className="py-2 text-center text-sm text-muted-foreground">المسابقات ظاهرة أعلى الصفحة.</p>}
+        {tab === "quiz" && <p className="py-2 text-center text-sm text-muted-foreground">المسابقات ودوري المسابقات ظاهرة أعلى الصفحة.</p>}
       </main>
     </div>
   );

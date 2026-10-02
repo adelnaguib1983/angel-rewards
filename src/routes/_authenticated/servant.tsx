@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
 import { ACADEMIC_YEARS, fileToDataUrl, useMe } from "@/lib/app";
 import { Textarea } from "@/components/ui/textarea";
+import { BirthdaysButton, PrepArchive, ReadingPlanner, VisitArchive, VisitHistoryDialog } from "@/components/StaffMemberExtras";
+import { NotificationsBell } from "@/components/MemberExtras";
 
 export const Route = createFileRoute("/_authenticated/servant")({
   head: () => ({
@@ -26,7 +28,7 @@ const card = "pop float-in rounded-3xl border-2 border-border bg-card p-5";
 
 function ServantPage() {
   const { data: me, isLoading } = useMe();
-  const [tab, setTab] = useState<"prep" | "visit">("prep");
+  const [tab, setTab] = useState<string>("prep");
   if (isLoading || !me) return <div className="p-10 text-center">...</div>;
   const p = me.profile;
   const allowed = me.isAdmin || (p?.account_type === "servant" && p?.status === "approved");
@@ -48,12 +50,18 @@ function ServantPage() {
               <h1 className="text-3xl font-extrabold">{p?.full_name}</h1>
               <p className="text-sm text-muted-foreground">أرسل تحضيرك قبل يوم الخميس، وسجّل افتقادك للمشتركين كل أسبوع.</p>
             </div>
-            <nav className="my-5 flex gap-2">
-              {([["prep", "📘 تحضير الخادم"], ["visit", "📞 الافتقاد الأسبوعي"]] as const).map(([k, l]) => (
+            <nav className="my-5 flex flex-wrap gap-2">
+              {([["prep", "📘 تحضير الخادم"], ["visit", "📞 الافتقاد الأسبوعي"], ["preparch", "📚 أرشيف التحضيرات"], ["visitarch", "🗂️ أرشيف الافتقاد"], ["read", "📖 القراءات اليومية"]] as const).map(([k, l]) => (
                 <button key={k} onClick={() => setTab(k)} className={`rounded-2xl border-2 px-4 py-2 font-bold transition ${tab === k ? "border-sky bg-sky text-primary-foreground pop" : "border-border bg-card"}`}>{l}</button>
               ))}
+              <BirthdaysButton />
+              <div className="mr-auto"><NotificationsBell /></div>
             </nav>
-            {tab === "prep" ? <Prep userId={me.user.id} /> : <Visits />}
+            {tab === "prep" && <Prep userId={me.user.id} />}
+            {tab === "visit" && <Visits />}
+            {tab === "preparch" && <PrepArchive userId={me.user.id} />}
+            {tab === "visitarch" && <VisitArchive />}
+            {tab === "read" && <ReadingPlanner />}
           </>
         )}
       </main>
@@ -137,6 +145,7 @@ function Visits() {
   const [open, setOpen] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [method, setMethod] = useState("call");
+  const [hist, setHist] = useState(null);
   const { data } = useQuery({ queryKey: ["servant-members"], queryFn: async () => { const { data, error } = await supabase.rpc("servant_members"); if (error) throw error; return data; } });
   const rows = (data ?? []).filter((m) => m.academic_year === year);
   const save = async (member_id: string) => {
@@ -156,7 +165,7 @@ function Visits() {
         <div key={m.id} className={card}>
           <div className="flex items-center gap-3">
             {m.photo_url ? <img src={m.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-3xl">{m.avatar}</span>}
-            <b className="flex-1">{m.full_name}</b>
+            <button onClick={() => setHist({ id: m.id, name: m.full_name })} className="flex-1 text-right font-bold text-primary underline-offset-4 hover:underline" title="سجل الافتقادات">{m.full_name}</button>
             {!m.active_this_week && <span title="لم يسجل نشاطًا">🔴</span>}
             {m.visited ? <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-accent-foreground">✅ تم</span>
               : <button onClick={() => { setOpen(m.id); setNote(""); }} className="rounded-xl bg-sky px-3 py-1.5 text-sm font-bold text-primary-foreground">افتقاد</button>}
@@ -173,6 +182,7 @@ function Visits() {
           )}
         </div>
       ))}</div>
+      <VisitHistoryDialog member={hist} onClose={() => setHist(null)} />
     </div>
   );
 }

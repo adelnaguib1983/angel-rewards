@@ -222,6 +222,39 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_readings: {
+        Row: {
+          book_name: string
+          book_nr: number
+          chapter: number
+          created_at: string
+          created_by: string
+          id: string
+          points: number
+          reading_date: string
+        }
+        Insert: {
+          book_name: string
+          book_nr: number
+          chapter: number
+          created_at?: string
+          created_by?: string
+          id?: string
+          points?: number
+          reading_date: string
+        }
+        Update: {
+          book_name?: string
+          book_nr?: number
+          chapter?: number
+          created_at?: string
+          created_by?: string
+          id?: string
+          points?: number
+          reading_date?: string
+        }
+        Relationships: []
+      }
       gifts: {
         Row: {
           active: boolean
@@ -264,6 +297,7 @@ export type Database = {
           message: string
           quiz_id: string | null
           read: boolean
+          ref_id: string | null
           user_id: string
         }
         Insert: {
@@ -274,6 +308,7 @@ export type Database = {
           message: string
           quiz_id?: string | null
           read?: boolean
+          ref_id?: string | null
           user_id: string
         }
         Update: {
@@ -284,6 +319,7 @@ export type Database = {
           message?: string
           quiz_id?: string | null
           read?: boolean
+          ref_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -311,6 +347,7 @@ export type Database = {
           kind: string
           message: string
           read: boolean
+          ref_id: string | null
         }
         Insert: {
           actor_id?: string | null
@@ -319,6 +356,7 @@ export type Database = {
           kind: string
           message: string
           read?: boolean
+          ref_id?: string | null
         }
         Update: {
           actor_id?: string | null
@@ -327,6 +365,7 @@ export type Database = {
           kind?: string
           message?: string
           read?: boolean
+          ref_id?: string | null
         }
         Relationships: []
       }
@@ -544,6 +583,35 @@ export type Database = {
         }
         Relationships: []
       }
+      reading_completions: {
+        Row: {
+          created_at: string
+          id: string
+          reading_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          reading_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          reading_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reading_completions_reading_id_fkey"
+            columns: ["reading_id"]
+            isOneToOne: false
+            referencedRelation: "daily_readings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       redemptions: {
         Row: {
           admin_note: string | null
@@ -612,6 +680,30 @@ export type Database = {
           updated_at?: string
           user_id?: string
           week_start?: string
+        }
+        Relationships: []
+      }
+      suggestions: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          images: string[]
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          images?: string[]
+          user_id?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          images?: string[]
+          user_id?: string
         }
         Relationships: []
       }
@@ -766,7 +858,19 @@ export type Database = {
         Returns: Json
       }
       balance_of: { Args: { _uid: string }; Returns: number }
+      birthdays: {
+        Args: { _month: number }
+        Returns: {
+          academic_year: string
+          avatar: string
+          day: number
+          full_name: string
+          id: string
+          photo_url: string
+        }[]
+      }
       can_view_contacts: { Args: { _uid: string }; Returns: boolean }
+      complete_reading: { Args: { _reading: string }; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -799,6 +903,16 @@ export type Database = {
           id: string
           photo_url: string
           points: number
+        }[]
+      }
+      member_visit_history: {
+        Args: { _member: string }
+        Returns: {
+          created_at: string
+          method: string
+          note: string
+          servant: string
+          week_start: string
         }[]
       }
       my_contact: {
@@ -835,6 +949,18 @@ export type Database = {
         Returns: undefined
       }
       points_of: { Args: { _uid: string }; Returns: number }
+      quiz_league: {
+        Args: never
+        Returns: {
+          academic_year: string
+          avatar: string
+          full_name: string
+          id: string
+          photo_url: string
+          points: number
+          quizzes: number
+        }[]
+      }
       quiz_open: { Args: { _quiz: string }; Returns: boolean }
       quiz_questions_for: {
         Args: { _quiz: string }
@@ -900,6 +1026,19 @@ export type Database = {
           address: string
           birth_date: string
           phone: string
+        }[]
+      }
+      visit_archive: {
+        Args: never
+        Returns: {
+          academic_year: string
+          created_at: string
+          id: string
+          member: string
+          member_id: string
+          method: string
+          note: string
+          servant: string
         }[]
       }
       week_start: { Args: { _offset?: number }; Returns: string }

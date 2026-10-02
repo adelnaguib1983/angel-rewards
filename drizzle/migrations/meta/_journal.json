@@ -64,6 +64,13 @@
       "when": 1790813160941,
       "tag": "0008_separate_notifications_and_absence",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790929938028,
+      "tag": "0009_suggestions_readings_archives",
+      "breakpoints": true
     }
   ]
 }
