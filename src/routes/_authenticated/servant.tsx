@@ -182,6 +182,7 @@ function Visits() {
           )}
         </div>
       ))}</div>
+      <VisitHistoryDialog member={hist} onClose={() => setHist(null)} />
     </div>
   );
 }
