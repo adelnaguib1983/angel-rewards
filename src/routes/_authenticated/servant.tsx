@@ -14,9 +14,9 @@ export const Route = createFileRoute("/_authenticated/servant")({
   head: () => ({
     meta: [
       { title: "مرحلة الخدام | أبطال الإيمان" },
-      { name: "description", content: "تحضير الخادم الأسبوعي وافتقاد المشتركين." },
+      { name: "description", content: "تحضير الخادم الأسبوعي وافتقاد المخدومين." },
       { property: "og:title", content: "مرحلة الخدام | أبطال الإيمان" },
-      { property: "og:description", content: "تحضير الخادم الأسبوعي وافتقاد المشتركين." },
+      { property: "og:description", content: "تحضير الخادم الأسبوعي وافتقاد المخدومين." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -48,7 +48,7 @@ function ServantPage() {
             <div className="rounded-3xl bg-gradient-to-l from-sky/40 via-card to-card p-5 pop float-in">
               <div className="text-sm font-bold text-sky">أهلا يا خادم 🙏</div>
               <h1 className="text-3xl font-extrabold">{p?.full_name}</h1>
-              <p className="text-sm text-muted-foreground">أرسل تحضيرك قبل يوم الخميس، وسجّل افتقادك للمشتركين كل أسبوع.</p>
+              <p className="text-sm text-muted-foreground">أرسل تحضيرك قبل يوم الخميس، وسجّل افتقادك للمخدومين كل أسبوع.</p>
             </div>
             <nav className="my-5 flex flex-wrap gap-2">
               {([["prep", "📘 تحضير الخادم"], ["visit", "📞 الافتقاد الأسبوعي"], ["preparch", "📚 أرشيف التحضيرات"], ["visitarch", "🗂️ أرشيف الافتقاد"], ["read", "📖 القراءات اليومية"]] as const).map(([k, l]) => (
@@ -160,7 +160,7 @@ function Visits() {
         <button key={y} onClick={() => setYear(y)} className={`rounded-xl px-3 py-1.5 text-sm font-bold ${year === y ? "bg-sky text-primary-foreground" : "bg-card"}`}>{y} ({(data ?? []).filter((m) => m.academic_year === y).length})</button>
       ))}</div>
       <p className="text-xs text-muted-foreground">🔴 = لم يسجّل أي نشاط هذا الأسبوع (يحتاج افتقاد) · ✅ = تم افتقاده هذا الأسبوع. التقرير يصل للمشرف تلقائيًا.</p>
-      {!rows.length && <p className="text-muted-foreground">لا يوجد مشتركون في هذه المرحلة.</p>}
+      {!rows.length && <p className="text-muted-foreground">لا يوجد مخدومون في هذه المرحلة.</p>}
       <div className="grid gap-3 md:grid-cols-2">{rows.map((m) => (
         <div key={m.id} className={card}>
           <div className="flex items-center gap-3">

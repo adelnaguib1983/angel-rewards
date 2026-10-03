@@ -23,7 +23,7 @@ export function VisitHistoryDialog({ member, onClose }: { member: { id: string; 
         <DialogHeader><DialogTitle>📜 سجل الافتقادات التراكمي: {member?.name}</DialogTitle></DialogHeader>
         <div className="max-h-[65vh] overflow-y-auto pr-1">
           {isLoading && <p className="text-muted-foreground">جاري التحميل...</p>}
-          {!isLoading && !data?.length && <p className="text-muted-foreground">لم يتم افتقاد هذا المشترك من قبل.</p>}
+          {!isLoading && !data?.length && <p className="text-muted-foreground">لم يتم افتقاد هذا المخدوم من قبل.</p>}
           <ol className="relative mr-3 border-r-2 border-sky">
             {data?.map((v, i) => (
               <li key={i} className="relative mb-4 pr-5">
@@ -49,7 +49,7 @@ export function VisitArchive() {
   return (
     <section className={card}>
       <h2 className="mb-3 text-xl font-extrabold">🗂️ أرشيف الافتقاد</h2>
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث باسم المشترك أو الخادم" className="mb-3 w-full rounded-xl border-2 border-border bg-background px-3 py-2" />
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث باسم المخدوم أو الخادم" className="mb-3 w-full rounded-xl border-2 border-border bg-background px-3 py-2" />
       {!rows.length && <p className="text-muted-foreground">لا يوجد افتقاد مسجّل.</p>}
       <div className="max-h-[70vh] space-y-2 overflow-y-auto">{rows.map((v) => (
         <div key={v.id} className="rounded-xl bg-muted p-3 text-sm">

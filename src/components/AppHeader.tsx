@@ -5,7 +5,7 @@ import { signOut } from "@/lib/app";
 
 type Stage = "member" | "servant" | "admin";
 const STAGE: Record<Stage, { label: string; cls: string; badge: string }> = {
-  member: { label: "🦁 مرحلة المشتركين", cls: "stage-member", badge: "bg-primary text-primary-foreground" },
+  member: { label: "🦁 مرحلة المخدومين", cls: "stage-member", badge: "bg-primary text-primary-foreground" },
   servant: { label: "📘 مرحلة الخدام", cls: "stage-servant", badge: "bg-sky text-primary-foreground" },
   admin: { label: "🛡️ مرحلة المشرفين", cls: "stage-admin", badge: "bg-secondary text-secondary-foreground" },
 };
@@ -26,7 +26,7 @@ export function AppHeader({ name, avatar, photo, isAdmin, stage = "member", chil
           {children}
           {isAdmin && (
             <nav className="flex gap-1 text-xs font-bold">
-              {stage !== "member" && <Link to="/home" className="rounded-xl bg-primary px-2 py-1.5 text-primary-foreground">المشتركين</Link>}
+              {stage !== "member" && <Link to="/home" className="rounded-xl bg-primary px-2 py-1.5 text-primary-foreground">المخدومين</Link>}
               {stage !== "servant" && <Link to="/servant" className="rounded-xl bg-sky px-2 py-1.5 text-primary-foreground">الخدام</Link>}
               {stage !== "admin" && <Link to="/admin" className="rounded-xl bg-secondary px-2 py-1.5 text-secondary-foreground">المشرف</Link>}
             </nav>

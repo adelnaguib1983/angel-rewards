@@ -14,9 +14,9 @@ export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
     meta: [
       { title: "لوحة المشرف | أبطال الإيمان" },
-      { name: "description", content: "إدارة المشتركين والأنشطة والهدايا والنقاط." },
+      { name: "description", content: "إدارة المخدومين والأنشطة والهدايا والنقاط." },
       { property: "og:title", content: "لوحة المشرف | أبطال الإيمان" },
-      { property: "og:description", content: "إدارة المشتركين والأنشطة والهدايا والنقاط." },
+      { property: "og:description", content: "إدارة المخدومين والأنشطة والهدايا والنقاط." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -38,7 +38,7 @@ function useMembers() {
 }
 
 const TABS = [
-  ["summary", "📊 الملخص الأسبوعي"], ["announcements", "📣 الإعلانات"], ["requests", "📝 طلبات التسجيل"], ["members", "👥 المشتركون"], ["servants", "📘 الخدام والافتقاد"], ["absence", "🚫 الغياب الأسبوعي"],
+  ["summary", "📊 الملخص الأسبوعي"], ["announcements", "📣 الإعلانات"], ["requests", "📝 طلبات التسجيل"], ["members", "👥 المخدومون"], ["servants", "📘 الخدام والافتقاد"], ["absence", "🚫 الغياب الأسبوعي"],
   ["activities", "✅ الأنشطة"], ["redeem", "🎁 طلبات الهدايا"], ["log", "📒 سجل النقاط"],
   ["archive", "🗂️ الأرشيف والمقارنة"], ["gifts", "🛍️ الهدايا"], ["badges", "🏅 الأوسمة والنقاط"], ["notif", "🔔 مركز التنبيهات"], ["quiz", "🧠 المسابقات"], ["visitarch", "🗂️ أرشيف الافتقاد"], ["read", "📖 القراءات اليومية"],
   ["audit", "🕵️ سجل التدقيق"], ["staff", "🔑 الصلاحيات"],
@@ -177,7 +177,7 @@ function Announcements() {
               <input type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; try { setForm({ ...form, image_url: await fileToDataUrl(f, 1000, 0.75) }); } catch (err) { toast.error((err as Error).message); } }} /></label>
             {form.image_url && <><img src={form.image_url} alt="" className="h-16 rounded-xl object-cover" /><button onClick={() => setForm({ ...form, image_url: "" })} className="text-sm text-destructive">إزالة</button></>}
           </div>
-          <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={form.published} onChange={(e) => setForm({ ...form, published: e.target.checked })} /> ظاهر للمشتركين</label>
+          <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={form.published} onChange={(e) => setForm({ ...form, published: e.target.checked })} /> ظاهر للمخدومين</label>
           <div className="flex gap-2 md:justify-end"><button onClick={save} className="rounded-xl bg-primary px-5 py-2 font-extrabold text-primary-foreground">{editing ? "حفظ التعديل" : "نشر الإعلان"}</button>{editing && <button onClick={() => { setEditing(null); setForm(empty); }} className="rounded-xl bg-muted px-4 py-2 font-bold">إلغاء</button>}</div>
         </div>
       </section>
@@ -272,7 +272,7 @@ function Summary({ initialOffset = 0 }: { initialOffset?: number }) {
       </div>
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
         <DialogContent className="max-h-[80vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{detail === "acts" ? "الأنشطة المكتملة" : detail === "points" ? "النقاط لكل مشترك" : "المشتركون المفعّلون"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{detail === "acts" ? "الأنشطة المكتملة" : detail === "points" ? "النقاط لكل مخدوم" : "المخدومون المفعّلون"}</DialogTitle></DialogHeader>
           {detail === "acts" && (logs.length ? [...logs].sort((a, b) => b.created_at.localeCompare(a.created_at)).map((l) => {
             const s = settings?.find((x) => x.key === l.activity);
             return <div key={l.id} className="flex items-center gap-2 border-b border-border py-2 text-sm last:border-0"><span>{s?.emoji}</span><span className="flex-1">{s?.label ?? l.activity}</span><b>{names[l.user_id]?.full_name ?? "—"}</b><span className="text-xs text-muted-foreground">{cairoDate(l.created_at)}</span></div>;
@@ -332,7 +332,7 @@ function Requests() {
       {data.map((p) => (
         <div key={p.id} className={card}>
           <div className="flex items-center justify-between">
-            <b className="text-lg">{p.avatar} {p.full_name} <span className={`rounded-full px-2 py-0.5 text-xs ${p.account_type === "servant" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>{p.account_type === "servant" ? "خادم" : "مشترك"}</span></b>
+            <b className="text-lg">{p.avatar} {p.full_name} <span className={`rounded-full px-2 py-0.5 text-xs ${p.account_type === "servant" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>{p.account_type === "servant" ? "خادم" : "مخدوم"}</span></b>
             <span className={`rounded-full px-2 py-0.5 text-xs ${p.status === "rejected" ? "bg-destructive text-destructive-foreground" : "bg-primary text-primary-foreground"}`}>{p.status === "rejected" ? "مرفوض" : "جديد"}</span>
           </div>
           <Contact p={p} />
@@ -418,7 +418,7 @@ function Members() {
                 if (!confirm(`إزالة ${m.full_name} نهائيًا من البرنامج؟ سيتم حذف كل بياناته.`)) return;
                 const { error } = await supabase.rpc("admin_remove_member", { _member: m.id });
                 if (error) return toast.error(error.message);
-                toast.success("تمت إزالة المشترك"); qc.invalidateQueries();
+                toast.success("تمت إزالة المخدوم"); qc.invalidateQueries();
               }} className="rounded-xl bg-destructive px-3 py-1.5 text-sm font-bold text-destructive-foreground">🗑️ إزالة</button>
             </div>
             {open === m.id && pmap[m.id] && <Contact p={pmap[m.id]} />}
@@ -694,12 +694,12 @@ function Notifications() {
   const missingPrep = (preps ?? []).filter((p) => !p.submitted);
   const categories = [
     { key: "prep", icon: "📘", label: "تحضير الخدام", rows: (data ?? []).filter((n) => n.kind === "prep") },
-    { key: "visitation", icon: "📞", label: "افتقاد الخدام للمشتركين", rows: (data ?? []).filter((n) => n.kind === "visitation") },
-    { key: "activity", icon: "✅", label: "أنشطة المشتركين", rows: (data ?? []).filter((n) => n.kind === "activity") },
-    { key: "suggestion", icon: "💡", label: "اقتراحات المشتركين", rows: (data ?? []).filter((n) => n.kind === "suggestion") },
+    { key: "visitation", icon: "📞", label: "افتقاد الخدام للمخدومين", rows: (data ?? []).filter((n) => n.kind === "visitation") },
+    { key: "activity", icon: "✅", label: "أنشطة المخدومين", rows: (data ?? []).filter((n) => n.kind === "activity") },
+    { key: "suggestion", icon: "💡", label: "اقتراحات المخدومين", rows: (data ?? []).filter((n) => n.kind === "suggestion") },
     { key: "signup", icon: "📝", label: "طلبات التسجيل الجديدة", rows: (data ?? []).filter((n) => n.kind === "signup") },
     { key: "servant_absence", icon: "🚷", label: "غياب الخدام", rows: (servantAbsence ?? []).map((r) => ({ id: `sa-${r.id}`, message: `${r.full_name} غائب هذا الأسبوع`, read: false, created_at: new Date().toISOString(), synthetic: true })) },
-    { key: "member_absence", icon: "🚫", label: "غياب المشتركين", rows: (memberAbsence ?? []).map((r) => ({ id: `ma-${r.id}`, message: `${r.full_name} · ${r.academic_year ?? "بدون مرحلة"}`, read: false, created_at: new Date().toISOString(), synthetic: true })) },
+    { key: "member_absence", icon: "🚫", label: "غياب المخدومين", rows: (memberAbsence ?? []).map((r) => ({ id: `ma-${r.id}`, message: `${r.full_name} · ${r.academic_year ?? "بدون مرحلة"}`, read: false, created_at: new Date().toISOString(), synthetic: true })) },
     { key: "missing_prep", icon: "⏰", label: "لم يرسلوا التحضير", rows: missingPrep.map((r) => ({ id: `mp-${r.user_id}`, message: `${r.full_name} لم يرسل تحضير هذا الأسبوع`, read: false, created_at: new Date().toISOString(), synthetic: true })) },
   ];
   const active = categories.find((c) => c.key === selected);
@@ -947,7 +947,7 @@ function AdminQuizzes() {
           <label className="text-xs font-bold">🔒 وقت القفل<Input type="datetime-local" value={closes} onChange={(e) => setCloses(e.target.value)} /></label>
           <label className="cursor-pointer rounded-xl border-2 border-dashed border-border p-2 text-center text-xs font-bold hover:bg-muted">{qimg ? <img src={qimg} alt="" className="mx-auto h-12 rounded" /> : "📷 صورة المسابقة"}<input type="file" accept="image/*" className="hidden" onChange={(e) => pickImg(e, setQimg)} /></label>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">اترك الوقت فارغًا لتفتح فورًا ولا تُقفل. التصحيح تلقائي بعد كل سؤال والنقاط تُضاف للمجموع، والمشترك لا يستطيع إعادة الحل.</p>
+        <p className="mt-1 text-xs text-muted-foreground">اترك الوقت فارغًا لتفتح فورًا ولا تُقفل. التصحيح تلقائي بعد كل سؤال والنقاط تُضاف للمجموع، والمخدوم لا يستطيع إعادة الحل.</p>
         {qs.map((q, i) => (
           <div key={i} className="mt-3 rounded-2xl bg-muted p-3">
             <div className="flex gap-2"><Input value={q.question} onChange={(e) => upd(i, { question: e.target.value })} placeholder={`السؤال ${i + 1}`} />
@@ -999,7 +999,7 @@ function ServantsTab() {
   const { data: visits } = useQuery({ queryKey: ["admin-visits", off], queryFn: async () => (await supabase.rpc("admin_visit_report", { _offset: off })).data ?? [] });
   const missing = preps?.filter((p) => !p.submitted) ?? [];
   const csv = () => {
-    const rows = [["الخادم", "المشترك", "المرحلة", "الطريقة", "الملاحظات", "التاريخ"], ...(visits ?? []).map((v) => [v.servant, v.member, v.academic_year ?? "", v.method, v.note, new Date(v.created_at).toLocaleString("ar-EG")])];
+    const rows = [["الخادم", "المخدوم", "المرحلة", "الطريقة", "الملاحظات", "التاريخ"], ...(visits ?? []).map((v) => [v.servant, v.member, v.academic_year ?? "", v.method, v.note, new Date(v.created_at).toLocaleString("ar-EG")])];
     const blob = new Blob(["\ufeff" + rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n")], { type: "text/csv" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `visits-week-${off}.csv`; a.click();
   };
@@ -1016,7 +1016,7 @@ function ServantsTab() {
         <div key={p.user_id} className={`${card} ${p.submitted ? "" : "ring-2 ring-destructive"}`}>
           <div className="flex items-center justify-between"><button onClick={() => setArch({ id: p.user_id, name: p.full_name })} className="font-bold text-primary hover:underline" title="أرشيف التحضيرات">📘 {p.full_name}</button>
             <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${p.submitted ? "bg-accent text-accent-foreground" : "bg-destructive text-destructive-foreground"}`}>{p.submitted ? "✓ أرسل التحضير" : "✗ لم يرسل"}</span></div>
-          <div className="mt-1 text-xs text-muted-foreground">افتقد {p.visits} مشترك{p.submitted_at && ` · ${new Date(p.submitted_at).toLocaleString("ar-EG")}`}</div>
+          <div className="mt-1 text-xs text-muted-foreground">افتقد {p.visits} مخدوم{p.submitted_at && ` · ${new Date(p.submitted_at).toLocaleString("ar-EG")}`}</div>
           {p.notes && <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm">{p.notes}</p>}
           {!!p.images?.length && <div className="mt-2 flex flex-wrap gap-2">{p.images.map((s, i) => <img key={i} src={s} alt="" onClick={() => setView(p.images)} className="h-16 w-16 cursor-pointer rounded-lg object-cover" />)}</div>}
         </div>
@@ -1044,13 +1044,13 @@ function AbsenceTab() {
   const notify = async (y: string) => {
     const { data: n, error } = await supabase.rpc("admin_notify_absent", { _year: y });
     if (error) return toast.error(error.message);
-    toast.success(`تم إرسال إشعار الغياب إلى ${n} مشترك`);
+    toast.success(`تم إرسال إشعار الغياب إلى ${n} مخدوم`);
   };
   return (
     <div className="space-y-4">
       <WeekPicker off={off} setOff={setOff} />
-      <div className="flex gap-2"><button onClick={() => setType("member")} className={`rounded-xl px-4 py-2 font-bold ${type === "member" ? "bg-primary text-primary-foreground" : "bg-card"}`}>👥 غياب المشتركين</button><button onClick={() => setType("servant")} className={`rounded-xl px-4 py-2 font-bold ${type === "servant" ? "bg-sky text-primary-foreground" : "bg-card"}`}>📘 غياب الخدام</button></div>
-      <p className="text-xs text-muted-foreground">{type === "member" ? "الغائب = مشترك معتمد لم يسجّل أي نشاط خلال الأسبوع من الأحد إلى السبت." : "الغائب = خادم معتمد لم يرسل تحضيرًا ولم يسجّل افتقادًا خلال الأسبوع."}</p>
+      <div className="flex gap-2"><button onClick={() => setType("member")} className={`rounded-xl px-4 py-2 font-bold ${type === "member" ? "bg-primary text-primary-foreground" : "bg-card"}`}>👥 غياب المخدومين</button><button onClick={() => setType("servant")} className={`rounded-xl px-4 py-2 font-bold ${type === "servant" ? "bg-sky text-primary-foreground" : "bg-card"}`}>📘 غياب الخدام</button></div>
+      <p className="text-xs text-muted-foreground">{type === "member" ? "الغائب = مخدوم معتمد لم يسجّل أي نشاط خلال الأسبوع من الأحد إلى السبت." : "الغائب = خادم معتمد لم يرسل تحضيرًا ولم يسجّل افتقادًا خلال الأسبوع."}</p>
       <div className={`grid gap-4 ${type === "member" ? "md:grid-cols-3" : "md:grid-cols-2"}`}>{(type === "member" ? ACADEMIC_YEARS : ["الخدام"]).map((y, i) => {
         const rows = type === "member" ? (data ?? []).filter((r) => r.academic_year === y) : (data ?? []);
         return (
