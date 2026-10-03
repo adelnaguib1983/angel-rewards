@@ -653,6 +653,27 @@ export type Database = {
           },
         ]
       }
+      servant_attendance: {
+        Row: {
+          created_at: string
+          id: string
+          servant_id: string
+          week_start: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          servant_id?: string
+          week_start?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          servant_id?: string
+          week_start?: string
+        }
+        Relationships: []
+      }
       servant_preparations: {
         Row: {
           created_at: string
@@ -825,6 +846,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_servant_attendance: {
+        Args: { _offset?: number }
+        Returns: {
+          attended: boolean
+          attended_at: string
+          full_name: string
+          user_id: string
+        }[]
+      }
       admin_set_account_type: {
         Args: { _member: string; _type: string }
         Returns: undefined
@@ -905,6 +935,7 @@ export type Database = {
           points: number
         }[]
       }
+      mark_servant_attendance: { Args: never; Returns: string }
       member_visit_history: {
         Args: { _member: string }
         Returns: {
@@ -933,6 +964,10 @@ export type Database = {
       }
       my_permissions: { Args: never; Returns: Json }
       my_stats: { Args: never; Returns: Json }
+      notify_missing_preparations: {
+        Args: { _offset?: number }
+        Returns: number
+      }
       owner_list_staff: {
         Args: never
         Returns: {

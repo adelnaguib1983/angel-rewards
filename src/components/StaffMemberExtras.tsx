@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { MONTHS, cairoDate, fileToDataUrl } from "@/lib/app";
+import { ImageLightbox } from "@/components/ImageLightbox";
 
 const card = "pop float-in rounded-3xl border-2 border-border bg-card p-5";
 const METHOD = { call: "📞 مكالمة", visit: "🏠 زيارة", message: "💬 رسالة" };
@@ -23,7 +24,7 @@ export function VisitHistoryDialog({ member, onClose }: { member: { id: string; 
         <DialogHeader><DialogTitle>📜 سجل الافتقادات التراكمي: {member?.name}</DialogTitle></DialogHeader>
         <div className="max-h-[65vh] overflow-y-auto pr-1">
           {isLoading && <p className="text-muted-foreground">جاري التحميل...</p>}
-          {!isLoading && !data?.length && <p className="text-muted-foreground">لم يتم افتقاد هذا المشترك من قبل.</p>}
+          {!isLoading && !data?.length && <p className="text-muted-foreground">لم يتم افتقاد هذا المخدوم من قبل.</p>}
           <ol className="relative mr-3 border-r-2 border-sky">
             {data?.map((v, i) => (
               <li key={i} className="relative mb-4 pr-5">
@@ -49,7 +50,7 @@ export function VisitArchive() {
   return (
     <section className={card}>
       <h2 className="mb-3 text-xl font-extrabold">🗂️ أرشيف الافتقاد</h2>
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث باسم المشترك أو الخادم" className="mb-3 w-full rounded-xl border-2 border-border bg-background px-3 py-2" />
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث باسم المخدوم أو الخادم" className="mb-3 w-full rounded-xl border-2 border-border bg-background px-3 py-2" />
       {!rows.length && <p className="text-muted-foreground">لا يوجد افتقاد مسجّل.</p>}
       <div className="max-h-[70vh] space-y-2 overflow-y-auto">{rows.map((v) => (
         <div key={v.id} className="rounded-xl bg-muted p-3 text-sm">
@@ -68,7 +69,7 @@ export function VisitArchive() {
 
 /* ---------- Preparation archive ---------- */
 export function PrepArchive({ userId, name }: { userId: string; name?: string }) {
-  const [view, setView] = useState<string | null>(null);
+  const [view, setView] = useState<string[] | null>(null);
   const { data } = useQuery({
     queryKey: ["prep-archive", userId],
     queryFn: async () => { const { data, error } = await supabase.from("servant_preparations").select("*").eq("user_id", userId).order("week_start", { ascending: false }); if (error) throw error; return data; },
@@ -81,10 +82,10 @@ export function PrepArchive({ userId, name }: { userId: string; name?: string })
         <details key={r.id} className="rounded-2xl border-2 border-border bg-card p-3">
           <summary className="cursor-pointer font-bold">📘 أسبوع {r.week_start} <span className="text-xs font-normal text-muted-foreground">· {fmt(r.updated_at)} · {r.images?.length ?? 0} صورة</span></summary>
           <p className="mt-2 whitespace-pre-wrap text-sm leading-7">{r.notes || "بدون نص"}</p>
-          <div className="mt-2 flex flex-wrap gap-2">{r.images?.map((s, i) => <img key={i} src={s} alt="" onClick={() => setView(s)} className="h-24 w-24 cursor-pointer rounded-xl object-cover" />)}</div>
+          <div className="mt-2 flex flex-wrap gap-2">{r.images?.map((s, i) => <img key={i} src={s} alt="" onClick={() => setView(r.images)} className="h-24 w-24 cursor-zoom-in rounded-xl object-cover" />)}</div>
         </details>
       ))}
-      <Dialog open={!!view} onOpenChange={(o) => !o && setView(null)}><DialogContent><img src={view ?? ""} alt="" className="w-full rounded-xl" /></DialogContent></Dialog>
+      <ImageLightbox images={view} title="صور التحضير" onClose={() => setView(null)} />
     </div>
   );
 }
@@ -165,6 +166,7 @@ export function SuggestionForm() {
 }
 
 export function SuggestionDetail({ id, onClose }: { id: string | null; onClose: () => void }) {
+  const [gallery, setGallery] = useState<string[] | null>(null);
   const { data } = useQuery({ queryKey: ["suggestion", id], enabled: !!id, queryFn: async () => (await supabase.from("suggestions").select("*").eq("id", id).maybeSingle()).data });
   return (
     <Dialog open={!!id} onOpenChange={(o) => !o && onClose()}><DialogContent>
@@ -173,11 +175,17 @@ export function SuggestionDetail({ id, onClose }: { id: string | null; onClose: 
         {!data ? <p className="text-muted-foreground">جاري التحميل...</p> : <>
           <div className="text-xs text-muted-foreground">{fmt(data.created_at)}</div>
           <p className="whitespace-pre-wrap leading-7">{data.body}</p>
-          {data.images?.map((s, i) => <img key={i} src={s} alt="" className="w-full rounded-xl" />)}
+          {data.images?.map((s, i) => <img key={i} src={s} alt="" onClick={() => setGallery(data.images)} className="w-full cursor-zoom-in rounded-xl" />)}
         </>}
       </div>
-    </DialogContent></Dialog>
+    </DialogContent><ImageLightbox images={gallery} title="صور الاقتراح" onClose={() => setGallery(null)} /></Dialog>
   );
+}
+
+export function PrepDetail({ id, onClose }: { id: string | null; onClose: () => void }) {
+  const [gallery, setGallery] = useState<string[] | null>(null);
+  const { data } = useQuery({ queryKey: ["prep-detail", id], enabled: !!id, queryFn: async () => (await supabase.from("servant_preparations").select("*,profiles:user_id(full_name)").eq("id", id).maybeSingle()).data });
+  return <><Dialog open={!!id} onOpenChange={(o) => !o && onClose()}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>📘 تحضير {data?.profiles?.full_name ?? "الخادم"}</DialogTitle></DialogHeader><div className="max-h-[65vh] overflow-y-auto"><div className="text-xs text-muted-foreground">أسبوع {data?.week_start ?? ""}</div><p className="my-3 whitespace-pre-wrap leading-7">{data?.notes || "بدون نص"}</p>{!!data?.images?.length && <button onClick={() => setGallery(data.images)} className="rounded-xl bg-primary px-4 py-2 font-bold text-primary-foreground">فتح الصور ({data.images.length})</button>}</div></DialogContent></Dialog><ImageLightbox images={gallery} title="صور التحضير" onClose={() => setGallery(null)} /></>;
 }
 
 /* ---------- Bible / daily readings ---------- */
@@ -313,6 +321,7 @@ export function QuizLeague({ myId }: { myId?: string }) {
 /* ---------- Member notification detail ---------- */
 export function NotificationDetail({ n, onClose }: { n: any; onClose: () => void }) {
   if (n?.kind === "suggestion" && n.ref_id) return <SuggestionDetail id={n.ref_id} onClose={onClose} />;
+  if (n?.kind === "prep" && n.ref_id) return <PrepDetail id={n.ref_id} onClose={onClose} />;
   return (
     <Dialog open={!!n} onOpenChange={(o) => !o && onClose()}><DialogContent>
       <DialogHeader><DialogTitle>🔔 تفاصيل التنبيه</DialogTitle></DialogHeader>

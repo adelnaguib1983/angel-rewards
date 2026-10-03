@@ -102,7 +102,7 @@ function AuthPage() {
         <Link to="/" className="text-sm text-muted-foreground">← الرئيسية</Link>
         {mode !== "forgot" && (
           <div className="mt-3 grid grid-cols-3 gap-2 rounded-2xl bg-muted p-1">
-            <button onClick={() => { setRole("member"); switchTo(mode === "admin" ? "in" : mode); }} className={`rounded-xl py-2 text-sm font-bold transition ${mode !== "admin" && !servant ? "bg-primary text-primary-foreground pop" : ""}`}>🦁 مشترك</button>
+            <button onClick={() => { setRole("member"); switchTo(mode === "admin" ? "in" : mode); }} className={`rounded-xl py-2 text-sm font-bold transition ${mode !== "admin" && !servant ? "bg-primary text-primary-foreground pop" : ""}`}>🦁 مخدوم</button>
             <button onClick={() => { setRole("servant"); switchTo(mode === "admin" ? "in" : mode); }} className={`rounded-xl py-2 text-sm font-bold transition ${mode !== "admin" && servant ? "bg-sky text-primary-foreground pop" : ""}`}>📘 خادم</button>
             <button onClick={() => switchTo("admin")} className={`rounded-xl py-2 text-sm font-bold transition ${mode === "admin" ? "bg-secondary text-secondary-foreground pop" : ""}`}>🛡️ مشرف</button>
           </div>
