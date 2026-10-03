@@ -25,3 +25,7 @@
 - [x] Add unresolved quiz badge to bottom navigation
 - [x] Five-person formal charts for stage and overall leaderboards
 - [x] Add continuous member and leader name effects
+- [ ] توحيد مسميات المخدومين في كامل التطبيق
+- [ ] إعادة بناء الملخص الأسبوعي ببطاقات تفصيلية وأرشيف
+- [ ] جعل صفحة الخدام والتحضير ومركز التنبيهات تفاعليين
+- [ ] إضافة مستعرض صور كامل مع التكبير والتحقق المرئي
