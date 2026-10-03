@@ -9,6 +9,7 @@ import { ACADEMIC_YEARS, fileToDataUrl, useMe } from "@/lib/app";
 import { Textarea } from "@/components/ui/textarea";
 import { BirthdaysButton, PrepArchive, ReadingPlanner, VisitArchive, VisitHistoryDialog } from "@/components/StaffMemberExtras";
 import { NotificationsBell } from "@/components/MemberExtras";
+import { ImageLightbox } from "@/components/ImageLightbox";
 
 export const Route = createFileRoute("/_authenticated/servant")({
   head: () => ({
@@ -49,6 +50,7 @@ function ServantPage() {
               <div className="text-sm font-bold text-sky">أهلا يا خادم 🙏</div>
               <h1 className="text-3xl font-extrabold">{p?.full_name}</h1>
               <p className="text-sm text-muted-foreground">أرسل تحضيرك قبل يوم الخميس، وسجّل افتقادك للمخدومين كل أسبوع.</p>
+              <ServantAttendance />
             </div>
             <nav className="my-5 flex flex-wrap gap-2">
               {([["prep", "📘 تحضير الخادم"], ["visit", "📞 الافتقاد الأسبوعي"], ["preparch", "📚 أرشيف التحضيرات"], ["visitarch", "🗂️ أرشيف الافتقاد"], ["read", "📖 القراءات اليومية"]] as const).map(([k, l]) => (
@@ -80,6 +82,7 @@ function Prep({ userId }: { userId: string }) {
   const [notes, setNotes] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [gallery, setGallery] = useState<string[] | null>(null);
   useEffect(() => { if (current) { setNotes(current.notes); setImages(current.images ?? []); } }, [current?.id]);
   const late = new Date().toLocaleDateString("en-US", { weekday: "short", timeZone: "Africa/Cairo" });
   const afterThu = ["Fri", "Sat"].includes(late);
@@ -107,7 +110,7 @@ function Prep({ userId }: { userId: string }) {
         <div className="mt-3 flex flex-wrap gap-2">
           {images.map((src, i) => (
             <div key={i} className="relative">
-              <img src={src} alt="" className="h-24 w-24 rounded-xl object-cover" />
+              <img src={src} alt="" onClick={() => setGallery(images)} className="h-24 w-24 cursor-zoom-in rounded-xl object-cover" />
               <button onClick={() => setImages(images.filter((_, j) => j !== i))} className="absolute -left-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-destructive text-xs text-destructive-foreground">✕</button>
             </div>
           ))}
@@ -129,13 +132,22 @@ function Prep({ userId }: { userId: string }) {
           <div className="space-y-2">{rows.filter((r) => r.week_start !== ws).map((r) => (
             <details key={r.id} className="rounded-xl bg-muted p-3"><summary className="cursor-pointer font-bold">أسبوع {r.week_start}</summary>
               <p className="mt-2 whitespace-pre-wrap text-sm">{r.notes}</p>
-              <div className="mt-2 flex flex-wrap gap-2">{r.images?.map((s, i) => <img key={i} src={s} alt="" className="h-20 w-20 rounded-lg object-cover" />)}</div>
+               <div className="mt-2 flex flex-wrap gap-2">{r.images?.map((s, i) => <img key={i} src={s} alt="" onClick={() => setGallery(r.images)} className="h-20 w-20 cursor-zoom-in rounded-lg object-cover" />)}</div>
             </details>
           ))}</div>
         </section>
       )}
+      <ImageLightbox images={gallery} title="صور التحضير" onClose={() => setGallery(null)} />
     </div>
   );
+}
+
+function ServantAttendance() {
+  const qc = useQueryClient();
+  const { data: ws } = useQuery({ queryKey: ["week-start"], queryFn: async () => (await supabase.rpc("week_start", { _offset: 0 })).data });
+  const { data: attendance } = useQuery({ queryKey: ["my-servant-attendance", ws], enabled: !!ws, queryFn: async () => (await supabase.from("servant_attendance").select("id,created_at").eq("week_start", ws).maybeSingle()).data });
+  const mark = async () => { const { error } = await supabase.rpc("mark_servant_attendance"); if (error) return toast.error(error.message); toast.success("تم تسجيل حضورك هذا الأسبوع ✅"); qc.invalidateQueries({ queryKey: ["my-servant-attendance"] }); };
+  return attendance ? <div className="mt-3 inline-flex rounded-xl bg-accent px-3 py-2 text-sm font-bold text-accent-foreground">✅ حضور هذا الأسبوع مسجّل</div> : <button onClick={mark} className="pop mt-3 rounded-xl bg-sky px-4 py-2 font-extrabold text-primary-foreground">🙏 تسجيل حضوري هذا الأسبوع</button>;
 }
 
 const METHODS = { call: "📞 مكالمة", visit: "🏠 زيارة", message: "💬 رسالة" };

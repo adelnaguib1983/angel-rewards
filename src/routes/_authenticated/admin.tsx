@@ -8,7 +8,9 @@ import { AppHeader } from "@/components/AppHeader";
 import { PROFILE_COLS, ACADEMIC_YEARS, MONTHS, REDEEM_STATUS, cairoDate, cairoWeek, useMe, useSettings, fileToDataUrl } from "@/lib/app";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { BirthdaysButton, PrepArchive, QuizLeague, ReadingPlanner, SuggestionDetail, VisitArchive, VisitHistoryDialog } from "@/components/StaffMemberExtras";
+import { BirthdaysButton, PrepArchive, PrepDetail, ReadingPlanner, SuggestionDetail, VisitArchive, VisitHistoryDialog } from "@/components/StaffMemberExtras";
+import { AdminWeeklySummary } from "@/components/AdminWeeklySummary";
+import { ImageLightbox } from "@/components/ImageLightbox";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
@@ -88,7 +90,7 @@ function Admin() {
             </button>
           ))}
         </nav>
-        {tab === "summary" && <Summary />}
+        {tab === "summary" && <AdminWeeklySummary />}
         {tab === "announcements" && <Announcements />}
         {tab === "requests" && <Requests />}
         {tab === "members" && <Members />}
@@ -732,7 +734,7 @@ function Notifications() {
           {active?.rows.map((n) => <div key={n.id} role="button" onClick={() => setItem(n)} className="cursor-pointer rounded-xl bg-muted p-3 text-sm hover:ring-2 hover:ring-primary"><div className="font-bold">{n.message}</div>{!n.synthetic && <div className="mt-1 text-[11px] text-muted-foreground">{new Date(n.created_at).toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })}</div>}</div>)}
         </div>
       </DialogContent></Dialog>
-      {item?.kind === "suggestion" && item.ref_id ? <SuggestionDetail id={item.ref_id} onClose={() => setItem(null)} /> : (
+      {item?.kind === "suggestion" && item.ref_id ? <SuggestionDetail id={item.ref_id} onClose={() => setItem(null)} /> : item?.kind === "prep" && item.ref_id ? <PrepDetail id={item.ref_id} onClose={() => setItem(null)} /> : (
         <Dialog open={!!item} onOpenChange={(o) => !o && setItem(null)}><DialogContent>
           <DialogHeader><DialogTitle>{active?.icon} تفاصيل التنبيه</DialogTitle></DialogHeader>
           <p className="whitespace-pre-wrap leading-7">{item?.message}</p>
@@ -994,6 +996,7 @@ function WeekPicker({ off, setOff }: { off: number; setOff: (n: number) => void 
 function ServantsTab() {
   const [off, setOff] = useState(0);
   const [view, setView] = useState<string[] | null>(null);
+  const [prep, setPrep] = useState(null);
   const [arch, setArch] = useState(null);
   const { data: preps } = useQuery({ queryKey: ["admin-prep", off], queryFn: async () => { const { data, error } = await supabase.rpc("admin_prep_status", { _offset: off }); if (error) throw error; return data; } });
   const { data: visits } = useQuery({ queryKey: ["admin-visits", off], queryFn: async () => (await supabase.rpc("admin_visit_report", { _offset: off })).data ?? [] });
@@ -1007,31 +1010,31 @@ function ServantsTab() {
     <div className="space-y-5">
       <WeekPicker off={off} setOff={setOff} />
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="pop rounded-3xl bg-accent p-4 text-accent-foreground"><div className="text-sm font-bold">أرسلوا التحضير</div><div className="font-display text-4xl font-extrabold">{(preps?.length ?? 0) - missing.length}</div></div>
-        <div className="pop rounded-3xl bg-destructive p-4 text-destructive-foreground"><div className="text-sm font-bold">لم يرسلوا (الموعد الخميس)</div><div className="font-display text-4xl font-extrabold">{missing.length}</div></div>
-        <div className="pop rounded-3xl bg-sky p-4 text-primary-foreground"><div className="text-sm font-bold">مرات الافتقاد</div><div className="font-display text-4xl font-extrabold">{visits?.length ?? 0}</div></div>
+        <button onClick={() => document.getElementById("servant-preps")?.scrollIntoView({ behavior: "smooth" })} className="pop rounded-3xl bg-accent p-4 text-right text-accent-foreground"><div className="text-sm font-bold">أرسلوا التحضير</div><div className="font-display text-4xl font-extrabold">{(preps?.length ?? 0) - missing.length}</div></button>
+        <button onClick={() => document.getElementById("servant-preps")?.scrollIntoView({ behavior: "smooth" })} className="pop rounded-3xl bg-destructive p-4 text-right text-destructive-foreground"><div className="text-sm font-bold">لم يرسلوا (الموعد الخميس)</div><div className="font-display text-4xl font-extrabold">{missing.length}</div></button>
+        <button onClick={() => document.getElementById("visit-report")?.scrollIntoView({ behavior: "smooth" })} className="pop rounded-3xl bg-sky p-4 text-right text-primary-foreground"><div className="text-sm font-bold">مرات الافتقاد</div><div className="font-display text-4xl font-extrabold">{visits?.length ?? 0}</div></button>
       </div>
       {!preps?.length && <p className="text-muted-foreground">لا يوجد خدام معتمدون بعد. الخادم يسجّل من صفحة الدخول «خادم» ثم توافق عليه من «طلبات التسجيل».</p>}
-      <div className="grid gap-3 md:grid-cols-2">{preps?.map((p) => (
-        <div key={p.user_id} className={`${card} ${p.submitted ? "" : "ring-2 ring-destructive"}`}>
+      <div id="servant-preps" className="grid scroll-mt-4 gap-3 md:grid-cols-2">{preps?.map((p) => (
+        <button key={p.user_id} onClick={() => p.submitted && setPrep(p)} className={`${card} text-right ${p.submitted ? "hover:border-primary" : "ring-2 ring-destructive"}`}>
           <div className="flex items-center justify-between"><button onClick={() => setArch({ id: p.user_id, name: p.full_name })} className="font-bold text-primary hover:underline" title="أرشيف التحضيرات">📘 {p.full_name}</button>
             <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${p.submitted ? "bg-accent text-accent-foreground" : "bg-destructive text-destructive-foreground"}`}>{p.submitted ? "✓ أرسل التحضير" : "✗ لم يرسل"}</span></div>
           <div className="mt-1 text-xs text-muted-foreground">افتقد {p.visits} مخدوم{p.submitted_at && ` · ${new Date(p.submitted_at).toLocaleString("ar-EG")}`}</div>
           {p.notes && <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm">{p.notes}</p>}
-          {!!p.images?.length && <div className="mt-2 flex flex-wrap gap-2">{p.images.map((s, i) => <img key={i} src={s} alt="" onClick={() => setView(p.images)} className="h-16 w-16 cursor-pointer rounded-lg object-cover" />)}</div>}
-        </div>
+          {!!p.images?.length && <div className="mt-2 flex flex-wrap gap-2">{p.images.map((s, i) => <img key={i} src={s} alt="" className="h-16 w-16 rounded-lg object-cover" />)}</div>}
+        </button>
       ))}</div>
-      <section className={card}>
+      <section id="visit-report" className={`${card} scroll-mt-4`}>
         <div className="mb-2 flex items-center justify-between"><h2 className="text-xl font-extrabold">📞 تقرير الافتقاد الأسبوعي</h2><button onClick={csv} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold">⬇️ CSV</button></div>
         {!visits?.length && <p className="text-muted-foreground">لا يوجد افتقاد مسجّل في هذا الأسبوع.</p>}
         <div className="space-y-1">{visits?.map((v, i) => (
-          <div key={i} className="rounded-xl bg-muted p-2 text-sm"><b>{v.member}</b> <span className="text-xs text-muted-foreground">({v.academic_year ?? "—"})</span> ← {v.servant} · {{ call: "📞", visit: "🏠", message: "💬" }[v.method] ?? v.method}{v.note && <div className="text-xs">{v.note}</div>}</div>
+          <button key={i} onClick={() => setArch({ visit: v })} className="w-full rounded-xl bg-muted p-2 text-right text-sm hover:ring-2 hover:ring-primary"><b>{v.member}</b> <span className="text-xs text-muted-foreground">({v.academic_year ?? "—"})</span> ← {v.servant} · {{ call: "📞", visit: "🏠", message: "💬" }[v.method] ?? v.method}{v.note && <div className="text-xs">{v.note}</div>}</button>
         ))}</div>
       </section>
-      <Dialog open={!!arch} onOpenChange={(o) => !o && setArch(null)}><DialogContent className="max-w-2xl"><div className="max-h-[75vh] overflow-y-auto">{arch && <PrepArchive userId={arch.id} name={arch.name} />}</div></DialogContent></Dialog>
+      <Dialog open={!!arch} onOpenChange={(o) => !o && setArch(null)}><DialogContent className="max-w-2xl"><div className="max-h-[75vh] overflow-y-auto">{arch?.visit ? <><DialogHeader><DialogTitle>تفاصيل الافتقاد</DialogTitle></DialogHeader><p className="font-bold">{arch.visit.member} ← {arch.visit.servant}</p><p>{arch.visit.note || "بدون ملاحظات"}</p><div className="text-xs text-muted-foreground">{new Date(arch.visit.created_at).toLocaleString("ar-EG")}</div></> : arch && <PrepArchive userId={arch.id} name={arch.name} />}</div></DialogContent></Dialog>
+      <Dialog open={!!prep} onOpenChange={(o) => !o && setPrep(null)}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>📘 تحضير {prep?.full_name}</DialogTitle></DialogHeader><div className="max-h-[65vh] overflow-y-auto"><p className="whitespace-pre-wrap leading-7">{prep?.notes || "بدون نص"}</p>{!!prep?.images?.length && <button onClick={() => setView(prep.images)} className="mt-3 rounded-xl bg-primary px-4 py-2 font-bold text-primary-foreground">فتح الصور ({prep.images.length})</button>}</div></DialogContent></Dialog>
       <p className="text-xs text-muted-foreground">اضغط اسم الخادم لعرض أرشيف تحضيراته كاملًا.</p>
-      <Dialog open={!!view} onOpenChange={(o) => !o && setView(null)}><DialogContent><DialogHeader><DialogTitle>صور التحضير</DialogTitle></DialogHeader>
-        <div className="max-h-[70vh] space-y-2 overflow-y-auto">{view?.map((s, i) => <img key={i} src={s} alt="" className="w-full rounded-xl" />)}</div></DialogContent></Dialog>
+      <ImageLightbox images={view} title="صور التحضير" onClose={() => setView(null)} />
     </div>
   );
 }
@@ -1050,7 +1053,7 @@ function AbsenceTab() {
     <div className="space-y-4">
       <WeekPicker off={off} setOff={setOff} />
       <div className="flex gap-2"><button onClick={() => setType("member")} className={`rounded-xl px-4 py-2 font-bold ${type === "member" ? "bg-primary text-primary-foreground" : "bg-card"}`}>👥 غياب المخدومين</button><button onClick={() => setType("servant")} className={`rounded-xl px-4 py-2 font-bold ${type === "servant" ? "bg-sky text-primary-foreground" : "bg-card"}`}>📘 غياب الخدام</button></div>
-      <p className="text-xs text-muted-foreground">{type === "member" ? "الغائب = مخدوم معتمد لم يسجّل أي نشاط خلال الأسبوع من الأحد إلى السبت." : "الغائب = خادم معتمد لم يرسل تحضيرًا ولم يسجّل افتقادًا خلال الأسبوع."}</p>
+      <p className="text-xs text-muted-foreground">{type === "member" ? "الغائب = مخدوم معتمد لم يسجّل أي نشاط خلال الأسبوع من الأحد إلى السبت." : "الغائب = خادم معتمد لم يسجّل حضوره خلال الأسبوع."}</p>
       <div className={`grid gap-4 ${type === "member" ? "md:grid-cols-3" : "md:grid-cols-2"}`}>{(type === "member" ? ACADEMIC_YEARS : ["الخدام"]).map((y, i) => {
         const rows = type === "member" ? (data ?? []).filter((r) => r.academic_year === y) : (data ?? []);
         return (
