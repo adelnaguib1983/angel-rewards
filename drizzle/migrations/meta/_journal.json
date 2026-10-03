@@ -71,6 +71,13 @@
       "when": 1790929938028,
       "tag": "0009_suggestions_readings_archives",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791020401389,
+      "tag": "0010_servant_attendance_and_actionable_weekly_summary",
+      "breakpoints": true
     }
   ]
 }
