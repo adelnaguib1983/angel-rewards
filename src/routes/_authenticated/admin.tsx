@@ -1016,13 +1016,13 @@ function ServantsTab() {
       </div>
       {!preps?.length && <p className="text-muted-foreground">لا يوجد خدام معتمدون بعد. الخادم يسجّل من صفحة الدخول «خادم» ثم توافق عليه من «طلبات التسجيل».</p>}
       <div id="servant-preps" className="grid scroll-mt-4 gap-3 md:grid-cols-2">{preps?.map((p) => (
-        <button key={p.user_id} onClick={() => p.submitted && setPrep(p)} className={`${card} text-right ${p.submitted ? "hover:border-primary" : "ring-2 ring-destructive"}`}>
+        <div key={p.user_id} role="button" tabIndex={0} onClick={() => p.submitted && setPrep(p)} className={`${card} cursor-pointer text-right ${p.submitted ? "hover:border-primary" : "ring-2 ring-destructive"}`}>
           <div className="flex items-center justify-between"><button onClick={() => setArch({ id: p.user_id, name: p.full_name })} className="font-bold text-primary hover:underline" title="أرشيف التحضيرات">📘 {p.full_name}</button>
             <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${p.submitted ? "bg-accent text-accent-foreground" : "bg-destructive text-destructive-foreground"}`}>{p.submitted ? "✓ أرسل التحضير" : "✗ لم يرسل"}</span></div>
           <div className="mt-1 text-xs text-muted-foreground">افتقد {p.visits} مخدوم{p.submitted_at && ` · ${new Date(p.submitted_at).toLocaleString("ar-EG")}`}</div>
           {p.notes && <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm">{p.notes}</p>}
           {!!p.images?.length && <div className="mt-2 flex flex-wrap gap-2">{p.images.map((s, i) => <img key={i} src={s} alt="" className="h-16 w-16 rounded-lg object-cover" />)}</div>}
-        </button>
+        </div>
       ))}</div>
       <section id="visit-report" className={`${card} scroll-mt-4`}>
         <div className="mb-2 flex items-center justify-between"><h2 className="text-xl font-extrabold">📞 تقرير الافتقاد الأسبوعي</h2><button onClick={csv} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold">⬇️ CSV</button></div>
