@@ -405,7 +405,7 @@ function Members() {
 
   return (
     <div>
-      <Input placeholder="بحث بالاسم..." value={q} onChange={(e) => setQ(e.target.value)} className="mb-3 max-w-xs" />
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><Input placeholder="بحث بالاسم..." value={q} onChange={(e) => setQ(e.target.value)} className="max-w-xs" /><AddMemberButton /></div>
       <div className="space-y-2">
         {list.map((m) => (
           <div key={m.id} className={card}>
