@@ -8,7 +8,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { PROFILE_COLS, ACADEMIC_YEARS, MONTHS, REDEEM_STATUS, cairoDate, cairoWeek, useMe, useSettings, fileToDataUrl } from "@/lib/app";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { BirthdaysButton, PrepArchive, PrepDetail, ReadingPlanner, SuggestionDetail, VisitArchive, VisitHistoryDialog } from "@/components/StaffMemberExtras";
+import { AddMemberButton, BirthdaysButton, PrepArchive, PrepDetail, ReadingPlanner, SuggestionDetail, VisitArchive, VisitHistoryDialog } from "@/components/StaffMemberExtras";
 import { AdminWeeklySummary } from "@/components/AdminWeeklySummary";
 import { ImageLightbox } from "@/components/ImageLightbox";
 

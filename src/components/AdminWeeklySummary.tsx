@@ -9,7 +9,7 @@ import { ImageLightbox } from "@/components/ImageLightbox";
 
 const cards = [
   ["sent", "📘", "خدام أرسلوا التحضير"], ["missing", "⏰", "خدام لم يرسلوا التحضير"],
-  ["present", "✅", "المخدومون الحاضرون"], ["servants", "🙏", "الخدام الحاضرون"],
+  ["present", "✅", "المخدومون الحاضرون"], ["servants", "🙏", "الخدام الحاضرون"], ["servantAbsent", "🚷", "غياب الخدام"],
   ["absent", "🚫", "غياب المخدومين"], ["quiz", "🧠", "أوائل المسابقات"], ["birthdays", "🎂", "أعياد الميلاد هذا الشهر"],
 ] as const;
 const Box = ({ children }) => <div className="rounded-xl bg-muted p-3">{children}</div>;
@@ -25,13 +25,14 @@ export function AdminWeeklySummary({ initialOffset = 0 }: { initialOffset?: numb
   const { data: league=[] } = useQuery({ queryKey:["summary-quiz-league"], queryFn:async()=> (await supabase.rpc("quiz_league")).data??[] });
   const { data: birthdays=[] } = useQuery({ queryKey:["summary-birthdays",month], queryFn:async()=> (await supabase.rpc("birthdays",{_month:month})).data??[] });
   const filteredLogs = logs.filter(l=>!year||names[l.user_id]?.academic_year===year); const presentIds=[...new Set(filteredLogs.map(l=>l.user_id))];
-  const counts={sent:preps.filter(p=>p.submitted).length,missing:preps.filter(p=>!p.submitted).length,present:presentIds.length,servants:attendance.filter(a=>a.attended).length,absent:absent.filter(a=>!year||a.academic_year===year).length,quiz:league.length,birthdays:birthdays.length};
+  const counts={sent:preps.filter(p=>p.submitted).length,missing:preps.filter(p=>!p.submitted).length,present:presentIds.length,servants:attendance.filter(a=>a.attended).length,servantAbsent:attendance.filter(a=>!a.attended).length,absent:absent.filter(a=>!year||a.academic_year===year).length,quiz:league.length,birthdays:birthdays.length};
   const search=(s="")=>!q||s.includes(q); const notify=async()=>{const {data,error}=await supabase.rpc("notify_missing_preparations",{_offset:offset});if(error)return toast.error(error.message);toast.success(`تم تنبيه ${data} خادم`);qc.invalidateQueries({queryKey:["myNotifs"]});};
   const render=()=>{
     if(detail==="sent") return preps.filter(p=>p.submitted&&search(p.full_name)).map(p=><Box key={p.user_id}><b>{p.full_name}</b><div className="text-xs text-muted-foreground">{p.submitted_at?new Date(p.submitted_at).toLocaleString("ar-EG"):""}</div><p className="my-2 whitespace-pre-wrap">{p.notes||"بدون نص"}</p>{!!p.images?.length&&<button onClick={()=>setGallery(p.images)} className="font-bold text-primary">🖼️ فتح {p.images.length} صورة</button>}</Box>);
     if(detail==="missing") return <><button onClick={notify} className="mb-3 w-full rounded-xl bg-secondary py-2 font-bold text-secondary-foreground">🔔 تنبيه كل المتأخرين</button>{preps.filter(p=>!p.submitted&&search(p.full_name)).map(p=><Box key={p.user_id}><b>{p.full_name}</b></Box>)}</>;
     if(detail==="present") return presentIds.filter(id=>search(names[id]?.full_name)).map(id=><Box key={id}><b>{names[id]?.full_name}</b><div className="mt-1 text-sm">{filteredLogs.filter(l=>l.user_id===id).map(l=>settings?.find(s=>s.key===l.activity)?.label??l.activity).join(" · ")}</div></Box>);
     if(detail==="servants") return attendance.filter(a=>a.attended&&search(a.full_name)).map(a=><Box key={a.user_id}><b>{a.full_name}</b><div className="text-xs text-muted-foreground">{new Date(a.attended_at).toLocaleString("ar-EG")}</div></Box>);
+    if(detail==="servantAbsent") return attendance.filter(a=>!a.attended&&search(a.full_name)).map(a=><Box key={a.user_id}><b>{a.full_name}</b><div className="text-xs text-muted-foreground">لم يسجّل حضوره أسبوع {days[0]}</div></Box>);
     if(detail==="absent") return absent.filter(a=>(!year||a.academic_year===year)&&search(a.full_name)).map(a=><Box key={a.id}><b>{a.full_name}</b><div className="text-xs">{a.academic_year??"بدون مرحلة"} · {a.visited?"تم افتقاده":"بدون افتقاد"}</div></Box>);
     if(detail==="quiz") return league.filter(r=>search(r.full_name)).map((r,i)=><Box key={r.id}><div className="flex justify-between"><b>{i+1}. {r.full_name}</b><span>{r.points} نقطة · {r.quizzes} مسابقة</span></div></Box>);
     return birthdays.filter(b=>search(b.full_name)).map(b=><Box key={b.id}><div className="flex items-center gap-3">{b.photo_url?<img src={b.photo_url} alt="" className="h-12 w-12 rounded-full object-cover"/>:<span className="text-3xl">{b.avatar}</span>}<b className="flex-1">{b.full_name}</b><span>{b.day} {MONTHS[month-1]}</span></div></Box>);
