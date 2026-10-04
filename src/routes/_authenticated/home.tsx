@@ -185,7 +185,7 @@ function Burst({ pts }: { pts: number }) {
     <div className="pointer-events-none fixed inset-0 z-50 grid place-items-center">
       <div className="points-fly rounded-full bg-primary px-6 py-3 text-3xl font-extrabold text-primary-foreground shadow-xl">+{pts} ⭐</div>
       {Array.from({ length: 24 }).map((_, i) => (
-        <span key={i} className="confetti" style={{ "--x": `${Math.cos(i) * (120 + (i % 5) * 40)}px`, "--y": `${Math.sin(i) * (120 + (i % 4) * 40)}px`, "--r": `${i * 47}deg`, background: `hsl(${i * 37} 85% 60%)` } as React.CSSProperties} />
+        <span key={i} className="confetti" style={{ "--x": `${Math.cos(i) * (120 + (i % 5) * 40)}px`, "--y": `${Math.sin(i) * (120 + (i % 4) * 40)}px`, "--r": `${i * 47}deg`, background: `hsl(${i * 37} 85% 60%)` } as any} />
       ))}
     </div>
   );
