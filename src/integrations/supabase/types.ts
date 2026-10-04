@@ -984,6 +984,7 @@ export type Database = {
         Returns: undefined
       }
       points_of: { Args: { _uid: string }; Returns: number }
+      promote_academic_years: { Args: never; Returns: undefined }
       quiz_league: {
         Args: never
         Returns: {
@@ -1038,6 +1039,16 @@ export type Database = {
           announcement_id: string
           n: number
         }[]
+      }
+      staff_add_member: {
+        Args: {
+          _address: string
+          _birth: string
+          _name: string
+          _phone: string
+          _year: string
+        }
+        Returns: string
       }
       submit_quiz: { Args: { _answers: Json; _quiz: string }; Returns: Json }
       update_my_contact: {
