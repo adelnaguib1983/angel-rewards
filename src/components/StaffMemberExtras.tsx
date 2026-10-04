@@ -22,6 +22,7 @@ export function VisitHistoryDialog({ member, onClose }: { member: { id: string; 
     <Dialog open={!!member} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader><DialogTitle>📜 سجل الافتقادات التراكمي: {member?.name}</DialogTitle></DialogHeader>
+        {!isLoading && <div className="mx-auto rounded-full bg-sky px-5 py-2 text-lg font-extrabold text-primary-foreground pop">تم افتقاده ({data?.length ?? 0}) مرة</div>}
         <div className="max-h-[65vh] overflow-y-auto pr-1">
           {isLoading && <p className="text-muted-foreground">جاري التحميل...</p>}
           {!isLoading && !data?.length && <p className="text-muted-foreground">لم يتم افتقاد هذا المخدوم من قبل.</p>}
@@ -329,4 +330,52 @@ export function NotificationDetail({ n, onClose }: { n: any; onClose: () => void
       {n && <div className="text-xs text-muted-foreground">{fmt(n.created_at)}</div>}
     </DialogContent></Dialog>
   );
+}
+
+/* ---------- Add / remove member (admin + servant) ---------- */
+const YEARS3 = ["أولى إعدادي", "ثانية إعدادي", "ثالثة إعدادي"];
+export function AddMemberButton({ defaultYear }: { defaultYear?: string }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState({ name: "", year: defaultYear ?? YEARS3[0], birth: "", phone: "", address: "" });
+  const [busy, setBusy] = useState(false);
+  const inp = "w-full rounded-xl border-2 border-border bg-background px-3 py-2";
+  const save = async () => {
+    if (!f.name.trim()) return toast.error("الاسم بالكامل مطلوب");
+    if (!f.birth) return toast.error("تاريخ الميلاد مطلوب");
+    setBusy(true);
+    const { error } = await supabase.rpc("staff_add_member", { _name: f.name, _year: f.year, _birth: f.birth, _phone: f.phone, _address: f.address });
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success("تمت إضافة المخدوم ✅");
+    setOpen(false); setF({ name: "", year: f.year, birth: "", phone: "", address: "" });
+    qc.invalidateQueries();
+  };
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className="pop rounded-xl bg-primary px-4 py-2 font-extrabold text-primary-foreground">+ إضافة مخدوم جديد</button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>➕ إضافة مخدوم جديد</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <label className="block text-sm font-bold">الاسم بالكامل *<input className={inp} value={f.name} maxLength={80} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
+            <label className="block text-sm font-bold">المرحلة الدراسية *<select className={inp} value={f.year} onChange={(e) => setF({ ...f, year: e.target.value })}>{YEARS3.map((y) => <option key={y}>{y}</option>)}</select></label>
+            <label className="block text-sm font-bold">تاريخ الميلاد *<input type="date" className={inp} value={f.birth} onChange={(e) => setF({ ...f, birth: e.target.value })} /></label>
+            <label className="block text-sm font-bold">رقم الهاتف (اختياري)<input className={inp} inputMode="tel" placeholder="01012345678" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label>
+            <label className="block text-sm font-bold">العنوان (اختياري)<input className={inp} maxLength={200} value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} /></label>
+            <button disabled={busy} onClick={save} className="pop w-full rounded-2xl bg-primary py-3 font-extrabold text-primary-foreground disabled:opacity-60">{busy ? "جاري الحفظ..." : "حفظ المخدوم"}</button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+export async function removeMember(id: string, name: string, onDone?: () => void) {
+  if (!confirm(`⚠️ تحذير: سيتم حذف المخدوم «${name}» نهائيًا مع كل سجلاته (أنشطة، نقاط، افتقادات).\nهل أنت متأكد؟`)) return;
+  if (!confirm("تأكيد أخير: لا يمكن التراجع عن الحذف. متابعة؟")) return;
+  const { error } = await supabase.rpc("admin_remove_member", { _member: id });
+  if (error) return toast.error(error.message);
+  toast.success("تم حذف المخدوم");
+  onDone?.();
 }
