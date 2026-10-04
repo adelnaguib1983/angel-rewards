@@ -138,3 +138,9 @@
 @media (prefers-reduced-motion: reduce) {
   .name-shimmer, .stage-bar { animation: none; }
 }
+
+@keyframes points-fly { 0% { transform: scale(.4); opacity: 0; } 30% { transform: scale(1.2); opacity: 1; } 100% { transform: translateY(-160px) scale(.9); opacity: 0; } }
+.points-fly { animation: points-fly 1.3s ease-out forwards; }
+@keyframes confetti-burst { from { transform: translate(0,0) rotate(0); opacity: 1; } to { transform: translate(var(--x), var(--y)) rotate(var(--r)); opacity: 0; } }
+.confetti { position: absolute; width: 10px; height: 14px; border-radius: 3px; animation: confetti-burst 1.2s ease-out forwards; }
+@media (prefers-reduced-motion: reduce) { .points-fly, .confetti { animation: none; display: none; } }

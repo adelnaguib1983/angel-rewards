@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AnnouncementsBoard, NotificationsBell, Quizzes, openAnnouncement } from "@/components/MemberExtras";
 import { Birthdays, DailyReadings, QuizLeague, SuggestionForm } from "@/components/StaffMemberExtras";
-import { fileToDataUrl } from "@/lib/app";
+import { fileToDataUrl, OT_BOOKS, NT_BOOK_NAMES } from "@/lib/app";
 import { CalendarView, StreakBadges, StreakCard, WeeklyCoach } from "@/components/HomeExtras";
 
 export const Route = createFileRoute("/_authenticated/home")({
@@ -178,13 +178,28 @@ function StatsHero({ name, avatar, photo }: { name: string; avatar: string; phot
   );
 }
 
+const GRADS = ["from-primary to-secondary", "from-sky to-primary", "from-accent to-sky", "from-secondary to-accent"];
+const CHEERS = ["أحسنت يا بطل! 💪", "استمر، أنت رائع! 🌟", "خطوة جميلة نحو الهدف! 🚀", "ربنا يباركك! 🙏"];
+function Burst({ pts }: { pts: number }) {
+  return (
+    <div className="pointer-events-none fixed inset-0 z-50 grid place-items-center">
+      <div className="points-fly rounded-full bg-primary px-6 py-3 text-3xl font-extrabold text-primary-foreground shadow-xl">+{pts} ⭐</div>
+      {Array.from({ length: 24 }).map((_, i) => (
+        <span key={i} className="confetti" style={{ "--x": `${Math.cos(i) * (120 + (i % 5) * 40)}px`, "--y": `${Math.sin(i) * (120 + (i % 4) * 40)}px`, "--r": `${i * 47}deg`, background: `hsl(${i * 37} 85% 60%)` } as any} />
+      ))}
+    </div>
+  );
+}
+
 function Tracker({ userId }: { userId: string }) {
   const now = new Date();
   const [ym, setYm] = useState({ y: now.getFullYear(), m: now.getMonth() + 1 });
   const { data: settings } = useSettings();
   const qc = useQueryClient();
   const [verseFor, setVerseFor] = useState<{ week: number } | null>(null);
-  const [verse, setVerse] = useState("");
+  const [bv, setBv] = useState({ t: "NT", book: NT_BOOK_NAMES[0], ch: "", vs: "", text: "" });
+  const [burst, setBurst] = useState<number | null>(null);
+  const [cheer, setCheer] = useState("");
   const { data: logs } = useQuery({
     queryKey: ["logs", ym.y, ym.m],
     queryFn: async () => {
@@ -200,6 +215,8 @@ function Tracker({ userId }: { userId: string }) {
     },
     onSuccess: (_d, v) => {
       const s = settings?.find((x) => x.key === v.activity);
+      setBurst(s?.points ?? 0); setTimeout(() => setBurst(null), 1400);
+      setCheer(CHEERS[Math.floor(Math.random() * CHEERS.length)]);
       toast.success(`رائع! +${s?.points ?? 0} نقطة ${s?.emoji ?? ""}`);
       qc.invalidateQueries({ queryKey: ["logs"] }); qc.invalidateQueries({ queryKey: ["stats"] });
     },
@@ -216,70 +233,86 @@ function Tracker({ userId }: { userId: string }) {
   });
 
   const isNow = ym.y === now.getFullYear() && ym.m === now.getMonth() + 1;
-  const cw = isNow ? currentWeek(now) : 0;
+  const isPast = ym.y < now.getFullYear() || (ym.y === now.getFullYear() && ym.m < now.getMonth() + 1);
+  const cw = isNow ? currentWeek(now) : isPast ? 5 : 0;
   const shift = (d: number) => {
     let m = ym.m + d, y = ym.y;
     if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; }
     setYm({ y, m });
   };
-  const colors = ["bg-primary text-primary-foreground", "bg-secondary text-secondary-foreground", "bg-accent text-accent-foreground", "bg-sky text-primary-foreground"];
+  const total = (settings?.length ?? 0) * 4;
+  const done = (logs ?? []).filter((l) => l.status === "approved").length;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const books = bv.t === "OT" ? OT_BOOKS : NT_BOOK_NAMES;
+  const saveVerse = () => {
+    if (!bv.ch) return toast.error("حدد الأصحاح");
+    const ref = `${bv.book} ${bv.ch}${bv.vs ? `: ${bv.vs}` : ""}`;
+    add.mutate({ activity: "bible", week: verseFor!.week, verse: bv.text.trim() ? `${bv.text.trim()} (${ref})` : ref });
+    setVerseFor(null);
+  };
+  const sel = "w-full rounded-xl border-2 border-border bg-background px-3 py-2";
 
   return (
     <section>
+      {burst !== null && <Burst pts={burst} />}
       <div className="mb-4 flex items-center justify-between">
         <button onClick={() => shift(-1)} className="rounded-xl bg-card px-4 py-2 font-bold hover:bg-muted">→</button>
         <h2 className="text-2xl font-extrabold">{MONTHS[ym.m - 1]} {ym.y}</h2>
         <button onClick={() => shift(1)} className="rounded-xl bg-card px-4 py-2 font-bold hover:bg-muted">←</button>
       </div>
-      <div className="overflow-x-auto rounded-3xl border-2 border-border bg-card p-3 pop">
-        <table className="w-full min-w-[640px] border-separate border-spacing-2">
-          <thead>
-            <tr>
-              <th className="text-right text-sm text-muted-foreground">النشاط</th>
-              {[1, 2, 3, 4].map((w) => (
-                <th key={w}><div className={`rounded-xl py-2 text-sm font-extrabold ${colors[w - 1]} ${cw === w ? "ring-4 ring-foreground/60" : ""}`}>الأسبوع {w}</div></th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {settings?.map((s) => (
-              <tr key={s.key}>
-                <td className="whitespace-nowrap font-bold"><span className="text-2xl">{s.emoji}</span> {s.label}<div className="text-xs text-muted-foreground">+{s.points} نقطة</div></td>
-                {[1, 2, 3, 4].map((w) => {
-                  const log = logs?.find((l) => l.activity === s.key && l.week === w);
-                  const done = log && log.status === "approved";
-                  const locked = cw !== w;
-                  return (
-                    <td key={w} className="text-center">
-                      <button
-                        title={log?.verse ?? log?.admin_note ?? ""}
-                        disabled={locked}
-                        onClick={() => {
-                          if (log) { if (confirm("إلغاء هذا التسجيل؟")) remove.mutate(log.id); return; }
-                          if (s.key === "bible") { setVerse(""); setVerseFor({ week: w }); return; }
-                          add.mutate({ activity: s.key, week: w });
-                        }}
-                        className={`h-14 w-full rounded-2xl border-2 text-2xl transition-all hover:scale-105 ${locked ? "cursor-not-allowed opacity-50 hover:scale-100 " : ""}${done ? `${colors[w - 1]} border-transparent pop` : log ? "border-destructive bg-destructive/20" : "border-dashed border-border hover:bg-muted"}`}>
-                        {done ? "✓" : log ? "✗" : "+"}
-                      </button>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mb-5 rounded-3xl border-2 border-border bg-card p-4">
+        <div className="mb-2 flex justify-between text-sm font-bold"><span>إنجاز الشهر</span><span>{done}/{total} · {pct}%</span></div>
+        <Progress value={pct} className="h-3 transition-all" />
+        <p className="mt-2 text-center font-extrabold text-primary">{cheer || (pct >= 100 ? "أكملت كل الأنشطة! 👑" : "كل نشاط يقرّبك من الهدية الجاية 🎁")}</p>
       </div>
-      <p className="mt-2 text-center text-xs text-muted-foreground">🔒 يمكنك التسجيل أو الإلغاء في الأسبوع الحالي فقط.</p>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {settings?.map((s, i) => (
+          <div key={s.key} className="float-in overflow-hidden rounded-3xl border-2 border-border bg-card shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+            <div className={`flex items-center gap-3 bg-gradient-to-l ${GRADS[i % 4]} p-4 text-primary-foreground`}>
+              <div className="grid h-14 w-14 place-items-center rounded-2xl bg-background/25 text-3xl shadow-inner">{s.emoji}</div>
+              <div className="flex-1 font-extrabold">{s.label}</div>
+              <span className="rounded-full bg-background/90 px-3 py-1 text-sm font-extrabold text-foreground">+{s.points} ⭐</span>
+            </div>
+            <div className="grid grid-cols-4 gap-2 p-3">
+              {[1, 2, 3, 4].map((w) => {
+                const log = logs?.find((l) => l.activity === s.key && l.week === w);
+                const ok = log?.status === "approved";
+                const current = cw === w;
+                const future = w > cw;
+                return (
+                  <button key={w} title={log?.verse ?? log?.admin_note ?? ""} disabled={!current}
+                    onClick={() => {
+                      if (log) { if (confirm("إلغاء هذا التسجيل؟")) remove.mutate(log.id); return; }
+                      if (s.key === "bible") { setBv({ t: "NT", book: NT_BOOK_NAMES[0], ch: "", vs: "", text: "" }); setVerseFor({ week: w }); return; }
+                      add.mutate({ activity: s.key, week: w });
+                    }}
+                    className={`flex flex-col items-center justify-center rounded-2xl py-2 text-xs font-bold transition active:scale-90 ${ok ? `bg-gradient-to-b ${GRADS[i % 4]} text-primary-foreground` : log ? "bg-destructive/20" : current ? "animate-pulse border-2 border-primary bg-primary/10 text-primary hover:scale-105" : "bg-muted text-muted-foreground opacity-70"}`}>
+                    <span className="text-lg">{ok ? "✓" : log ? "✗" : current ? "✍️" : future ? "🔒" : "—"}</span>
+                    <span>{current && !log ? "سجّل الآن" : `أسبوع ${w}`}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 text-center text-xs text-muted-foreground">🔒 يمكنك التسجيل أو الإلغاء في الأسبوع الحالي فقط.</p>
       <Verses logs={logs ?? []} />
       <Dialog open={!!verseFor} onOpenChange={(o) => !o && setVerseFor(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>📜 أكثر آية لمست قلبك</DialogTitle></DialogHeader>
-          <Textarea rows={4} value={verse} onChange={(e) => setVerse(e.target.value)} placeholder="اكتب الآية وشاهدها (مثال: يو 3: 16)" />
-          <button className="pop rounded-2xl bg-primary py-3 font-extrabold text-primary-foreground"
-            onClick={() => { if (!verse.trim()) return toast.error("اكتب الآية"); add.mutate({ activity: "bible", week: verseFor!.week, verse }); setVerseFor(null); }}>
-            حفظ
-          </button>
+          <DialogHeader><DialogTitle>📖 قراءة وحفظ الكتاب المقدس</DialogTitle></DialogHeader>
+          <div className="grid grid-cols-2 gap-2">
+            {[["OT", "العهد القديم"], ["NT", "العهد الجديد"]].map(([k, l]) => (
+              <button key={k} onClick={() => setBv({ ...bv, t: k, book: (k === "OT" ? OT_BOOKS : NT_BOOK_NAMES)[0] })} className={`rounded-xl py-2 font-bold ${bv.t === k ? "bg-primary text-primary-foreground" : "bg-muted"}`}>{l}</button>
+            ))}
+          </div>
+          <label className="text-sm font-bold">السفر<select className={sel} value={bv.book} onChange={(e) => setBv({ ...bv, book: e.target.value })}>{books.map((b) => <option key={b}>{b}</option>)}</select></label>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="text-sm font-bold">الأصحاح<input type="number" min={1} max={150} className={sel} value={bv.ch} onChange={(e) => setBv({ ...bv, ch: e.target.value })} /></label>
+            <label className="text-sm font-bold">الآيات<input className={sel} placeholder="مثال: 16 أو 1-5" value={bv.vs} onChange={(e) => setBv({ ...bv, vs: e.target.value })} /></label>
+          </div>
+          <Textarea rows={3} value={bv.text} maxLength={500} onChange={(e) => setBv({ ...bv, text: e.target.value })} placeholder="نص الآية المحفوظة (اختياري)" />
+          <button className="pop rounded-2xl bg-primary py-3 font-extrabold text-primary-foreground" onClick={saveVerse}>حفظ</button>
         </DialogContent>
       </Dialog>
     </section>

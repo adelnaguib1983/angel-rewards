@@ -8,7 +8,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { PROFILE_COLS, ACADEMIC_YEARS, MONTHS, REDEEM_STATUS, cairoDate, cairoWeek, useMe, useSettings, fileToDataUrl } from "@/lib/app";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { BirthdaysButton, PrepArchive, PrepDetail, ReadingPlanner, SuggestionDetail, VisitArchive, VisitHistoryDialog } from "@/components/StaffMemberExtras";
+import { AddMemberButton, BirthdaysButton, PrepArchive, PrepDetail, ReadingPlanner, SuggestionDetail, VisitArchive, VisitHistoryDialog } from "@/components/StaffMemberExtras";
 import { AdminWeeklySummary } from "@/components/AdminWeeklySummary";
 import { ImageLightbox } from "@/components/ImageLightbox";
 
@@ -405,7 +405,7 @@ function Members() {
 
   return (
     <div>
-      <Input placeholder="بحث بالاسم..." value={q} onChange={(e) => setQ(e.target.value)} className="mb-3 max-w-xs" />
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><Input placeholder="بحث بالاسم..." value={q} onChange={(e) => setQ(e.target.value)} className="max-w-xs" /><AddMemberButton /></div>
       <div className="space-y-2">
         {list.map((m) => (
           <div key={m.id} className={card}>

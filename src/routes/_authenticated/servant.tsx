@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
 import { ACADEMIC_YEARS, fileToDataUrl, useMe } from "@/lib/app";
 import { Textarea } from "@/components/ui/textarea";
-import { BirthdaysButton, PrepArchive, ReadingPlanner, VisitArchive, VisitHistoryDialog } from "@/components/StaffMemberExtras";
+import { AddMemberButton, removeMember, BirthdaysButton, PrepArchive, ReadingPlanner, VisitArchive, VisitHistoryDialog } from "@/components/StaffMemberExtras";
 import { NotificationsBell } from "@/components/MemberExtras";
 import { ImageLightbox } from "@/components/ImageLightbox";
 
@@ -168,6 +168,7 @@ function Visits() {
   };
   return (
     <div className="space-y-4">
+      <div className="flex justify-end"><AddMemberButton defaultYear={year} /></div>
       <div className="flex flex-wrap gap-2">{ACADEMIC_YEARS.map((y) => (
         <button key={y} onClick={() => setYear(y)} className={`rounded-xl px-3 py-1.5 text-sm font-bold ${year === y ? "bg-sky text-primary-foreground" : "bg-card"}`}>{y} ({(data ?? []).filter((m) => m.academic_year === y).length})</button>
       ))}</div>
@@ -179,8 +180,9 @@ function Visits() {
             {m.photo_url ? <img src={m.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-3xl">{m.avatar}</span>}
             <button onClick={() => setHist({ id: m.id, name: m.full_name })} className="flex-1 text-right font-bold text-primary underline-offset-4 hover:underline" title="سجل الافتقادات">{m.full_name}</button>
             {!m.active_this_week && <span title="لم يسجل نشاطًا">🔴</span>}
-            {m.visited ? <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-accent-foreground">✅ تم</span>
-              : <button onClick={() => { setOpen(m.id); setNote(""); }} className="rounded-xl bg-sky px-3 py-1.5 text-sm font-bold text-primary-foreground">افتقاد</button>}
+            {m.visited && <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-accent-foreground">✅ تم</span>}
+            <button onClick={() => { setOpen(m.id); setNote(""); }} className="rounded-xl bg-sky px-3 py-1.5 text-sm font-bold text-primary-foreground">{m.visited ? "افتقاد آخر" : "افتقاد"}</button>
+            <button title="حذف المخدوم" onClick={() => removeMember(m.id, m.full_name, () => qc.invalidateQueries({ queryKey: ["servant-members"] }))} className="rounded-xl bg-destructive/15 px-2 py-1.5 text-sm">🗑️</button>
           </div>
           {open === m.id && (
             <div className="mt-3 space-y-2">

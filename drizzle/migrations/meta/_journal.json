@@ -78,6 +78,13 @@
       "when": 1791020401389,
       "tag": "0010_servant_attendance_and_actionable_weekly_summary",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791125494270,
+      "tag": "0011_staff_members_promotion",
+      "breakpoints": true
     }
   ]
 }
