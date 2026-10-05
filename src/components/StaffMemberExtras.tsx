@@ -393,3 +393,63 @@ export async function removeMember(id: string, name: string, onDone?: () => void
   toast.success("تم حذف المخدوم");
   onDone?.();
 }
+
+/* ---------- Edit person / add servant (admin) ---------- */
+export function PersonDialog({ person, mode, onClose }: { person?: { id: string; full_name: string; academic_year?: string; birth_date?: string } | null; mode: "edit" | "servant" | null; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [f, setF] = useState({ name: "", year: "", birth: "", phone: "", address: "" });
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setF({ name: person?.full_name ?? "", year: person?.academic_year ?? "", birth: person?.birth_date ?? "", phone: "", address: "" }); }, [person?.id, mode]);
+  const inp = "w-full rounded-xl border-2 border-border bg-background px-3 py-2";
+  const isNew = mode === "servant" && !person;
+  const save = async () => {
+    if (!f.name.trim()) return toast.error("الاسم مطلوب");
+    if (isNew && (!f.birth || !f.phone.trim() || !f.address.trim())) return toast.error("كل البيانات مطلوبة");
+    if (f.phone && !/^01[0125][0-9]{8}$/.test(f.phone)) return toast.error("رقم الموبايل غير صحيح");
+    setBusy(true);
+    const { error } = isNew
+      ? await supabase.rpc("admin_add_servant", { _name: f.name, _birth: f.birth, _phone: f.phone, _address: f.address })
+      : await supabase.rpc("staff_update_person", { _id: person!.id, _name: f.name, _year: f.year, _birth: f.birth || null, _phone: f.phone, _address: f.address });
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success("تم الحفظ ✅"); qc.invalidateQueries(); onClose();
+  };
+  return (
+    <Dialog open={!!mode} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>{isNew ? "➕ إضافة خادم" : `✏️ تعديل بيانات ${person?.full_name ?? ""}`}</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <label className="block text-sm font-bold">الاسم *<input className={inp} value={f.name} maxLength={80} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
+          {mode === "edit" && f.year !== "" && <label className="block text-sm font-bold">المرحلة<select className={inp} value={f.year} onChange={(e) => setF({ ...f, year: e.target.value })}>{YEARS3.map((y) => <option key={y}>{y}</option>)}</select></label>}
+          <label className="block text-sm font-bold">تاريخ الميلاد{isNew && " *"}<input type="date" className={inp} value={f.birth} onChange={(e) => setF({ ...f, birth: e.target.value })} /></label>
+          <label className="block text-sm font-bold">رقم الموبايل{isNew ? " *" : " (اتركه فارغًا لعدم التغيير)"}<input className={inp} inputMode="tel" placeholder="01012345678" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label>
+          <label className="block text-sm font-bold">العنوان{isNew ? " *" : " (اتركه فارغًا لعدم التغيير)"}<input className={inp} maxLength={200} value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} /></label>
+          <button disabled={busy} onClick={save} className="pop w-full rounded-2xl bg-primary py-3 font-extrabold text-primary-foreground disabled:opacity-60">{busy ? "جاري الحفظ..." : "حفظ"}</button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function ServantsManager() {
+  const qc = useQueryClient();
+  const [mode, setMode] = useState<"edit" | "servant" | null>(null);
+  const [person, setPerson] = useState(null);
+  const { data } = useQuery({ queryKey: ["admin-servants"], queryFn: async () => (await supabase.rpc("admin_servants")).data ?? [] });
+  return (
+    <section className={card}>
+      <div className="mb-3 flex items-center justify-between"><h2 className="text-xl font-extrabold">🙏 إدارة الخدام ({data?.length ?? 0})</h2>
+        <button onClick={() => { setPerson(null); setMode("servant"); }} className="pop rounded-xl bg-primary px-4 py-2 font-extrabold text-primary-foreground">+ إضافة خادم</button></div>
+      {!data?.length && <p className="text-muted-foreground">لا يوجد خدام.</p>}
+      <div className="space-y-1">{data?.map((s) => (
+        <div key={s.id} className="flex items-center gap-2 rounded-xl bg-muted p-2 text-sm">
+          <b className="flex-1">{s.full_name}</b>
+          <span className="text-xs text-muted-foreground">{s.birth_date ?? ""}</span>
+          <button onClick={() => { setPerson(s); setMode("edit"); }} className="rounded-lg bg-secondary px-2 py-1 font-bold text-secondary-foreground">✏️ تعديل</button>
+          <button onClick={() => removeMember(s.id, s.full_name, () => qc.invalidateQueries())} className="rounded-lg bg-destructive px-2 py-1 font-bold text-destructive-foreground">🗑️</button>
+        </div>
+      ))}</div>
+      <PersonDialog person={person} mode={mode} onClose={() => setMode(null)} />
+    </section>
+  );
+}
