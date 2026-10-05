@@ -799,6 +799,15 @@ export type Database = {
           visited: boolean
         }[]
       }
+      admin_add_servant: {
+        Args: {
+          _address: string
+          _birth: string
+          _name: string
+          _phone: string
+        }
+        Returns: string
+      }
       admin_members: {
         Args: never
         Returns: {
@@ -853,6 +862,16 @@ export type Database = {
           attended_at: string
           full_name: string
           user_id: string
+        }[]
+      }
+      admin_servants: {
+        Args: never
+        Returns: {
+          birth_date: string
+          created_at: string
+          full_name: string
+          id: string
+          status: string
         }[]
       }
       admin_set_account_type: {
@@ -1049,6 +1068,17 @@ export type Database = {
           _year: string
         }
         Returns: string
+      }
+      staff_update_person: {
+        Args: {
+          _address: string
+          _birth: string
+          _id: string
+          _name: string
+          _phone: string
+          _year: string
+        }
+        Returns: undefined
       }
       submit_quiz: { Args: { _answers: Json; _quiz: string }; Returns: Json }
       update_my_contact: {
