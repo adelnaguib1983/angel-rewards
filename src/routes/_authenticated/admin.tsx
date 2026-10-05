@@ -8,7 +8,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { PROFILE_COLS, ACADEMIC_YEARS, MONTHS, REDEEM_STATUS, cairoDate, cairoWeek, useMe, useSettings, fileToDataUrl } from "@/lib/app";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AddMemberButton, BirthdaysButton, PrepArchive, PrepDetail, ReadingPlanner, SuggestionDetail, VisitArchive, VisitHistoryDialog } from "@/components/StaffMemberExtras";
+import { AddMemberButton, BirthdaysButton, PersonDialog, PrepArchive, PrepDetail, ReadingPlanner, ServantsManager, SuggestionDetail, VisitArchive, VisitHistoryDialog, removeMember } from "@/components/StaffMemberExtras";
 import { AdminWeeklySummary } from "@/components/AdminWeeklySummary";
 import { ImageLightbox } from "@/components/ImageLightbox";
 
@@ -933,10 +933,13 @@ function AdminQuizzes() {
     if (opens && closes && new Date(closes) <= new Date(opens)) return toast.error("وقت القفل لازم يكون بعد وقت الفتح");
     if (clean.some((q) => !q.question.trim() || q.options.length < 2 || q.correct >= q.options.length)) return toast.error("كل سؤال يحتاج نصًا واختيارين على الأقل وإجابة صحيحة");
     const { data: auth } = await supabase.auth.getUser();
-    const { data: z, error } = await supabase.from("quizzes").insert({ title: title.trim(), created_by: auth.user.id, image_url: qimg, opens_at: opens ? new Date(opens).toISOString() : null, closes_at: closes ? new Date(closes).toISOString() : null }).select("id").single();
+    // Create hidden first so members never see (or get notified about) a quiz without questions.
+    const { data: z, error } = await supabase.from("quizzes").insert({ title: title.trim(), created_by: auth.user.id, published: false, image_url: qimg, opens_at: opens ? new Date(opens).toISOString() : null, closes_at: closes ? new Date(closes).toISOString() : null }).select("id").single();
     if (error) return toast.error(error.message);
-    const { error: e2 } = await supabase.from("quiz_questions").insert(clean.map((q, i) => ({ quiz_id: z.id, question: q.question.trim(), options: q.options, correct: q.correct, points: q.points, sort: i, image_url: q.image_url })));
-    if (e2) return toast.error(e2.message);
+    const { error: e2 } = await supabase.from("quiz_questions").insert(clean.map((q, i) => ({ quiz_id: z.id, question: q.question.trim(), options: q.options, correct: q.correct, points: q.points || 0, sort: i, image_url: q.image_url })));
+    if (e2) { await supabase.from("quizzes").delete().eq("id", z.id); return toast.error(e2.message); }
+    const { error: e3 } = await supabase.from("quizzes").update({ published: true }).eq("id", z.id);
+    if (e3) return toast.error(e3.message);
     toast.success("تم نشر المسابقة"); setTitle(""); setQs([blank()]); setOpens(""); setCloses(""); setQimg(null); qc.invalidateQueries({ queryKey: ["admin-quizzes"] });
   };
   return (
@@ -972,7 +975,8 @@ function AdminQuizzes() {
         <div key={z.id} className={`${card} flex flex-wrap items-center justify-between gap-2`}>
           <span className="font-extrabold">🧠 {z.title} <span className="text-xs text-muted-foreground">{new Date(z.created_at).toLocaleDateString("ar-EG")}{z.opens_at && ` · يفتح ${new Date(z.opens_at).toLocaleString("ar-EG")}`}{z.closes_at && ` · يقفل ${new Date(z.closes_at).toLocaleString("ar-EG")}`}</span></span>
           <div className="flex gap-2"><button onClick={() => setResults({ id: z.id, title: z.title })} className="rounded-xl bg-secondary px-3 py-1.5 text-sm font-bold text-secondary-foreground">النتائج</button>
-            <button onClick={async () => { await supabase.from("quizzes").update({ published: !z.published }).eq("id", z.id); qc.invalidateQueries({ queryKey: ["admin-quizzes"] }); }} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold">{z.published ? "إخفاء" : "إظهار"}</button></div>
+            <button onClick={async () => { const { error } = await supabase.from("quizzes").update({ published: !z.published }).eq("id", z.id); if (error) return toast.error(error.message); qc.invalidateQueries({ queryKey: ["admin-quizzes"] }); }} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold">{z.published ? "إخفاء" : "إظهار"}</button>
+            <button onClick={async () => { if (!confirm(`حذف مسابقة «${z.title}» نهائيًا؟`)) return; const { error } = await supabase.from("quizzes").delete().eq("id", z.id); if (error) return toast.error("لا يمكن حذف مسابقة شارك فيها مخدومون — استخدم إخفاء"); qc.invalidateQueries({ queryKey: ["admin-quizzes"] }); }} className="rounded-xl bg-destructive px-3 py-1.5 text-sm font-bold text-destructive-foreground">🗑️</button></div>
         </div>
       ))}</section>
       <Dialog open={!!results} onOpenChange={(o) => !o && setResults(null)}>
@@ -1008,6 +1012,7 @@ function ServantsTab() {
   };
   return (
     <div className="space-y-5">
+      <ServantsManager />
       <WeekPicker off={off} setOff={setOff} />
       <div className="grid gap-3 sm:grid-cols-3">
         <button onClick={() => document.getElementById("servant-preps")?.scrollIntoView({ behavior: "smooth" })} className="pop rounded-3xl bg-accent p-4 text-right text-accent-foreground"><div className="text-sm font-bold">أرسلوا التحضير</div><div className="font-display text-4xl font-extrabold">{(preps?.length ?? 0) - missing.length}</div></button>
