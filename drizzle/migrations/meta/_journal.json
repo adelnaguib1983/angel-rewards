@@ -85,6 +85,13 @@
       "when": 1791125494270,
       "tag": "0011_staff_members_promotion",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791212923323,
+      "tag": "0012_staff_person_management",
+      "breakpoints": true
     }
   ]
 }
