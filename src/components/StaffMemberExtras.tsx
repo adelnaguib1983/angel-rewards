@@ -196,6 +196,25 @@ export const NT_BOOKS: [number, string, number][] = [
   [56, "تيطس", 3], [57, "فليمون", 1], [58, "العبرانيين", 13], [59, "يعقوب", 5], [60, "بطرس الأولى", 5], [61, "بطرس الثانية", 3], [62, "يوحنا الأولى", 5], [63, "يوحنا الثانية", 1],
   [64, "يوحنا الثالثة", 1], [65, "يهوذا", 1], [66, "رؤيا يوحنا", 22],
 ];
+const OT_N = ["التكوين",50,"الخروج",40,"اللاويين",27,"العدد",36,"التثنية",34,"يشوع",24,"القضاة",21,"راعوث",4,"صموئيل الأول",31,"صموئيل الثاني",24,"الملوك الأول",22,"الملوك الثاني",25,"أخبار الأيام الأول",29,"أخبار الأيام الثاني",36,"عزرا",10,"نحميا",13,"أستير",10,"أيوب",42,"المزامير",150,"الأمثال",31,"الجامعة",12,"نشيد الأنشاد",8,"إشعياء",66,"إرميا",52,"مراثي إرميا",5,"حزقيال",48,"دانيال",12,"هوشع",14,"يوئيل",3,"عاموس",9,"عوبديا",1,"يونان",4,"ميخا",7,"ناحوم",3,"حبقوق",3,"صفنيا",3,"حجي",2,"زكريا",14,"ملاخي",4] as const;
+export const OT_BOOKS_N: [number, string, number][] = Array.from({ length: 39 }, (_, i) => [i + 1, OT_N[i * 2] as string, OT_N[i * 2 + 1] as number]);
+export const ALL_BOOKS = [...OT_BOOKS_N, ...NT_BOOKS];
+const sel = "rounded-xl border-2 border-border bg-background px-3 py-2 font-bold";
+function BookPicker({ book, chapter, onChange }: { book: number; chapter: number; onChange: (b: number, c: number) => void }) {
+  const ot = book < 40;
+  const list = ot ? OT_BOOKS_N : NT_BOOKS;
+  const bk = ALL_BOOKS.find((b) => b[0] === book) ?? NT_BOOKS[0];
+  return (
+    <div className="flex flex-wrap gap-2">
+      <div className="flex overflow-hidden rounded-xl border-2 border-border">
+        <button onClick={() => onChange(1, 1)} className={`px-3 py-2 text-sm font-bold ${ot ? "bg-primary text-primary-foreground" : "bg-card"}`}>العهد القديم</button>
+        <button onClick={() => onChange(40, 1)} className={`px-3 py-2 text-sm font-bold ${!ot ? "bg-primary text-primary-foreground" : "bg-card"}`}>العهد الجديد</button>
+      </div>
+      <select value={book} onChange={(e) => onChange(+e.target.value, 1)} className={sel}>{list.map(([n, name]) => <option key={n} value={n}>{name}</option>)}</select>
+      <select value={chapter} onChange={(e) => onChange(book, +e.target.value)} className={sel}>{Array.from({ length: bk[2] }, (_, i) => <option key={i} value={i + 1}>الإصحاح {i + 1}</option>)}</select>
+    </div>
+  );
+}
 function useChapter(book: number, chapter: number) {
   return useQuery({
     queryKey: ["bible", book, chapter], staleTime: Infinity,
@@ -239,7 +258,6 @@ export function DailyReadings() {
     qc.invalidateQueries({ queryKey: ["reading-done"] }); qc.invalidateQueries({ queryKey: ["stats"] });
   };
   const ready = reachedEnd && elapsed >= minSec;
-  const bk = NT_BOOKS.find((b) => b[0] === browse[0]);
   return (
     <div className="space-y-4">
       <section className={card}>
@@ -254,11 +272,8 @@ export function DailyReadings() {
         </>}
       </section>
       <section className={card}>
-        <h2 className="mb-2 text-xl font-extrabold">✝️ الإنجيل كاملًا</h2>
-        <div className="mb-3 flex flex-wrap gap-2">
-          <select value={browse[0]} onChange={(e) => setBrowse([+e.target.value, 1])} className="rounded-xl border-2 border-border bg-background px-3 py-2 font-bold">{NT_BOOKS.map(([n, name]) => <option key={n} value={n}>{name}</option>)}</select>
-          <select value={browse[1]} onChange={(e) => setBrowse([browse[0], +e.target.value])} className="rounded-xl border-2 border-border bg-background px-3 py-2 font-bold">{Array.from({ length: bk[2] }, (_, i) => <option key={i} value={i + 1}>الإصحاح {i + 1}</option>)}</select>
-        </div>
+        <h2 className="mb-2 text-xl font-extrabold">✝️ الكتاب المقدس كاملًا (العهدين)</h2>
+        <div className="mb-3"><BookPicker book={browse[0]} chapter={browse[1]} onChange={(b, c) => setBrowse([b, c])} /></div>
         <ChapterText book={browse[0]} chapter={browse[1]} />
       </section>
     </div>
@@ -272,7 +287,7 @@ export function ReadingPlanner() {
   const [chapter, setChapter] = useState(1);
   const [points, setPoints] = useState(5);
   const { data } = useQuery({ queryKey: ["readings-plan"], queryFn: async () => (await supabase.from("daily_readings").select("*").order("reading_date", { ascending: false }).limit(30)).data ?? [] });
-  const bk = NT_BOOKS.find((b) => b[0] === book);
+  const bk = ALL_BOOKS.find((b) => b[0] === book);
   const save = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase.from("daily_readings").upsert({ reading_date: date, book_nr: book, book_name: bk[1], chapter, points, created_by: user.id }, { onConflict: "reading_date" });
@@ -282,11 +297,10 @@ export function ReadingPlanner() {
   return (
     <section className={card}>
       <h2 className="mb-3 text-xl font-extrabold">📖 اختيار القراءات اليومية</h2>
-      <div className="grid gap-2 sm:grid-cols-4">
-        <label className="text-xs font-bold">اليوم<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1 w-full rounded-xl border-2 border-border bg-background px-2 py-2" /></label>
-        <label className="text-xs font-bold">السفر<select value={book} onChange={(e) => { setBook(+e.target.value); setChapter(1); }} className="mt-1 w-full rounded-xl border-2 border-border bg-background px-2 py-2">{NT_BOOKS.map(([n, name]) => <option key={n} value={n}>{name}</option>)}</select></label>
-        <label className="text-xs font-bold">الإصحاح<select value={chapter} onChange={(e) => setChapter(+e.target.value)} className="mt-1 w-full rounded-xl border-2 border-border bg-background px-2 py-2">{Array.from({ length: bk[2] }, (_, i) => <option key={i} value={i + 1}>{i + 1}</option>)}</select></label>
-        <label className="text-xs font-bold">النقاط<input type="number" min={0} value={points} onChange={(e) => setPoints(+e.target.value)} className="mt-1 w-full rounded-xl border-2 border-border bg-background px-2 py-2" /></label>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="text-xs font-bold">اليوم<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1 block rounded-xl border-2 border-border bg-background px-2 py-2" /></label>
+        <BookPicker book={book} chapter={chapter} onChange={(b, c) => { setBook(b); setChapter(c); }} />
+        <label className="text-xs font-bold">النقاط<input type="number" min={0} value={points} onChange={(e) => setPoints(+e.target.value)} className="mt-1 block w-20 rounded-xl border-2 border-border bg-background px-2 py-2" /></label>
       </div>
       <button onClick={save} className="pop mt-3 rounded-2xl bg-primary px-5 py-2 font-extrabold text-primary-foreground">حفظ</button>
       <div className="mt-4 space-y-1">{data?.map((r) => (
