@@ -8,7 +8,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { PROFILE_COLS, ACADEMIC_YEARS, MONTHS, REDEEM_STATUS, cairoDate, cairoWeek, useMe, useSettings, fileToDataUrl } from "@/lib/app";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AddMemberButton, BirthdaysButton, PersonDialog, PrepArchive, PrepDetail, ReadingPlanner, ServantsManager, SuggestionDetail, VisitArchive, VisitHistoryDialog, removeMember } from "@/components/StaffMemberExtras";
+import { AddMemberButton, BirthdaysButton, PersonDialog, PrepArchive, PrepDetail, QuizLeague, ReadingPlanner, ServantsManager, SuggestionDetail, VisitArchive, VisitHistoryDialog, removeMember } from "@/components/StaffMemberExtras";
 import { AdminWeeklySummary } from "@/components/AdminWeeklySummary";
 import { ImageLightbox } from "@/components/ImageLightbox";
 
@@ -390,10 +390,14 @@ function Members() {
   const [q, setQ] = useState("");
   const [adj, setAdj] = useState<Member | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [year, setYear] = useState<string>("all");
+  const [edit, setEdit] = useState<any>(null);
   const [amount, setAmount] = useState(10);
   const [reason, setReason] = useState("");
   const pmap = Object.fromEntries((profiles ?? []).map((p) => [p.id, p]));
-  const list = (members ?? []).filter((m) => m.status === "approved" && m.full_name.includes(q));
+  const approved = (members ?? []).filter((m) => m.status === "approved");
+  const yearOf = (m: Member) => pmap[m.id]?.academic_year ?? m.academic_year ?? "";
+  const list = approved.filter((m) => (year === "all" || yearOf(m) === year) && m.full_name.includes(q));
 
   async function saveAdj() {
     if (!adj || !reason.trim() || !amount) return toast.error("اكتب المقدار والسبب");
@@ -405,23 +409,27 @@ function Members() {
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><Input placeholder="بحث بالاسم..." value={q} onChange={(e) => setQ(e.target.value)} className="max-w-xs" /><AddMemberButton /></div>
+      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {[["all", "الكل", approved.length], ...ACADEMIC_YEARS.map((y) => [y, `فصل ${y}`, approved.filter((m) => yearOf(m) === y).length])].map(([k, label, n]) => (
+          <button key={k as string} onClick={() => setYear(k as string)} className={`pop rounded-2xl p-3 text-center font-extrabold ${year === k ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+            <div className="text-sm">{label}</div><div className="text-2xl">{n as number}</div>
+          </button>
+        ))}
+      </div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><Input placeholder="بحث بالاسم..." value={q} onChange={(e) => setQ(e.target.value)} className="max-w-xs" /><AddMemberButton defaultYear={year !== "all" ? year : undefined} /></div>
       <div className="space-y-2">
+        {list.length === 0 && <p className="text-muted-foreground">لا يوجد مخدومون في هذا الفصل.</p>}
         {list.map((m) => (
           <div key={m.id} className={card}>
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-3xl">{m.avatar}</span>
-              <div className="flex-1"><button onClick={() => setHist({ id: m.id, name: m.full_name })} className="font-bold text-primary underline-offset-4 hover:underline" title="سجل الافتقادات">{m.full_name}</button><div className="text-xs text-muted-foreground">{pmap[m.id]?.academic_year ?? ""} {m.class_name ?? ""}</div></div>
+              <div className="flex-1"><button onClick={() => setHist({ id: m.id, name: m.full_name })} className="font-bold text-primary underline-offset-4 hover:underline" title="سجل الافتقادات">{m.full_name}</button><div className="text-xs text-muted-foreground">{yearOf(m)} {m.class_name ?? ""}</div></div>
               <div className="text-center"><div className="text-xs text-muted-foreground">النقاط</div><b className="text-primary">{m.points}</b></div>
               <div className="text-center"><div className="text-xs text-muted-foreground">الرصيد</div><b>{m.balance}</b></div>
               <button onClick={() => setOpen(open === m.id ? null : m.id)} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold">التفاصيل</button>
-              <button onClick={() => { setAdj(m); setAmount(10); }} className="rounded-xl bg-secondary px-3 py-1.5 text-sm font-bold text-secondary-foreground">± تعديل النقاط</button>
-              <button onClick={async () => {
-                if (!confirm(`إزالة ${m.full_name} نهائيًا من البرنامج؟ سيتم حذف كل بياناته.`)) return;
-                const { error } = await supabase.rpc("admin_remove_member", { _member: m.id });
-                if (error) return toast.error(error.message);
-                toast.success("تمت إزالة المخدوم"); qc.invalidateQueries();
-              }} className="rounded-xl bg-destructive px-3 py-1.5 text-sm font-bold text-destructive-foreground">🗑️ إزالة</button>
+              <button onClick={() => setEdit({ id: m.id, full_name: m.full_name, academic_year: yearOf(m) || "أولى إعدادي" })} className="rounded-xl bg-accent px-3 py-1.5 text-sm font-bold text-accent-foreground">✏️ تعديل</button>
+              <button onClick={() => { setAdj(m); setAmount(10); }} className="rounded-xl bg-secondary px-3 py-1.5 text-sm font-bold text-secondary-foreground">± النقاط</button>
+              <button onClick={() => removeMember(m.id, m.full_name, () => qc.invalidateQueries())} className="rounded-xl bg-destructive px-3 py-1.5 text-sm font-bold text-destructive-foreground">🗑️ حذف</button>
             </div>
             {open === m.id && pmap[m.id] && <Contact p={pmap[m.id]} />}
           </div>
