@@ -351,32 +351,35 @@ const YEARS3 = ["أولى إعدادي", "ثانية إعدادي", "ثالثة 
 export function AddMemberButton({ defaultYear }: { defaultYear?: string }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [f, setF] = useState({ name: "", year: defaultYear ?? YEARS3[0], birth: "", phone: "", address: "" });
+  const [f, setF] = useState({ name: "", year: defaultYear ?? YEARS3[0], birth: "", phone: "", address: "", phone2: "", notes: "" });
   const [busy, setBusy] = useState(false);
   const inp = "w-full rounded-xl border-2 border-border bg-background px-3 py-2";
   const save = async () => {
     if (!f.name.trim()) return toast.error("الاسم بالكامل مطلوب");
     if (!f.birth) return toast.error("تاريخ الميلاد مطلوب");
     setBusy(true);
-    const { error } = await supabase.rpc("staff_add_member", { _name: f.name, _year: f.year, _birth: f.birth, _phone: f.phone, _address: f.address });
+    const { data: id, error } = await supabase.rpc("staff_add_member", { _name: f.name, _year: f.year, _birth: f.birth, _phone: f.phone, _address: f.address });
+    if (!error && id && (f.phone2 || f.notes)) await supabase.rpc("staff_set_extra", { _id: id, _phone2: f.phone2, _notes: f.notes });
     setBusy(false);
     if (error) return toast.error(error.message);
     toast.success("تمت إضافة المخدوم ✅");
-    setOpen(false); setF({ name: "", year: f.year, birth: "", phone: "", address: "" });
+    setOpen(false); setF({ name: "", year: f.year, birth: "", phone: "", address: "", phone2: "", notes: "" });
     qc.invalidateQueries();
   };
   return (
     <>
       <button onClick={() => setOpen(true)} className="pop rounded-xl bg-primary px-4 py-2 font-extrabold text-primary-foreground">+ إضافة مخدوم جديد</button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>➕ إضافة مخدوم جديد</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <label className="block text-sm font-bold">الاسم بالكامل *<input className={inp} value={f.name} maxLength={80} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
             <label className="block text-sm font-bold">المرحلة الدراسية *<select className={inp} value={f.year} onChange={(e) => setF({ ...f, year: e.target.value })}>{YEARS3.map((y) => <option key={y}>{y}</option>)}</select></label>
             <label className="block text-sm font-bold">تاريخ الميلاد *<input type="date" className={inp} value={f.birth} onChange={(e) => setF({ ...f, birth: e.target.value })} /></label>
             <label className="block text-sm font-bold">رقم الهاتف (اختياري)<input className={inp} inputMode="tel" placeholder="01012345678" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label>
+            <label className="block text-sm font-bold">رقم إضافي / ولي الأمر (اختياري)<input className={inp} inputMode="tel" value={f.phone2} onChange={(e) => setF({ ...f, phone2: e.target.value })} /></label>
             <label className="block text-sm font-bold">العنوان (اختياري)<input className={inp} maxLength={200} value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} /></label>
+            <label className="block text-sm font-bold">ملاحظات (اختياري)<textarea className={inp} rows={3} maxLength={1000} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></label>
             <button disabled={busy} onClick={save} className="pop w-full rounded-2xl bg-primary py-3 font-extrabold text-primary-foreground disabled:opacity-60">{busy ? "جاري الحفظ..." : "حفظ المخدوم"}</button>
           </div>
         </DialogContent>
@@ -397,33 +400,44 @@ export async function removeMember(id: string, name: string, onDone?: () => void
 /* ---------- Edit person / add servant (admin) ---------- */
 export function PersonDialog({ person, mode, onClose }: { person?: { id: string; full_name: string; academic_year?: string; birth_date?: string } | null; mode: "edit" | "servant" | null; onClose: () => void }) {
   const qc = useQueryClient();
-  const [f, setF] = useState({ name: "", year: "", birth: "", phone: "", address: "" });
+  const [f, setF] = useState({ name: "", year: "", birth: "", phone: "", address: "", phone2: "", notes: "" });
   const [busy, setBusy] = useState(false);
-  useEffect(() => { setF({ name: person?.full_name ?? "", year: person?.academic_year ?? "", birth: person?.birth_date ?? "", phone: "", address: "" }); }, [person?.id, mode]);
+  useEffect(() => {
+    setF({ name: person?.full_name ?? "", year: person?.academic_year ?? "", birth: person?.birth_date ?? "", phone: "", address: "", phone2: "", notes: "" });
+    if (person?.id && mode) supabase.rpc("staff_get_extra", { _id: person.id }).then(({ data }) => {
+      const r = data?.[0]; if (r) setF((x) => ({ ...x, phone2: r.phone2 ?? "", notes: r.staff_notes ?? "" }));
+    });
+  }, [person?.id, mode]);
   const inp = "w-full rounded-xl border-2 border-border bg-background px-3 py-2";
   const isNew = mode === "servant" && !person;
   const save = async () => {
     if (!f.name.trim()) return toast.error("الاسم مطلوب");
     if (isNew && (!f.birth || !f.phone.trim() || !f.address.trim())) return toast.error("كل البيانات مطلوبة");
     if (f.phone && !/^01[0125][0-9]{8}$/.test(f.phone)) return toast.error("رقم الموبايل غير صحيح");
+    if (f.phone2 && !/^0[0-9]{8,10}$/.test(f.phone2)) return toast.error("الرقم الإضافي غير صحيح");
     setBusy(true);
-    const { error } = isNew
+    const res = isNew
       ? await supabase.rpc("admin_add_servant", { _name: f.name, _birth: f.birth, _phone: f.phone, _address: f.address })
       : await supabase.rpc("staff_update_person", { _id: person!.id, _name: f.name, _year: f.year, _birth: f.birth || null, _phone: f.phone, _address: f.address });
+    let error = res.error;
+    const id = isNew ? res.data : person!.id;
+    if (!error && id) error = (await supabase.rpc("staff_set_extra", { _id: id, _phone2: f.phone2, _notes: f.notes })).error;
     setBusy(false);
     if (error) return toast.error(error.message);
     toast.success("تم الحفظ ✅"); qc.invalidateQueries(); onClose();
   };
   return (
     <Dialog open={!!mode} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{isNew ? "➕ إضافة خادم" : `✏️ تعديل بيانات ${person?.full_name ?? ""}`}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <label className="block text-sm font-bold">الاسم *<input className={inp} value={f.name} maxLength={80} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
           {mode === "edit" && f.year !== "" && <label className="block text-sm font-bold">المرحلة<select className={inp} value={f.year} onChange={(e) => setF({ ...f, year: e.target.value })}>{YEARS3.map((y) => <option key={y}>{y}</option>)}</select></label>}
           <label className="block text-sm font-bold">تاريخ الميلاد{isNew && " *"}<input type="date" className={inp} value={f.birth} onChange={(e) => setF({ ...f, birth: e.target.value })} /></label>
           <label className="block text-sm font-bold">رقم الموبايل{isNew ? " *" : " (اتركه فارغًا لعدم التغيير)"}<input className={inp} inputMode="tel" placeholder="01012345678" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label>
+          <label className="block text-sm font-bold">رقم إضافي / ولي الأمر (اختياري)<input className={inp} inputMode="tel" value={f.phone2} onChange={(e) => setF({ ...f, phone2: e.target.value })} /></label>
           <label className="block text-sm font-bold">العنوان{isNew ? " *" : " (اتركه فارغًا لعدم التغيير)"}<input className={inp} maxLength={200} value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} /></label>
+          <label className="block text-sm font-bold">ملاحظات (اختياري)<textarea className={inp} rows={3} maxLength={1000} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></label>
           <button disabled={busy} onClick={save} className="pop w-full rounded-2xl bg-primary py-3 font-extrabold text-primary-foreground disabled:opacity-60">{busy ? "جاري الحفظ..." : "حفظ"}</button>
         </div>
       </DialogContent>

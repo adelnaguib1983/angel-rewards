@@ -411,7 +411,9 @@ export type Database = {
           full_name: string
           id: string
           phone: string | null
+          phone2: string | null
           photo_url: string | null
+          staff_notes: string | null
           status: string
         }
         Insert: {
@@ -425,7 +427,9 @@ export type Database = {
           full_name?: string
           id: string
           phone?: string | null
+          phone2?: string | null
           photo_url?: string | null
+          staff_notes?: string | null
           status?: string
         }
         Update: {
@@ -439,7 +443,9 @@ export type Database = {
           full_name?: string
           id?: string
           phone?: string | null
+          phone2?: string | null
           photo_url?: string | null
+          staff_notes?: string | null
           status?: string
         }
         Relationships: []
@@ -1068,6 +1074,17 @@ export type Database = {
           _year: string
         }
         Returns: string
+      }
+      staff_get_extra: {
+        Args: { _id: string }
+        Returns: {
+          phone2: string
+          staff_notes: string
+        }[]
+      }
+      staff_set_extra: {
+        Args: { _id: string; _notes: string; _phone2: string }
+        Returns: undefined
       }
       staff_update_person: {
         Args: {
