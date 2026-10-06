@@ -436,6 +436,7 @@ function Members() {
         ))}
       </div>
       <VisitHistoryDialog member={hist} onClose={() => setHist(null)} />
+      <PersonDialog person={edit} mode={edit ? "edit" : null} onClose={() => setEdit(null)} />
       <Dialog open={!!adj} onOpenChange={(o) => !o && setAdj(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>تعديل نقاط {adj?.full_name}</DialogTitle></DialogHeader>
