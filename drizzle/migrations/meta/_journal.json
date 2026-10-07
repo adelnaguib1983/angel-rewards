@@ -99,6 +99,13 @@
       "when": 1791293793900,
       "tag": "0013_person_extra_phone_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791365374448,
+      "tag": "0014_merge_profile_by_phone",
+      "breakpoints": true
     }
   ]
 }
