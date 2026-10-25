@@ -9,7 +9,7 @@ import { PROFILE_COLS, ACADEMIC_YEARS, MONTHS, REDEEM_STATUS, cairoDate, cairoWe
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AddMemberButton, BirthdaysButton, PersonDialog, PrepArchive, PrepDetail, QuizLeague, ReadingPlanner, ServantsManager, SuggestionDetail, VisitArchive, VisitHistoryDialog, removeMember } from "@/components/StaffMemberExtras";
-import { AdminWeeklySummary } from "@/components/AdminWeeklySummary";
+import AdminWeeklySummary from "@/components/AdminWeeklySummary";
 import { ImageLightbox } from "@/components/ImageLightbox";
 
 export const Route = createFileRoute("/_authenticated/admin")({
