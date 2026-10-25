@@ -195,7 +195,7 @@ function AiQuizGeneratorSection() {
 }
 
 /* ==========================================================================
-   قسم الحضور والغياب اليومي مع التمييز بين (سجل من الخارج / أُضيف داخلياً)
+   قسم الحضور والغياب اليومي مع تحميل أسماء المخدومين والخدام
    ========================================================================== */
 function DailyAttendanceSection() {
   const qc = useQueryClient();
@@ -207,7 +207,8 @@ function DailyAttendanceSection() {
 
   const filterYear = selectedYear === "all" ? null : selectedYear;
 
-  const { data: people, isLoading } = useQuery({
+  // استدعاء بيانات الحضور من الدالة المخزنة، وفي حال تبويب المخدومين يمكننا أيضاً جلبهم من دالة servant_members لضمان ظهور كافة المخدومين بوضوح
+  const { data: rpcPeople, isLoading: rpcLoading } = useQuery({
     queryKey: ["daily-attendance-full", date, accountType, filterYear],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_daily_attendance", { _date: date, _account_type: accountType });
@@ -218,11 +219,49 @@ function DailyAttendanceSection() {
     },
   });
 
+  // جلب إضافي لقائمة المخدومين من صفحة المخدومين (servant_members) لضمان توافر جميع الأسماء لعملية الافتقاد والحضور
+  const { data: servantMembersData } = useQuery({
+    queryKey: ["servant-members-for-attendance"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("servant_members");
+      if (error) return [];
+      return data || [];
+    },
+    enabled: accountType === "student",
+  });
+
+  // دمج أو اختيار القائمة المناسبة (لضمان ظهور المخدومين المسجلين بصفحة المخدومين بالإضافة لقائمة الحضور)
+  const people = (() => {
+    if (accountType === "student" && servantMembersData && servantMembersData.length > 0) {
+      // دمج حالة الحضور الحالية إن وجدت مع قائمة المخدومين الفعلية
+      return servantMembersData
+        .filter((m: any) => !filterYear || m.academic_year === filterYear)
+        .map((m: any) => {
+          const existing = (rpcPeople || []).find((p: any) => p.person_id === m.id || p.person_id === m.user_id);
+          return {
+            person_id: m.id || m.user_id,
+            full_name: m.full_name,
+            avatar: m.avatar || "👤",
+            photo_url: m.photo_url,
+            academic_year: m.academic_year,
+            attendance_status: existing?.attendance_status || null,
+            auth_user_id: m.auth_user_id,
+            email: m.email,
+            registered_externally: m.registered_externally,
+          };
+        });
+    }
+    return rpcPeople || [];
+  })();
+
+  const isLoading = rpcLoading;
+
   const handleStatusChange = async (personId: string, status: "present" | "absent") => {
     const { error } = await supabase.from("daily_attendance").upsert({ person_id: personId, attendance_date: date, status: status }, { onConflict: "person_id,attendance_date" });
     if (error) return toast.error(error.message);
     toast.success("تم تحديث حالة الحضور بنجاح ✅");
     qc.invalidateQueries({ queryKey: ["daily-attendance-full"] });
+    qc.invalidateQueries({ queryKey: ["servant-members-for-attendance"] });
   };
 
   const presentCount = (people || []).filter((p: any) => p.attendance_status === "present").length;
@@ -578,3 +617,4 @@ function Visits() {
     </div>
   );
 }
+
