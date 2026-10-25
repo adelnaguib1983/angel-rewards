@@ -3,13 +3,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import { AppHeader } from "@/components/AppHeader";
-import { ACADEMIC_YEARS, fileToDataUrl, useMe } from "@/lib/app";
-import { Textarea } from "@/components/ui/textarea";
-import { AddMemberButton, removeMember, BirthdaysButton, PrepArchive, ReadingPlanner, VisitArchive, VisitHistoryDialog } from "@/components/StaffMemberExtras";
-import { NotificationsBell } from "@/components/MemberExtras";
-import { ImageLightbox } from "@/components/ImageLightbox";
+import { supabase } from "@/integrations/supabase/client";[span_1](start_span)[span_1](end_span)
+import { AppHeader } from "@/components/AppHeader";[span_2](start_span)[span_2](end_span)
+import { ACADEMIC_YEARS, fileToDataUrl, useMe } from "@/lib/app";[span_3](start_span)[span_3](end_span)
+import { Textarea } from "@/components/ui/textarea";[span_4](start_span)[span_4](end_span)
+import { AddMemberButton, removeMember, BirthdaysButton, PrepArchive, ReadingPlanner, VisitArchive, VisitHistoryDialog } from "@/components/StaffMemberExtras";[span_5](start_span)[span_5](end_span)
+import { NotificationsBell } from "@/components/MemberExtras";[span_6](start_span)[span_6](end_span)
+import { ImageLightbox } from "@/components/ImageLightbox";[span_7](start_span)[span_7](end_span)
 
 export const Route = createFileRoute("/_authenticated/servant")({
   head: () => ({
@@ -207,7 +207,6 @@ function DailyAttendanceSection() {
 
   const filterYear = selectedYear === "all" ? null : selectedYear;
 
-  // استدعاء بيانات الحضور من الدالة المخزنة، وفي حال تبويب المخدومين يمكننا أيضاً جلبهم من دالة servant_members لضمان ظهور كافة المخدومين بوضوح
   const { data: rpcPeople, isLoading: rpcLoading } = useQuery({
     queryKey: ["daily-attendance-full", date, accountType, filterYear],
     queryFn: async () => {
@@ -219,7 +218,6 @@ function DailyAttendanceSection() {
     },
   });
 
-  // جلب إضافي لقائمة المخدومين من صفحة المخدومين (servant_members) لضمان توافر جميع الأسماء لعملية الافتقاد والحضور
   const { data: servantMembersData } = useQuery({
     queryKey: ["servant-members-for-attendance"],
     queryFn: async () => {
@@ -230,10 +228,8 @@ function DailyAttendanceSection() {
     enabled: accountType === "student",
   });
 
-  // دمج أو اختيار القائمة المناسبة (لضمان ظهور المخدومين المسجلين بصفحة المخدومين بالإضافة لقائمة الحضور)
   const people = (() => {
     if (accountType === "student" && servantMembersData && servantMembersData.length > 0) {
-      // دمج حالة الحضور الحالية إن وجدت مع قائمة المخدومين الفعلية
       return servantMembersData
         .filter((m: any) => !filterYear || m.academic_year === filterYear)
         .map((m: any) => {
@@ -322,7 +318,6 @@ function DailyAttendanceSection() {
           ) : (
             <div className="grid gap-2.5 md:grid-cols-2">
               {people.map((item: any) => {
-                // التمييز بين المسجل من الخارج (عبر التطبيق) أو المضاف داخلياً
                 const isExternal = item.auth_user_id || item.email || item.registered_externally;
                 return (
                   <div key={item.person_id} className="flex items-center justify-between rounded-2xl border-2 border-border bg-card p-3.5">
@@ -484,7 +479,7 @@ function Prep({ userId }: { userId: string }) {
   const ws = getFridayWeekStart();
   const current = rows?.find((r) => r.week_start === ws);
   const [notes, setNotes] = useState("");
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<string[]>([]); // تستخدم لتخزين روابط الصور، الفيديوهات، والملفات الصوتية
   const [busy, setBusy] = useState(false);
   const [gallery, setGallery] = useState<string[] | null>(null);
 
@@ -492,8 +487,38 @@ function Prep({ userId }: { userId: string }) {
   const late = new Date().toLocaleDateString("en-US", { weekday: "short", timeZone: "Africa/Cairo" });
   const afterThu = ["Fri", "Sat"].includes(late);
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video' | 'audio') => {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    setBusy(true);
+    try {
+      const newUrls: string[] = [];
+      for (const file of files) {
+        if (type === 'image') {
+          const url = await fileToDataUrl(file, 900, 0.75);
+          newUrls.push(url);
+        } else {
+          const fileExt = file.name.split(".").pop();
+          const fileName = `prep_${type}_${Math.random()}.${fileExt}`;
+          const filePath = `prep_media/${fileName}`;
+          const { error: uploadError } = await supabase.storage.from("uploads").upload(filePath, file);
+          if (uploadError) throw uploadError;
+          const { data: publicUrlData } = supabase.storage.from("uploads").getPublicUrl(filePath);
+          newUrls.push(publicUrlData.publicUrl);
+        }
+      }
+      setImages([...images, ...newUrls]);
+      toast.success("تم رفع الملف بنجاح ✅");
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setBusy(false);
+      e.target.value = "";
+    }
+  };
+
   const save = async () => {
-    if (!notes.trim() && !images.length) return toast.error("اكتب التحضير أو ارفع صورة");
+    if (!notes.trim() && !images.length) return toast.error("اكتب التحضير أو ارفع ملفاً (صورة، فيديو، صوت)");
     setBusy(true);
     const { error } = current
       ? await supabase.from("servant_preparations").update({ notes, images, updated_at: new Date().toISOString() }).eq("id", current.id)
@@ -502,6 +527,28 @@ function Prep({ userId }: { userId: string }) {
     if (error) return toast.error(error.message);
     toast.success("تم إرسال التحضير للمشرف ✅");
     qc.invalidateQueries({ queryKey: ["my-preps"] });
+  };
+
+  const renderMediaItem = (src: string, i: number, onDelete?: () => void) => {
+    const isVideo = src.match(/\.(mp4|webm|ogg|mov)$/i) || src.includes("video") || src.includes("prep_video");
+    const isAudio = src.match(/\.(mp3|wav|m4a|aac|ogg)$/i) || src.includes("audio") || src.includes("prep_audio");
+
+    return (
+      <div key={i} className="relative rounded-xl border-2 border-border bg-muted p-2 flex flex-col items-center justify-center">
+        {isVideo ? (
+          <video src={src} controls className="h-28 w-40 rounded-lg object-cover bg-black" />
+        ) : isAudio ? (
+          <div className="w-48 py-2 px-1">
+            <audio controls src={src} className="w-full h-10" />
+          </div>
+        ) : (
+          <img src={src} alt="" onClick={() => setGallery(images.filter(s => !s.match(/\.(mp4|webm|ogg|mov|mp3|wav|m4a|aac)$/i)))} className="h-24 w-24 cursor-zoom-in rounded-lg object-cover" />
+        )}
+        {onDelete && (
+          <button onClick={onDelete} className="absolute -left-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-destructive text-xs text-destructive-foreground z-10">✕</button>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -514,37 +561,53 @@ function Prep({ userId }: { userId: string }) {
           </span>
         </div>
         <Textarea className="mt-3 min-h-40" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="موضوع الدرس، الآيات، الوسائل، ملاحظات..." />
-        <div className="mt-3 flex flex-wrap gap-2">
-          {images.map((src, i) => (
-            <div key={i} className="relative">
-              <img src={src} alt="" onClick={() => setGallery(images)} className="h-24 w-24 cursor-zoom-in rounded-xl object-cover" />
-              <button onClick={() => setImages(images.filter((_, j) => j !== i))} className="absolute -left-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-destructive text-xs text-destructive-foreground">✕</button>
-            </div>
-          ))}
-          {images.length < 6 && (
-            <label className="grid h-24 w-24 cursor-pointer place-items-center rounded-xl border-2 border-dashed border-border text-center text-xs font-bold hover:bg-muted">📷<br />رفع صورة
-              <input type="file" accept="image/*" multiple className="hidden" onChange={async (e) => {
-                const files = Array.from(e.target.files ?? []).slice(0, 6 - images.length);
-                try { const urls = await Promise.all(files.map((f) => fileToDataUrl(f, 900, 0.75))); setImages([...images, ...urls]); } catch (err) { toast.error((err as Error).message); }
-                e.target.value = "";
-              }} />
+        
+        <div className="mt-3 space-y-2">
+          <label className="block text-xs font-bold text-muted-foreground">الملفات المرفقة (صور، فيديوهات، تسجيلات صوتية):</label>
+          <div className="flex flex-wrap gap-3">
+            {images.map((src, i) => renderMediaItem(src, i, () => setImages(images.filter((_, j) => j !== i))))}
+          </div>
+
+          <div className="flex flex-wrap gap-2 pt-2">
+            <label className="flex items-center gap-1 cursor-pointer rounded-xl bg-sky/10 border border-sky/30 px-3 py-2 text-xs font-bold text-sky hover:bg-sky/20 transition">
+              <span>📷 رفع صور</span>
+              <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFileUpload(e, 'image')} />
             </label>
-          )}
+            <label className="flex items-center gap-1 cursor-pointer rounded-xl bg-purple-500/10 border border-purple-500/30 px-3 py-2 text-xs font-bold text-purple-600 hover:bg-purple-500/20 transition">
+              <span>🎬 رفع فيديو</span>
+              <input type="file" accept="video/*" multiple className="hidden" onChange={(e) => handleFileUpload(e, 'video')} />
+            </label>
+            <label className="flex items-center gap-1 cursor-pointer rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-xs font-bold text-emerald-600 hover:bg-emerald-500/20 transition">
+              <span>🎤 رفع فويس / صوت</span>
+              <input type="file" accept="audio/*" multiple className="hidden" onChange={(e) => handleFileUpload(e, 'audio')} />
+            </label>
+          </div>
         </div>
-        <button disabled={busy} onClick={save} className="pop mt-4 w-full rounded-2xl bg-sky py-3 text-lg font-extrabold text-primary-foreground disabled:opacity-60">{busy ? "..." : current ? "تحديث التحضير" : "إرسال التحضير"}</button>
+
+        <button disabled={busy} onClick={save} className="pop mt-4 w-full rounded-2xl bg-sky py-3 text-lg font-extrabold text-primary-foreground disabled:opacity-60">
+          {busy ? "جاري الحفظ..." : current ? "تحديث التحضير" : "إرسال التحضير"}
+        </button>
       </section>
+
       {rows?.filter((r) => r.week_start !== ws).length > 0 && (
         <section className={card}>
           <h3 className="mb-2 font-extrabold">التحضيرات السابقة</h3>
-          <div className="space-y-2">{rows.filter((r) => r.week_start !== ws).map((r) => (
-            <details key={r.id} className="rounded-xl bg-muted p-3"><summary className="cursor-pointer font-bold">أسبوع {r.week_start}</summary>
-              <p className="mt-2 whitespace-pre-wrap text-sm">{r.notes}</p>
-               <div className="mt-2 flex flex-wrap gap-2">{r.images?.map((s, i) => <img key={i} src={s} alt="" onClick={() => setGallery(r.images)} className="h-20 w-20 cursor-zoom-in rounded-lg object-cover" />)}</div>
-            </details>
-          ))}</div>
+          <div className="space-y-2">
+            {rows.filter((r) => r.week_start !== ws).map((r) => (
+              <details key={r.id} className="rounded-xl bg-muted p-3">
+                <summary className="cursor-pointer font-bold">أسبوع {r.week_start}</summary>
+                <p className="mt-2 whitespace-pre-wrap text-sm">{r.notes}</p>
+                {!!r.images?.length && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {r.images.map((src: string, i: number) => renderMediaItem(src, i))}
+                  </div>
+                )}
+              </details>
+            ))}
+          </div>
         </section>
       )}
-      <ImageLightbox images={gallery} title="صور التحضير" onClose={() => setGallery(null)} />
+      <ImageLightbox images={gallery?.filter(s => !s.match(/\.(mp4|webm|ogg|mov|mp3|wav|m4a|aac)$/i))} title="صور التحضير" onClose={() => setGallery(null)} />
     </div>
   );
 }
@@ -617,4 +680,3 @@ function Visits() {
     </div>
   );
 }
-
