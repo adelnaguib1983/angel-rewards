@@ -1,6 +1,6 @@
 import React from 'react';
 
-export function AdminWeeklySummary() {
+export default function AdminWeeklySummary() {
   return (
     <div className="p-6 bg-white rounded-lg shadow-md">
       <h2 className="text-2xl font-bold mb-4 text-gray-800">Weekly Summary</h2>
