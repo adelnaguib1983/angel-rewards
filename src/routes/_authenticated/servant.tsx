@@ -30,7 +30,7 @@ const card = "pop float-in rounded-3xl border-2 border-border bg-card p-5";
 // دالة لحساب بداية الأسبوع ليكون "يوم الجمعة"
 function getFridayWeekStart(): string {
   const d = new Date();
-  const day = d.getDay(); // 0 = الأحد, 5 = الجمعة, 6 = السبت
+  const day = d.getDay();
   const diff = d.getDate() - day + (day === 5 ? 0 : day < 5 ? day - 5 - 7 : 1);
   const friday = new Date(d.setDate(diff));
   return friday.toISOString().split("T")[0];
@@ -93,7 +93,7 @@ function ServantPage() {
 }
 
 /* ==========================================================================
-   قسم توليد المسابقات بالذكاء الاصطناعي (من نص، صورة، أو فويس)
+   قسم توليد المسابقات بالذكاء الاصطناعي
    ========================================================================== */
 function AiQuizGeneratorSection() {
   const [sourceType, setSourceType] = useState<"text" | "image" | "voice">("text");
@@ -104,15 +104,9 @@ function AiQuizGeneratorSection() {
   const [generatedQuestions, setGeneratedQuestions] = useState<any[]>([]);
 
   const handleGenerate = async () => {
-    if (sourceType === "text" && !textContent.trim()) {
-      return toast.error("يرجى كتابة نص المسابقة أولاً");
-    }
-    if (sourceType === "image" && !selectedImage) {
-      return toast.error("يرجى رفع صورة المسابقة أولاً");
-    }
-    if (sourceType === "voice" && !voiceFile) {
-      return toast.error("يرجى تسجيل أو رفع ملف الصوت أولاً");
-    }
+    if (sourceType === "text" && !textContent.trim()) return toast.error("يرجى كتابة نص المسابقة أولاً");
+    if (sourceType === "image" && !selectedImage) return toast.error("يرجى رفع صورة المسابقة أولاً");
+    if (sourceType === "voice" && !voiceFile) return toast.error("يرجى تسجيل أو رفع ملف الصوت أولاً");
 
     setLoading(true);
     setTimeout(() => {
@@ -141,87 +135,41 @@ function AiQuizGeneratorSection() {
         <p className="text-xs text-muted-foreground mt-1">اختر مصدر المسابقة (نص، صورة، أو تسجيل صوتي) ليقوم النظام بتحويلها لأسئلة فوراً.</p>
 
         <div className="mt-4 flex gap-2">
-          <button
-            onClick={() => setSourceType("text")}
-            className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${sourceType === "text" ? "bg-sky text-primary-foreground" : "bg-muted"}`}
-          >
-            📝 من نص مكتوب
-          </button>
-          <button
-            onClick={() => setSourceType("image")}
-            className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${sourceType === "image" ? "bg-sky text-primary-foreground" : "bg-muted"}`}
-          >
-            📷 من صورة
-          </button>
-          <button
-            onClick={() => setSourceType("voice")}
-            className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${sourceType === "voice" ? "bg-sky text-primary-foreground" : "bg-muted"}`}
-          >
-            🎤 من تسجيل صوتي
-          </button>
+          <button onClick={() => setSourceType("text")} className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${sourceType === "text" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>📝 من نص مكتوب</button>
+          <button onClick={() => setSourceType("image")} className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${sourceType === "image" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>📷 من صورة</button>
+          <button onClick={() => setSourceType("voice")} className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${sourceType === "voice" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>🎤 من تسجيل صوتي</button>
         </div>
 
         <div className="mt-4">
           {sourceType === "text" && (
-            <Textarea
-              value={textContent}
-              onChange={(e) => setTextContent(e.target.value)}
-              placeholder="اكتب أو الصق نص الدرس، الكتاب المقدس، أو محتوى المسابقة هنا..."
-              className="min-h-32"
-            />
+            <Textarea value={textContent} onChange={(e) => setTextContent(e.target.value)} placeholder="اكتب أو الصق نص الدرس، الكتاب المقدس، أو محتوى المسابقة هنا..." className="min-h-32" />
           )}
-
           {sourceType === "image" && (
             <div className="space-y-2">
-              {selectedImage && (
-                <img src={selectedImage} alt="Uploaded quiz" className="max-h-48 rounded-2xl object-cover mx-auto" />
-              )}
+              {selectedImage && <img src={selectedImage} alt="Uploaded quiz" className="max-h-48 rounded-2xl object-cover mx-auto" />}
               <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-6 cursor-pointer hover:bg-muted">
                 <span>📷 اضغط لرفع صورة المسابقة</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      try {
-                        const url = await fileToDataUrl(file, 900, 0.75);
-                        setSelectedImage(url);
-                      } catch (err) {
-                        toast.error((err as Error).message);
-                      }
-                    }
-                  }}
-                />
+                <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    try { const url = await fileToDataUrl(file, 900, 0.75); setSelectedImage(url); } catch (err) { toast.error((err as Error).message); }
+                  }
+                }} />
               </label>
             </div>
           )}
-
           {sourceType === "voice" && (
             <div className="space-y-2">
               <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-6 cursor-pointer hover:bg-muted">
                 <span>🎤 اضغط لرفع ملف صوتي (فويس) للأسئلة</span>
-                <input
-                  type="file"
-                  accept="audio/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) setVoiceFile(file);
-                  }}
-                />
+                <input type="file" accept="audio/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) setVoiceFile(file); }} />
               </label>
               {voiceFile && <p className="text-xs font-bold text-emerald-600 text-center">تم اختيار الملف: {voiceFile.name}</p>}
             </div>
           )}
         </div>
 
-        <button
-          disabled={loading}
-          onClick={handleGenerate}
-          className="pop mt-4 w-full rounded-2xl bg-sky py-3 text-base font-extrabold text-primary-foreground disabled:opacity-60"
-        >
+        <button disabled={loading} onClick={handleGenerate} className="pop mt-4 w-full rounded-2xl bg-sky py-3 text-base font-extrabold text-primary-foreground disabled:opacity-60">
           {loading ? "جاري تحليل المحتوى وتوليد الأسئلة..." : "توليد الأسئلة تلقائياً ⚡"}
         </button>
       </section>
@@ -237,10 +185,7 @@ function AiQuizGeneratorSection() {
               </div>
             ))}
           </div>
-          <button
-            onClick={handleSaveQuizToDB}
-            className="pop mt-4 w-full rounded-2xl bg-emerald-600 py-3 text-base font-extrabold text-white"
-          >
+          <button onClick={handleSaveQuizToDB} className="pop mt-4 w-full rounded-2xl bg-emerald-600 py-3 text-base font-extrabold text-white">
             اعتماد وحفظ المسابقة للمخدومين ✅
           </button>
         </section>
@@ -250,7 +195,7 @@ function AiQuizGeneratorSection() {
 }
 
 /* ==========================================================================
-   باقي الأقسام (الحضور والغياب، الاقتراحات، التحضير، الافتقاد)
+   قسم الحضور والغياب اليومي المتكامل
    ========================================================================== */
 function DailyAttendanceSection() {
   const qc = useQueryClient();
@@ -265,30 +210,16 @@ function DailyAttendanceSection() {
   const { data: people, isLoading } = useQuery({
     queryKey: ["daily-attendance-full", date, accountType, filterYear],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_daily_attendance", {
-        _date: date,
-        _account_type: accountType,
-      });
+      const { data, error } = await supabase.rpc("get_daily_attendance", { _date: date, _account_type: accountType });
       if (error) throw error;
       let list = data || [];
-      if (filterYear) {
-        list = list.filter((p: any) => p.academic_year === filterYear);
-      }
+      if (filterYear) list = list.filter((p: any) => p.academic_year === filterYear);
       return list;
     },
   });
 
   const handleStatusChange = async (personId: string, status: "present" | "absent") => {
-    const { error } = await supabase
-      .from("daily_attendance")
-      .upsert(
-        {
-          person_id: personId,
-          attendance_date: date,
-          status: status,
-        },
-        { onConflict: "person_id,attendance_date" }
-      );
+    const { error } = await supabase.from("daily_attendance").upsert({ person_id: personId, attendance_date: date, status: status }, { onConflict: "person_id,attendance_date" });
     if (error) return toast.error(error.message);
     toast.success("تم تحديث حالة الحضور بنجاح ✅");
     qc.invalidateQueries({ queryKey: ["daily-attendance-full"] });
@@ -324,56 +255,23 @@ function DailyAttendanceSection() {
       <div className={`${card} flex flex-wrap items-center justify-between gap-3`}>
         <div className="flex items-center gap-2">
           <label className="text-sm font-extrabold">📅 التاريخ:</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="rounded-xl border-2 border-border bg-background px-3 py-1.5 font-bold text-sm"
-          />
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="rounded-xl border-2 border-border bg-background px-3 py-1.5 font-bold text-sm" />
         </div>
-
         <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setAccountType("student")}
-            className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${accountType === "student" ? "bg-sky text-primary-foreground" : "bg-muted"}`}
-          >
-            المخدومين (الأولاد)
-          </button>
-          <button
-            onClick={() => setAccountType("servant")}
-            className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${accountType === "servant" ? "bg-sky text-primary-foreground" : "bg-muted"}`}
-          >
-            الخدام
-          </button>
+          <button onClick={() => setAccountType("student")} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${accountType === "student" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>المخدومين (الأولاد)</button>
+          <button onClick={() => setAccountType("servant")} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${accountType === "servant" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>الخدام</button>
         </div>
-
         <div className="flex items-center gap-2">
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
-            className="rounded-xl border-2 border-border bg-background px-3 py-1.5 text-xs font-bold"
-          >
+          <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="rounded-xl border-2 border-border bg-background px-3 py-1.5 text-xs font-bold">
             <option value="all">كل المراحل</option>
-            {ACADEMIC_YEARS.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
+            {ACADEMIC_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
       </div>
 
       <div className="flex gap-2">
-        <button
-          onClick={() => setSubTab("record")}
-          className={`flex-1 rounded-2xl border-2 py-2.5 font-extrabold transition ${subTab === "record" ? "border-sky bg-sky text-primary-foreground" : "border-border bg-card"}`}
-        >
-          📝 تسجيل الحضور اليومي
-        </button>
-        <button
-          onClick={() => setSubTab("absent")}
-          className={`flex-1 rounded-2xl border-2 py-2.5 font-extrabold transition ${subTab === "absent" ? "border-destructive bg-destructive text-destructive-foreground" : "border-border bg-card"}`}
-        >
-          ⚠️ كشف الغياب ({absentPeople.length})
-        </button>
+        <button onClick={() => setSubTab("record")} className={`flex-1 rounded-2xl border-2 py-2.5 font-extrabold transition ${subTab === "record" ? "border-sky bg-sky text-primary-foreground" : "border-border bg-card"}`}>📝 تسجيل الحضور اليومي</button>
+        <button onClick={() => setSubTab("absent")} className={`flex-1 rounded-2xl border-2 py-2.5 font-extrabold transition ${subTab === "absent" ? "border-destructive bg-destructive text-destructive-foreground" : "border-border bg-card"}`}>⚠️ كشف الغياب ({absentPeople.length})</button>
       </div>
 
       {subTab === "record" ? (
@@ -387,38 +285,15 @@ function DailyAttendanceSection() {
               {people.map((item: any) => (
                 <div key={item.person_id} className="flex items-center justify-between rounded-2xl border-2 border-border bg-card p-3.5">
                   <div className="flex items-center gap-3">
-                    {item.photo_url ? (
-                      <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" />
-                    ) : (
-                      <span className="text-2xl">{item.avatar || "👤"}</span>
-                    )}
+                    {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
                     <div>
                       <div className="font-extrabold text-sm">{item.full_name}</div>
                       <div className="text-xs text-muted-foreground">{item.academic_year || "بدون مرحلة"}</div>
                     </div>
                   </div>
-
                   <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => handleStatusChange(item.person_id, "present")}
-                      className={`rounded-xl px-3 py-1.5 text-xs font-black transition ${
-                        item.attendance_status === "present"
-                          ? "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400"
-                          : "bg-muted text-muted-foreground hover:bg-emerald-100 hover:text-emerald-800"
-                      }`}
-                    >
-                      ✓ حاضر
-                    </button>
-                    <button
-                      onClick={() => handleStatusChange(item.person_id, "absent")}
-                      className={`rounded-xl px-3 py-1.5 text-xs font-black transition ${
-                        item.attendance_status === "absent"
-                          ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-destructive"
-                          : "bg-muted text-muted-foreground hover:bg-red-100 hover:text-red-800"
-                      }`}
-                    >
-                      ✕ غائب
-                    </button>
+                    <button onClick={() => handleStatusChange(item.person_id, "present")} className={`rounded-xl px-3 py-1.5 text-xs font-black transition ${item.attendance_status === "present" ? "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400" : "bg-muted text-muted-foreground hover:bg-emerald-100 hover:text-emerald-800"}`}>✓ حاضر</button>
+                    <button onClick={() => handleStatusChange(item.person_id, "absent")} className={`rounded-xl px-3 py-1.5 text-xs font-black transition ${item.attendance_status === "absent" ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-destructive" : "bg-muted text-muted-foreground hover:bg-red-100 hover:text-red-800"}`}>✕ غائب</button>
                   </div>
                 </div>
               ))}
@@ -428,19 +303,13 @@ function DailyAttendanceSection() {
       ) : (
         <div className="space-y-2">
           {!absentPeople.length ? (
-            <div className="rounded-2xl border-2 border-border bg-card p-8 text-center text-emerald-600 font-extrabold">
-              🎉 لا يوجد غياب مسجل لهذا التاريخ!
-            </div>
+            <div className="rounded-2xl border-2 border-border bg-card p-8 text-center text-emerald-600 font-extrabold">🎉 لا يوجد غياب مسجل لهذا التاريخ!</div>
           ) : (
             <div className="grid gap-2.5 md:grid-cols-2">
               {absentPeople.map((item: any) => (
                 <div key={item.person_id} className="flex items-center justify-between rounded-2xl border-2 border-destructive/40 bg-card p-3.5">
                   <div className="flex items-center gap-3">
-                    {item.photo_url ? (
-                      <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" />
-                    ) : (
-                      <span className="text-2xl">{item.avatar || "👤"}</span>
-                    )}
+                    {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
                     <div>
                       <div className="font-extrabold text-sm">{item.full_name}</div>
                       <div className="text-xs text-muted-foreground">{item.academic_year || "بدون مرحلة"}</div>
@@ -479,7 +348,6 @@ function SuggestionsSection({ currentUserId, isAdmin }: { currentUserId: string;
     if (!content.trim()) return toast.error("يرجى كتابة نص الاقتراح أو التوجيه");
     setSubmitting(true);
     let mediaUrl = null;
-
     if (mediaFile) {
       const fileExt = mediaFile.name.split(".").pop();
       const fileName = `${Math.random()}.${fileExt}`;
@@ -490,22 +358,11 @@ function SuggestionsSection({ currentUserId, isAdmin }: { currentUserId: string;
         mediaUrl = publicUrlData.publicUrl;
       }
     }
-
-    const { error } = await supabase.from("suggestions_and_notes").insert({
-      content: content.trim(),
-      target_type: targetType,
-      target_id: targetId || null,
-      media_url: mediaUrl,
-      status: "pending",
-    });
-
+    const { error } = await supabase.from("suggestions_and_notes").insert({ content: content.trim(), target_type: targetType, target_id: targetId || null, media_url: mediaUrl, status: "pending" });
     setSubmitting(false);
     if (error) return toast.error(error.message);
-
     toast.success("تم إرسال الاقتراح / التوجيه بنجاح ✅");
-    setContent("");
-    setMediaFile(null);
-    setTargetId("");
+    setContent(""); setMediaFile(null); setTargetId("");
     qc.invalidateQueries({ queryKey: ["suggestions-and-notes-list"] });
   };
 
@@ -513,101 +370,44 @@ function SuggestionsSection({ currentUserId, isAdmin }: { currentUserId: string;
     <div className="space-y-4">
       <section className={card}>
         <h2 className="text-xl font-extrabold">💡 كتابة اقتراح أو توجيه جديد</h2>
-        <Textarea
-          className="mt-3 min-h-28"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="اكتب فكرتك أو التوجيه أو الملاحظة هنا..."
-        />
-
+        <Textarea className="mt-3 min-h-28" value={content} onChange={(e) => setContent(e.target.value)} placeholder="اكتب فكرتك أو التوجيه أو الملاحظة هنا..." />
         <div className="mt-3 space-y-2">
           <label className="text-xs font-bold text-muted-foreground">جهة الإرسال إلى:</label>
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => { setTargetType("all_servants"); setTargetId(""); }}
-              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${targetType === "all_servants" ? "bg-sky text-primary-foreground" : "bg-muted"}`}
-            >
-              👥 كل الخدام
-            </button>
-            <button
-              onClick={() => { setTargetType("specific_servant"); setTargetId(""); }}
-              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${targetType === "specific_servant" ? "bg-sky text-primary-foreground" : "bg-muted"}`}
-            >
-              👤 خادم محدد
-            </button>
-            <button
-              onClick={() => { setTargetType("specific_student"); setTargetId(""); }}
-              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${targetType === "specific_student" ? "bg-sky text-primary-foreground" : "bg-muted"}`}
-            >
-              🧒 مخدوم محدد
-            </button>
+            <button onClick={() => { setTargetType("all_servants"); setTargetId(""); }} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${targetType === "all_servants" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>👥 كل الخدام</button>
+            <button onClick={() => { setTargetType("specific_servant"); setTargetId(""); }} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${targetType === "specific_servant" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>👤 خادم محدد</button>
+            <button onClick={() => { setTargetType("specific_student"); setTargetId(""); }} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${targetType === "specific_student" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>🧒 مخدوم محدد</button>
           </div>
-
           {targetType !== "all_servants" && (
-            <select
-              value={targetId}
-              onChange={(e) => setTargetId(e.target.value)}
-              className="mt-2 w-full rounded-xl border-2 border-border bg-background p-2 text-sm font-bold"
-            >
+            <select value={targetId} onChange={(e) => setTargetId(e.target.value)} className="mt-2 w-full rounded-xl border-2 border-border bg-background p-2 text-sm font-bold">
               <option value="">-- اختر الشخص المستهدف --</option>
-              {recipients?.map((p: any) => (
-                <option key={p.id} value={p.id}>
-                  {p.full_name} ({p.account_type === "servant" ? "خادم" : "مخدوم"})
-                </option>
-              ))}
+              {recipients?.map((p: any) => <option key={p.id} value={p.id}>{p.full_name} ({p.account_type === "servant" ? "خادم" : "مخدوم"})</option>)}
             </select>
           )}
         </div>
-
         <div className="mt-3">
           <label className="block text-xs font-bold text-muted-foreground mb-1">رفع وسائل إيضاح (صور، فويس، فيديوهات):</label>
-          <input
-            type="file"
-            accept="image/*,audio/*,video/*"
-            onChange={(e) => setMediaFile(e.target.files?.[0] || null)}
-            className="w-full rounded-xl border-2 border-border bg-background p-2 text-xs font-bold"
-          />
+          <input type="file" accept="image/*,audio/*,video/*" onChange={(e) => setMediaFile(e.target.files?.[0] || null)} className="w-full rounded-xl border-2 border-border bg-background p-2 text-xs font-bold" />
         </div>
-
-        <button
-          disabled={submitting}
-          onClick={sendSuggestion}
-          className="pop mt-4 w-full rounded-2xl bg-sky py-3 text-base font-extrabold text-primary-foreground disabled:opacity-60"
-        >
+        <button disabled={submitting} onClick={sendSuggestion} className="pop mt-4 w-full rounded-2xl bg-sky py-3 text-base font-extrabold text-primary-foreground disabled:opacity-60">
           {submitting ? "جاري الإرسال..." : "إرسال الاقتراح / التوجيه 🚀"}
         </button>
       </section>
 
       <section className={card}>
         <h3 className="mb-3 text-xl font-extrabold">📬 سجل الاقتراحات والملاحظات</h3>
-        {isLoading ? (
-          <p className="text-center text-muted-foreground py-6">جاري التحميل...</p>
-        ) : !suggestions?.length ? (
-          <p className="text-center text-muted-foreground py-6">لا توجد اقتراحات حتى الآن.</p>
-        ) : (
+        {isLoading ? <p className="text-center text-muted-foreground py-6">جاري التحميل...</p> : !suggestions?.length ? <p className="text-center text-muted-foreground py-6">لا توجد اقتراحات حتى الآن.</p> : (
           <div className="space-y-3">
             {suggestions.map((s: any) => (
               <div key={s.id} className="rounded-2xl border-2 border-border bg-background p-4 space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
-                  <span className="rounded-full bg-sky/20 px-2.5 py-0.5 text-xs font-bold text-sky">
-                    {s.target_type === "all_servants" ? "إلى كل الخدام" : "موجه لشخص محدد"}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(s.created_at).toLocaleDateString("ar-EG")}
-                  </span>
+                  <span className="rounded-full bg-sky/20 px-2.5 py-0.5 text-xs font-bold text-sky">{s.target_type === "all_servants" ? "إلى كل الخدام" : "موجه لشخص محدد"}</span>
+                  <span className="text-xs text-muted-foreground">{new Date(s.created_at).toLocaleDateString("ar-EG")}</span>
                 </div>
-
                 <p className="whitespace-pre-wrap text-sm leading-relaxed">{s.content}</p>
-
                 {s.media_url && (
                   <div className="mt-2">
-                    {s.media_url.match(/\.(jpeg|jpg|gif|png)$/i) ? (
-                      <img src={s.media_url} alt="media" className="max-h-40 rounded-xl object-cover" />
-                    ) : s.media_url.match(/\.(mp3|wav|m4a|ogg)$/i) ? (
-                      <audio controls src={s.media_url} className="w-full" />
-                    ) : (
-                      <video controls src={s.media_url} className="max-h-48 rounded-xl w-full" />
-                    )}
+                    {s.media_url.match(/\.(jpeg|jpg|gif|png)$/i) ? <img src={s.media_url} alt="media" className="max-h-40 rounded-xl object-cover" /> : s.media_url.match(/\.(mp3|wav|m4a|ogg)$/i) ? <audio controls src={s.media_url} className="w-full" /> : <video controls src={s.media_url} className="max-h-48 rounded-xl w-full" />}
                   </div>
                 )}
               </div>
@@ -625,17 +425,14 @@ function Prep({ userId }: { userId: string }) {
     queryKey: ["my-preps"],
     queryFn: async () => (await supabase.from("servant_preparations").select("*").eq("user_id", userId).order("week_start", { ascending: false }).limit(8)).data ?? [],
   });
-  
   const ws = getFridayWeekStart();
   const current = rows?.find((r) => r.week_start === ws);
-
   const [notes, setNotes] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [gallery, setGallery] = useState<string[] | null>(null);
 
   useEffect(() => { if (current) { setNotes(current.notes); setImages(current.images ?? []); } }, [current?.id]);
-  
   const late = new Date().toLocaleDateString("en-US", { weekday: "short", timeZone: "Africa/Cairo" });
   const afterThu = ["Fri", "Sat"].includes(late);
 
