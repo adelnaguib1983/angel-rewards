@@ -195,7 +195,7 @@ function AiQuizGeneratorSection() {
 }
 
 /* ==========================================================================
-   قسم الحضور والغياب اليومي المتكامل
+   قسم الحضور والغياب اليومي مع التمييز بين (سجل من الخارج / أُضيف داخلياً)
    ========================================================================== */
 function DailyAttendanceSection() {
   const qc = useQueryClient();
@@ -282,21 +282,30 @@ function DailyAttendanceSection() {
             <p className="text-center text-muted-foreground py-8">لا توجد بيانات مسجلة.</p>
           ) : (
             <div className="grid gap-2.5 md:grid-cols-2">
-              {people.map((item: any) => (
-                <div key={item.person_id} className="flex items-center justify-between rounded-2xl border-2 border-border bg-card p-3.5">
-                  <div className="flex items-center gap-3">
-                    {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
-                    <div>
-                      <div className="font-extrabold text-sm">{item.full_name}</div>
-                      <div className="text-xs text-muted-foreground">{item.academic_year || "بدون مرحلة"}</div>
+              {people.map((item: any) => {
+                // التمييز بين المسجل من الخارج (عبر التطبيق) أو المضاف داخلياً
+                const isExternal = item.auth_user_id || item.email || item.registered_externally;
+                return (
+                  <div key={item.person_id} className="flex items-center justify-between rounded-2xl border-2 border-border bg-card p-3.5">
+                    <div className="flex items-center gap-3">
+                      {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-sm">{item.full_name}</span>
+                          <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${isExternal ? "bg-sky/20 text-sky" : "bg-amber-500/20 text-amber-600"}`}>
+                            {isExternal ? "🌐 سجل من الخارج" : "➕ أُضيف داخلياً"}
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">{item.academic_year || "بدون مرحلة"}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={() => handleStatusChange(item.person_id, "present")} className={`rounded-xl px-3 py-1.5 text-xs font-black transition ${item.attendance_status === "present" ? "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400" : "bg-muted text-muted-foreground hover:bg-emerald-100 hover:text-emerald-800"}`}>✓ حاضر</button>
+                      <button onClick={() => handleStatusChange(item.person_id, "absent")} className={`rounded-xl px-3 py-1.5 text-xs font-black transition ${item.attendance_status === "absent" ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-destructive" : "bg-muted text-muted-foreground hover:bg-red-100 hover:text-red-800"}`}>✕ غائب</button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => handleStatusChange(item.person_id, "present")} className={`rounded-xl px-3 py-1.5 text-xs font-black transition ${item.attendance_status === "present" ? "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400" : "bg-muted text-muted-foreground hover:bg-emerald-100 hover:text-emerald-800"}`}>✓ حاضر</button>
-                    <button onClick={() => handleStatusChange(item.person_id, "absent")} className={`rounded-xl px-3 py-1.5 text-xs font-black transition ${item.attendance_status === "absent" ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-destructive" : "bg-muted text-muted-foreground hover:bg-red-100 hover:text-red-800"}`}>✕ غائب</button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -306,18 +315,26 @@ function DailyAttendanceSection() {
             <div className="rounded-2xl border-2 border-border bg-card p-8 text-center text-emerald-600 font-extrabold">🎉 لا يوجد غياب مسجل لهذا التاريخ!</div>
           ) : (
             <div className="grid gap-2.5 md:grid-cols-2">
-              {absentPeople.map((item: any) => (
-                <div key={item.person_id} className="flex items-center justify-between rounded-2xl border-2 border-destructive/40 bg-card p-3.5">
-                  <div className="flex items-center gap-3">
-                    {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
-                    <div>
-                      <div className="font-extrabold text-sm">{item.full_name}</div>
-                      <div className="text-xs text-muted-foreground">{item.academic_year || "بدون مرحلة"}</div>
+              {absentPeople.map((item: any) => {
+                const isExternal = item.auth_user_id || item.email || item.registered_externally;
+                return (
+                  <div key={item.person_id} className="flex items-center justify-between rounded-2xl border-2 border-destructive/40 bg-card p-3.5">
+                    <div className="flex items-center gap-3">
+                      {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-sm">{item.full_name}</span>
+                          <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${isExternal ? "bg-sky/20 text-sky" : "bg-amber-500/20 text-amber-600"}`}>
+                            {isExternal ? "🌐 سجل من الخارج" : "➕ أُضيف داخلياً"}
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">{item.academic_year || "بدون مرحلة"}</div>
+                      </div>
                     </div>
+                    <span className="rounded-full bg-destructive/20 px-3 py-1 text-xs font-bold text-destructive">غائب</span>
                   </div>
-                  <span className="rounded-full bg-destructive/20 px-3 py-1 text-xs font-bold text-destructive">غائب</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -525,28 +542,38 @@ function Visits() {
       ))}</div>
       <p className="text-xs text-muted-foreground">🔴 = لم يسجّل أي نشاط هذا الأسبوع (يحتاج افتقاد) · ✅ = تم افتقاده هذا الأسبوع. التقرير يصل للمشرف تلقائيًا.</p>
       {!rows.length && <p className="text-muted-foreground">لا يوجد مخدومون في هذه المرحلة.</p>}
-      <div className="grid gap-3 md:grid-cols-2">{rows.map((m) => (
-        <div key={m.id} className={card}>
-          <div className="flex items-center gap-3">
-            {m.photo_url ? <img src={m.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-3xl">{m.avatar}</span>}
-            <button onClick={() => setHist({ id: m.id, name: m.full_name })} className="flex-1 text-right font-bold text-primary underline-offset-4 hover:underline" title="سجل الافتقادات">{m.full_name}</button>
-            {!m.active_this_week && <span title="لم يسجل نشاطًا">🔴</span>}
-            {m.visited && <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-accent-foreground">✅ تم</span>}
-            <button onClick={() => { setOpen(m.id); setNote(""); }} className="rounded-xl bg-sky px-3 py-1.5 text-sm font-bold text-primary-foreground">{m.visited ? "افتقاد آخر" : "افتقاد"}</button>
-            <button title="حذف المخدوم" onClick={() => removeMember(m.id, m.full_name, () => qc.invalidateQueries({ queryKey: ["servant-members"] }))} className="rounded-xl bg-destructive/15 px-2 py-1.5 text-sm">🗑️</button>
-          </div>
-          {open === m.id && (
-            <div className="mt-3 space-y-2">
-              <div className="flex gap-2">{Object.entries(METHODS).map(([k, l]) => (
-                <button key={k} onClick={() => setMethod(k)} className={`rounded-xl px-2 py-1 text-xs font-bold ${method === k ? "bg-sky text-primary-foreground" : "bg-muted"}`}>{l}</button>
-              ))}</div>
-              <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="ملاحظات الافتقاد (سبب الغياب، الحالة...)" />
-              <div className="flex gap-2"><button onClick={() => save(m.id)} className="flex-1 rounded-xl bg-accent py-2 font-bold text-accent-foreground">حفظ</button>
-                <button onClick={() => setOpen(null)} className="rounded-xl bg-muted px-4 py-2 font-bold">إلغاء</button></div>
+      <div className="grid gap-3 md:grid-cols-2">{rows.map((m) => {
+        const isExternal = m.auth_user_id || m.email || m.registered_externally;
+        return (
+          <div key={m.id} className={card}>
+            <div className="flex items-center gap-3">
+              {m.photo_url ? <img src={m.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-3xl">{m.avatar}</span>}
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setHist({ id: m.id, name: m.full_name })} className="text-right font-bold text-primary underline-offset-4 hover:underline" title="سجل الافتقادات">{m.full_name}</button>
+                  <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${isExternal ? "bg-sky/20 text-sky" : "bg-amber-500/20 text-amber-600"}`}>
+                    {isExternal ? "🌐 سجل من الخارج" : "➕ أُضيف داخلياً"}
+                  </span>
+                </div>
+              </div>
+              {!m.active_this_week && <span title="لم يسجل نشاطًا">🔴</span>}
+              {m.visited && <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-accent-foreground">✅ تم</span>}
+              <button onClick={() => { setOpen(m.id); setNote(""); }} className="rounded-xl bg-sky px-3 py-1.5 text-sm font-bold text-primary-foreground">{m.visited ? "افتقاد آخر" : "افتقاد"}</button>
+              <button title="حذف المخدوم" onClick={() => removeMember(m.id, m.full_name, () => qc.invalidateQueries({ queryKey: ["servant-members"] }))} className="rounded-xl bg-destructive/15 px-2 py-1.5 text-sm">🗑️</button>
             </div>
-          )}
-        </div>
-      ))}</div>
+            {open === m.id && (
+              <div className="mt-3 space-y-2">
+                <div className="flex gap-2">{Object.entries(METHODS).map(([k, l]) => (
+                  <button key={k} onClick={() => setMethod(k)} className={`rounded-xl px-2 py-1 text-xs font-bold ${method === k ? "bg-sky text-primary-foreground" : "bg-muted"}`}>{l}</button>
+                ))}</div>
+                <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="ملاحظات الافتقاد (سبب الغياب، الحالة...)" />
+                <div className="flex gap-2"><button onClick={() => save(m.id)} className="flex-1 rounded-xl bg-accent py-2 font-bold text-accent-foreground">حفظ</button>
+                  <button onClick={() => setOpen(null)} className="rounded-xl bg-muted px-4 py-2 font-bold">إلغاء</button></div>
+              </div>
+            )}
+          </div>
+        );
+      })}</div>
       <VisitHistoryDialog member={hist} onClose={() => setHist(null)} />
     </div>
   );
