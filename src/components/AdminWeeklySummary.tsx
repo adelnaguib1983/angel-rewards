@@ -9,6 +9,7 @@ import { ACADEMIC_YEARS, useMe } from "@/lib/app";
 import { Textarea } from "@/components/ui/textarea";
 import { AddMemberButton, removeMember, BirthdaysButton, PrepArchive, VisitArchive, VisitHistoryDialog } from "@/components/StaffMemberExtras";
 import { NotificationsBell } from "@/components/MemberExtras";
+import { AdminWeeklySummary } from "@/components/AdminWeeklySummary";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
@@ -28,7 +29,7 @@ const card = "pop float-in rounded-3xl border-2 border-border bg-card p-5";
 
 function AdminPage() {
   const { data: me, isLoading } = useMe();
-  const [tab, setTab] = useState<string>("servants");
+  const [tab, setTab] = useState<string>("summary");
   if (isLoading || !me) return <div className="p-10 text-center">...</div>;
   const p = me.profile;
   const allowed = me.isAdmin || p?.account_type === "servant";
@@ -52,6 +53,7 @@ function AdminPage() {
             </div>
             <nav className="my-5 flex flex-wrap gap-2">
               {([
+                ["summary", "📊 الملخص الأسبوعي"],
                 ["servants", "👥 إدارة الخدام والطلبات"],
                 ["members", "🧒 إدارة المخدومين"],
                 ["broadcast", "📢 الإشعارات الجماعية"],
@@ -63,6 +65,7 @@ function AdminPage() {
               <BirthdaysButton />
               <div className="mr-auto"><NotificationsBell /></div>
             </nav>
+            {tab === "summary" && <AdminWeeklySummary />}
             {tab === "servants" && <ServantsManagement />}
             {tab === "members" && <MembersManagement />}
             {tab === "broadcast" && <BroadcastSection />}
