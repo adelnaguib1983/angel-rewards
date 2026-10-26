@@ -252,7 +252,37 @@ function DailyAttendanceSection() {
 
   const isLoading = rpcLoading;
 
-  const handleStatusChange = async (personId: string, status: "present" | "absent") => {
+ const handleStatusChange = async (personId: string, status: "present" | "absent") => {
+    // 1. تحديث أو إدخال حالة الحضور في جدول daily_attendance
+    const { error } = await supabase.from("daily_attendance").upsert({ person_id: personId, attendance_date: date, status: status }, { onConflict: "person_id,attendance_date" });
+    if (error) return toast.error(error.message);
+
+    // 2. إذا كانت الحالة الجديدة "غياب"، نتحقق مما إذا كان قد غاب في المرة السابقة أيضاً (لتنبيه المشرف)
+    if (status === "absent") {
+      const { data: pastRecords } = await supabase
+        .from("daily_attendance")
+        .select("status, attendance_date")
+        .eq("person_id", personId)
+        .neq("attendance_date", date) // استبعاد تاريخ اليوم الحالي
+        .order("attendance_date", { ascending: false })
+        .limit(1);
+
+      if (pastRecords && pastRecords.length > 0 && pastRecords[0].status === "absent") {
+        toast.warning("⚠️ تنبيه: هذا الشخص غاب مرتين متتاليتين وتم إخطار المشرف!");
+        
+        // يمكنك هنا تسجيل إشعار في جدول الإشعارات أو إرسال تنبيه للمشرف تلقائياً
+        await supabase.from("suggestions_and_notes").insert({
+          content: `⚠️ تنبيه غياب متكرر: المخدوم / الخادم غاب مرتين متتاليتين في تاريخ ${date}`,
+          target_type: "all_servants",
+          status: "pending"
+        });
+      }
+    }
+
+    toast.success("تم تحديث حالة الحضور بنجاح ✅");
+    qc.invalidateQueries({ queryKey: ["daily-attendance-full"] });
+    qc.invalidateQueries({ queryKey: ["servant-members-for-attendance"] });
+  };
     const { error } = await supabase.from("daily_attendance").upsert({ person_id: personId, attendance_date: date, status: status }, { onConflict: "person_id,attendance_date" });
     if (error) return toast.error(error.message);
     toast.success("تم تحديث حالة الحضور بنجاح ✅");
