@@ -31,6 +31,13 @@ const card = "pop float-in rounded-3xl border-2 border-border bg-card p-5";
 function getFridayWeekStart(): string {
   const d = new Date();
   const day = d.getDay();
+  const diff = (day < 5 ? 7 : 0) + day - 5;
+  const friday = new Date(d);
+  friday.setDate(d.getDate() - diff);
+  return friday.toISOString().split("T")[0];
+}
+  const d = new Date();
+  const day = d.getDay();
   const diff = d.getDate() - day + (day === 5 ? 0 : day < 5 ? day - 5 - 7 : 1);
   const friday = new Date(d.setDate(diff));
   return friday.toISOString().split("T")[0];
