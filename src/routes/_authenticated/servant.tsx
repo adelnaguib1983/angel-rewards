@@ -27,7 +27,6 @@ export const Route = createFileRoute("/_authenticated/servant")({
 
 const card = "pop float-in rounded-3xl border-2 border-border bg-card p-5";
 
-// دالة لحساب بداية الأسبوع ليكون "يوم الجمعة"
 function getFridayWeekStart(): string {
   const d = new Date();
   const day = d.getDay();
@@ -91,9 +90,6 @@ function ServantPage() {
   );
 }
 
-/* ==========================================================================
-   قسم توليد المسابقات بالذكاء الاصطناعي
-   ========================================================================== */
 function AiQuizGeneratorSection() {
   const [sourceType, setSourceType] = useState<"text" | "image" | "voice">("text");
   const [textContent, setTextContent] = useState("");
@@ -193,9 +189,6 @@ function AiQuizGeneratorSection() {
   );
 }
 
-/* ==========================================================================
-   قسم الحضور والغياب اليومي مع العدادات المتغيرة للأسبوع
-   ========================================================================== */
 function DailyAttendanceSection() {
   const qc = useQueryClient();
   const todayStr = new Date().toISOString().split("T")[0];
@@ -220,7 +213,7 @@ function DailyAttendanceSection() {
   const { data: servantMembersData } = useQuery({
     queryKey: ["servant-members-for-attendance"],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("servant_members");
+      const { data, error } = await supabase.from("profiles").select("*");
       if (error) return [];
       return data || [];
     },
@@ -657,15 +650,4 @@ function Prep({ userId }: { userId: string }) {
           </div>
         </section>
       )}
-      <ImageLightbox images={gallery?.filter(s => !s.match(/\.(mp4|webm|ogg|mov|mp3|wav|m4a|aac)$/i))} title="صور التحضير" onClose={() => setGallery(null)} />
-    </div>
-  );
-}
-
-function ServantAttendanceHeader() {
-  const qc = useQueryClient();
-  const ws = getFridayWeekStart();
-  const { data: attendance } = useQuery({ queryKey: ["my-servant-attendance", ws], enabled: !!ws, queryFn: async () => (await supabase.from("servant_attendance").select("id,created_at").eq("week_start", ws).maybeSingle()).data });
-  const mark = async () => { const { error } = await supabase.rpc("mark_servant_attendance", { _week_start: ws }); if (error) return toast.error(error.message); toast.success("تم تسجيل حضورك هذا الأسبوع ✅"); qc.invalidateQueries({ queryKey: ["my-servant-attendance"] }); };
-  return attendance ? <div className="mt-3 inline-flex rounded-xl bg-accent px-3 py-2 text-sm font-bold text-accent-foreground">✅ حضور هذا الأسبوع مسجّل</div> : <button onClick={mark} className="pop mt-3 rounded-xl bg-sky px-4 py-2 font-extrabold text-primary-foreground">🙏 تسجيل حضوري هذا الأسبوع</button>;
-}
+      <ImageLightbox images={gallery?.filter(s => !s.match
