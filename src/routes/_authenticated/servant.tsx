@@ -74,7 +74,6 @@ function ServantPage() {
   );
 }
 
-// قسم تحضير الخادم الأسبوعي
 function Prep({ userId }: { userId: string }) {
   const [content, setContent] = useState("");
   const handleSave = () => {
@@ -92,7 +91,6 @@ function Prep({ userId }: { userId: string }) {
   );
 }
 
-// قسم توليد المسابقات بالذكاء الاصطناعي
 function AiQuizGeneratorSection() {
   const [sourceType, setSourceType] = useState<"text" | "image" | "voice">("text");
   const [textContent, setTextContent] = useState("");
@@ -255,7 +253,6 @@ function AiQuizGeneratorSection() {
   );
 }
 
-// قسم الحضور والغياب اليومي للجمعة
 function DailyAttendanceSection() {
   const qc = useQueryClient();
   const todayStr = new Date().toISOString().split("T")[0];
