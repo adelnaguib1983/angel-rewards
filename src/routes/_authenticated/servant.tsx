@@ -3,13 +3,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";[span_1](start_span)[span_1](end_span)
-import { AppHeader } from "@/components/AppHeader";[span_2](start_span)[span_2](end_span)
-import { ACADEMIC_YEARS, fileToDataUrl, useMe } from "@/lib/app";[span_3](start_span)[span_3](end_span)
-import { Textarea } from "@/components/ui/textarea";[span_4](start_span)[span_4](end_span)
-import { AddMemberButton, removeMember, BirthdaysButton, PrepArchive, ReadingPlanner, VisitArchive, VisitHistoryDialog } from "@/components/StaffMemberExtras";[span_5](start_span)[span_5](end_span)
-import { NotificationsBell } from "@/components/MemberExtras";[span_6](start_span)[span_6](end_span)
-import { ImageLightbox } from "@/components/ImageLightbox";[span_7](start_span)[span_7](end_span)
+import { supabase } from "@/integrations/supabase/client";
+import { AppHeader } from "@/components/AppHeader";
+import { ACADEMIC_YEARS, fileToDataUrl, useMe } from "@/lib/app";
+import { Textarea } from "@/components/ui/textarea";
+import { AddMemberButton, removeMember, BirthdaysButton, PrepArchive, ReadingPlanner, VisitArchive, VisitHistoryDialog } from "@/components/StaffMemberExtras";
+import { NotificationsBell } from "@/components/MemberExtras";
+import { ImageLightbox } from "@/components/ImageLightbox";
 
 export const Route = createFileRoute("/_authenticated/servant")({
   head: () => ({
@@ -34,12 +34,6 @@ function getFridayWeekStart(): string {
   const diff = (day < 5 ? 7 : 0) + day - 5;
   const friday = new Date(d);
   friday.setDate(d.getDate() - diff);
-  return friday.toISOString().split("T")[0];
-}
-  const d = new Date();
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 5 ? 0 : day < 5 ? day - 5 - 7 : 1);
-  const friday = new Date(d.setDate(diff));
   return friday.toISOString().split("T")[0];
 }
 
@@ -72,7 +66,6 @@ function ServantPage() {
               {([
                 ["prep", "📘 تحضير الخادم"],
                 ["attendance", "📋 الحضور والغياب اليومي"],
-                ["visit", "📞 الافتقاد الأسبوعي"],
                 ["suggestions", "💡 الاقتراحات والتوجيهات"],
                 ["ai_quiz", "🤖 توليد المسابقات"],
                 ["preparch", "📚 أرشيف التحضيرات"],
@@ -86,7 +79,6 @@ function ServantPage() {
             </nav>
             {tab === "prep" && <Prep userId={me.user.id} />}
             {tab === "attendance" && <DailyAttendanceSection />}
-            {tab === "visit" && <Visits />}
             {tab === "suggestions" && <SuggestionsSection currentUserId={me.user.id} isAdmin={me.isAdmin} />}
             {tab === "ai_quiz" && <AiQuizGeneratorSection />}
             {tab === "preparch" && <PrepArchive userId={me.user.id} />}
@@ -202,7 +194,7 @@ function AiQuizGeneratorSection() {
 }
 
 /* ==========================================================================
-   قسم الحضور والغياب اليومي مع تحميل أسماء المخدومين والخدام
+   قسم الحضور والغياب اليومي مع العدادات المتغيرة للأسبوع
    ========================================================================== */
 function DailyAttendanceSection() {
   const qc = useQueryClient();
@@ -235,63 +227,7 @@ function DailyAttendanceSection() {
     enabled: accountType === "student",
   });
 
-  {people.map((item: any) => {
-            const isExternal = item.auth_user_id || item.email || item.registered_externally;
-            
-            // متغيرات العدادات لكل شخص (حضور وغياب)
-            const presentCount = item.present_count || 0; 
-            const absentCount = item.absent_count || 0;
-
-            return (
-              <div key={item.person_id} className="flex items-center justify-between rounded-2xl border-2 border-border bg-card p-3.5">
-                <div className="flex items-center gap-3">
-                  {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-sm">{item.full_name}</span>
-                      <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${isExternal ? "bg-sky/20 text-sky" : "bg-amber-500/20 text-amber-600"}`}>
-                        {isExternal ? "🌐 سجل من الخارج" : "➕ أُضيف داخلياً"}
-                      </span>
-                    </div>
-                    <div className="text-xs text-muted-foreground">{item.academic_year || "بدون مرحلة"}</div>
-                  </div>
-                </div>
-                
-                {/* الأزرار مع العدادات المتغيرة بجانبها */}
-                <div className="flex items-center gap-2">
-                  {/* زر حاضر مع العداد */}
-                  <button 
-                    onClick={() => handleStatusChange(item.person_id, "present")} 
-                    className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
-                      item.attendance_status === "present" 
-                        ? "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400" 
-                        : "bg-muted text-muted-foreground hover:bg-emerald-100 hover:text-emerald-800"
-                    }`}
-                  >
-                    <span>✓ حاضر</span>
-                    <span className="rounded-full bg-black/20 px-1.5 py-0.2 text-[10px] text-white">
-                      {presentCount}
-                    </span>
-                  </button>
-
-                  {/* زر غائب مع العداد */}
-                  <button 
-                    onClick={() => handleStatusChange(item.person_id, "absent")} 
-                    className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
-                      item.attendance_status === "absent" 
-                        ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-destructive" 
-                        : "bg-muted text-muted-foreground hover:bg-red-100 hover:text-red-800"
-                    }`}
-                  >
-                    <span>✕ غائب</span>
-                    <span className="rounded-full bg-black/20 px-1.5 py-0.2 text-[10px] text-white">
-                      {absentCount}
-                    </span>
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+  const people = (() => {
     if (accountType === "student" && servantMembersData && servantMembersData.length > 0) {
       return servantMembersData
         .filter((m: any) => !filterYear || m.academic_year === filterYear)
@@ -307,6 +243,8 @@ function DailyAttendanceSection() {
             auth_user_id: m.auth_user_id,
             email: m.email,
             registered_externally: m.registered_externally,
+            present_count: m.present_count || 0,
+            absent_count: m.absent_count || 0,
           };
         });
     }
@@ -315,25 +253,21 @@ function DailyAttendanceSection() {
 
   const isLoading = rpcLoading;
 
- const handleStatusChange = async (personId: string, status: "present" | "absent") => {
-    // 1. تحديث أو إدخال حالة الحضور في جدول daily_attendance
+  const handleStatusChange = async (personId: string, status: "present" | "absent") => {
     const { error } = await supabase.from("daily_attendance").upsert({ person_id: personId, attendance_date: date, status: status }, { onConflict: "person_id,attendance_date" });
     if (error) return toast.error(error.message);
 
-    // 2. إذا كانت الحالة الجديدة "غياب"، نتحقق مما إذا كان قد غاب في المرة السابقة أيضاً (لتنبيه المشرف)
     if (status === "absent") {
       const { data: pastRecords } = await supabase
         .from("daily_attendance")
         .select("status, attendance_date")
         .eq("person_id", personId)
-        .neq("attendance_date", date) // استبعاد تاريخ اليوم الحالي
+        .neq("attendance_date", date)
         .order("attendance_date", { ascending: false })
         .limit(1);
 
       if (pastRecords && pastRecords.length > 0 && pastRecords[0].status === "absent") {
         toast.warning("⚠️ تنبيه: هذا الشخص غاب مرتين متتاليتين وتم إخطار المشرف!");
-        
-        // يمكنك هنا تسجيل إشعار في جدول الإشعارات أو إرسال تنبيه للمشرف تلقائياً
         await supabase.from("suggestions_and_notes").insert({
           content: `⚠️ تنبيه غياب متكرر: المخدوم / الخادم غاب مرتين متتاليتين في تاريخ ${date}`,
           target_type: "all_servants",
@@ -342,12 +276,6 @@ function DailyAttendanceSection() {
       }
     }
 
-    toast.success("تم تحديث حالة الحضور بنجاح ✅");
-    qc.invalidateQueries({ queryKey: ["daily-attendance-full"] });
-    qc.invalidateQueries({ queryKey: ["servant-members-for-attendance"] });
-  };
-    const { error } = await supabase.from("daily_attendance").upsert({ person_id: personId, attendance_date: date, status: status }, { onConflict: "person_id,attendance_date" });
-    if (error) return toast.error(error.message);
     toast.success("تم تحديث حالة الحضور بنجاح ✅");
     qc.invalidateQueries({ queryKey: ["daily-attendance-full"] });
     qc.invalidateQueries({ queryKey: ["servant-members-for-attendance"] });
@@ -412,6 +340,9 @@ function DailyAttendanceSection() {
             <div className="grid gap-2.5 md:grid-cols-2">
               {people.map((item: any) => {
                 const isExternal = item.auth_user_id || item.email || item.registered_externally;
+                const presentCountVal = item.present_count || 0; 
+                const absentCountVal = item.absent_count || 0;
+
                 return (
                   <div key={item.person_id} className="flex items-center justify-between rounded-2xl border-2 border-border bg-card p-3.5">
                     <div className="flex items-center gap-3">
@@ -426,9 +357,35 @@ function DailyAttendanceSection() {
                         <div className="text-xs text-muted-foreground">{item.academic_year || "بدون مرحلة"}</div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <button onClick={() => handleStatusChange(item.person_id, "present")} className={`rounded-xl px-3 py-1.5 text-xs font-black transition ${item.attendance_status === "present" ? "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400" : "bg-muted text-muted-foreground hover:bg-emerald-100 hover:text-emerald-800"}`}>✓ حاضر</button>
-                      <button onClick={() => handleStatusChange(item.person_id, "absent")} className={`rounded-xl px-3 py-1.5 text-xs font-black transition ${item.attendance_status === "absent" ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-destructive" : "bg-muted text-muted-foreground hover:bg-red-100 hover:text-red-800"}`}>✕ غائب</button>
+
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => handleStatusChange(item.person_id, "present")} 
+                        className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                          item.attendance_status === "present" 
+                            ? "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400" 
+                            : "bg-muted text-muted-foreground hover:bg-emerald-100 hover:text-emerald-800"
+                        }`}
+                      >
+                        <span>✓ حاضر</span>
+                        <span className="rounded-full bg-black/20 px-1.5 py-0.2 text-[10px] text-white">
+                          {presentCountVal}
+                        </span>
+                      </button>
+
+                      <button 
+                        onClick={() => handleStatusChange(item.person_id, "absent")} 
+                        className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                          item.attendance_status === "absent" 
+                            ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-destructive" 
+                            : "bg-muted text-muted-foreground hover:bg-red-100 hover:text-red-800"
+                        }`}
+                      >
+                        <span>✕ غائب</span>
+                        <span className="rounded-full bg-black/20 px-1.5 py-0.2 text-[10px] text-white">
+                          {absentCountVal}
+                        </span>
+                      </button>
                     </div>
                   </div>
                 );
@@ -572,7 +529,7 @@ function Prep({ userId }: { userId: string }) {
   const ws = getFridayWeekStart();
   const current = rows?.find((r) => r.week_start === ws);
   const [notes, setNotes] = useState("");
-  const [images, setImages] = useState<string[]>([]); // تستخدم لتخزين روابط الصور، الفيديوهات، والملفات الصوتية
+  const [images, setImages] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [gallery, setGallery] = useState<string[] | null>(null);
 
@@ -711,65 +668,4 @@ function ServantAttendanceHeader() {
   const { data: attendance } = useQuery({ queryKey: ["my-servant-attendance", ws], enabled: !!ws, queryFn: async () => (await supabase.from("servant_attendance").select("id,created_at").eq("week_start", ws).maybeSingle()).data });
   const mark = async () => { const { error } = await supabase.rpc("mark_servant_attendance", { _week_start: ws }); if (error) return toast.error(error.message); toast.success("تم تسجيل حضورك هذا الأسبوع ✅"); qc.invalidateQueries({ queryKey: ["my-servant-attendance"] }); };
   return attendance ? <div className="mt-3 inline-flex rounded-xl bg-accent px-3 py-2 text-sm font-bold text-accent-foreground">✅ حضور هذا الأسبوع مسجّل</div> : <button onClick={mark} className="pop mt-3 rounded-xl bg-sky px-4 py-2 font-extrabold text-primary-foreground">🙏 تسجيل حضوري هذا الأسبوع</button>;
-}
-
-const METHODS = { call: "📞 مكالمة", visit: "🏠 زيارة", message: "💬 رسالة" };
-function Visits() {
-  const qc = useQueryClient();
-  const [year, setYear] = useState(ACADEMIC_YEARS[0]);
-  const [open, setOpen] = useState<string | null>(null);
-  const [note, setNote] = useState("");
-  const [method, setMethod] = useState("call");
-  const [hist, setHist] = useState(null);
-  const { data } = useQuery({ queryKey: ["servant-members"], queryFn: async () => { const { data, error } = await supabase.rpc("servant_members"); if (error) throw error; return data; } });
-  const rows = (data ?? []).filter((m) => m.academic_year === year);
-  const save = async (member_id: string) => {
-    const { error } = await supabase.from("visitations").insert({ member_id, method, note: note.trim() });
-    if (error) return toast.error(error.message);
-    toast.success("تم تسجيل الافتقاد"); setOpen(null); setNote("");
-    qc.invalidateQueries({ queryKey: ["servant-members"] });
-  };
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-end"><AddMemberButton defaultYear={year} /></div>
-      <div className="flex flex-wrap gap-2">{ACADEMIC_YEARS.map((y) => (
-        <button key={y} onClick={() => setYear(y)} className={`rounded-xl px-3 py-1.5 text-sm font-bold ${year === y ? "bg-sky text-primary-foreground" : "bg-card"}`}>{y} ({(data ?? []).filter((m) => m.academic_year === y).length})</button>
-      ))}</div>
-      <p className="text-xs text-muted-foreground">🔴 = لم يسجّل أي نشاط هذا الأسبوع (يحتاج افتقاد) · ✅ = تم افتقاده هذا الأسبوع. التقرير يصل للمشرف تلقائيًا.</p>
-      {!rows.length && <p className="text-muted-foreground">لا يوجد مخدومون في هذه المرحلة.</p>}
-      <div className="grid gap-3 md:grid-cols-2">{rows.map((m) => {
-        const isExternal = m.auth_user_id || m.email || m.registered_externally;
-        return (
-          <div key={m.id} className={card}>
-            <div className="flex items-center gap-3">
-              {m.photo_url ? <img src={m.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-3xl">{m.avatar}</span>}
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setHist({ id: m.id, name: m.full_name })} className="text-right font-bold text-primary underline-offset-4 hover:underline" title="سجل الافتقادات">{m.full_name}</button>
-                  <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${isExternal ? "bg-sky/20 text-sky" : "bg-amber-500/20 text-amber-600"}`}>
-                    {isExternal ? "🌐 سجل من الخارج" : "➕ أُضيف داخلياً"}
-                  </span>
-                </div>
-              </div>
-              {!m.active_this_week && <span title="لم يسجل نشاطًا">🔴</span>}
-              {m.visited && <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-accent-foreground">✅ تم</span>}
-              <button onClick={() => { setOpen(m.id); setNote(""); }} className="rounded-xl bg-sky px-3 py-1.5 text-sm font-bold text-primary-foreground">{m.visited ? "افتقاد آخر" : "افتقاد"}</button>
-              <button title="حذف المخدوم" onClick={() => removeMember(m.id, m.full_name, () => qc.invalidateQueries({ queryKey: ["servant-members"] }))} className="rounded-xl bg-destructive/15 px-2 py-1.5 text-sm">🗑️</button>
-            </div>
-            {open === m.id && (
-              <div className="mt-3 space-y-2">
-                <div className="flex gap-2">{Object.entries(METHODS).map(([k, l]) => (
-                  <button key={k} onClick={() => setMethod(k)} className={`rounded-xl px-2 py-1 text-xs font-bold ${method === k ? "bg-sky text-primary-foreground" : "bg-muted"}`}>{l}</button>
-                ))}</div>
-                <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="ملاحظات الافتقاد (سبب الغياب، الحالة...)" />
-                <div className="flex gap-2"><button onClick={() => save(m.id)} className="flex-1 rounded-xl bg-accent py-2 font-bold text-accent-foreground">حفظ</button>
-                  <button onClick={() => setOpen(null)} className="rounded-xl bg-muted px-4 py-2 font-bold">إلغاء</button></div>
-              </div>
-            )}
-          </div>
-        );
-      })}</div>
-      <VisitHistoryDialog member={hist} onClose={() => setHist(null)} />
-    </div>
-  );
 }
