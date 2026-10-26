@@ -252,4 +252,60 @@ function AiQuizGeneratorSection() {
             <div className="space-y-2">
               <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-6 cursor-pointer hover:bg-muted">
                 <span>🎬 اضغط لرفع ملف فيديو</span>
-                <input type="file" accept="video/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0];
+                <input type="file" accept="video/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) setVideoFile(file); }} />
+              </label>
+              {videoFile && <p className="text-xs font-bold text-emerald-600 text-center">تم اختيار ملف الفيديو: {videoFile.name}</p>}
+            </div>
+          )}
+        </div>
+
+        <button disabled={loading} onClick={handleGenerate} className="pop mt-4 w-full rounded-2xl bg-sky py-3 text-base font-extrabold text-primary-foreground disabled:opacity-60">
+          {loading ? "جاري تحليل المحتوى وتوليد الأسئلة..." : "توليد الأسئلة تلقائياً ⚡"}
+        </button>
+      </section>
+
+      {generatedQuestions.length > 0 && (
+        <section className={card}>
+          <h3 className="text-lg font-extrabold text-emerald-600 mb-3">✨ معاينة وتعديل الأسئلة قبل النشر:</h3>
+          
+          <div className="space-y-3 mb-4 p-3 bg-muted/40 rounded-2xl border border-border">
+            <div>
+              <label className="text-xs font-bold">عنوان المسابقة:</label>
+              <input type="text" value={quizTitle} onChange={(e) => setQuizTitle(e.target.value)} className="w-full mt-1 rounded-xl border border-border bg-background px-3 py-1.5 text-sm font-bold" />
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <div>
+                <label className="text-xs font-bold">بداية المسابقة:</label>
+                <input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full mt-1 rounded-xl border border-border bg-background px-2 py-1 text-xs font-bold" />
+              </div>
+              <div>
+                <label className="text-xs font-bold">نهاية المسابقة:</label>
+                <input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full mt-1 rounded-xl border border-border bg-background px-2 py-1 text-xs font-bold" />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {generatedQuestions.map((q, idx) => (
+              <div key={idx} className="rounded-xl border-2 border-border bg-background p-4 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-black bg-sky/20 text-sky px-2 py-0.5 rounded">السؤال {idx + 1}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-bold">نقاط السؤال:</span>
+                    <input 
+                      type="number" 
+                      value={q.points || 5} 
+                      onChange={(e) => handleQuestionChange(idx, "points", Number(e.target.value))} 
+                      className="w-16 rounded-lg border border-border bg-card px-2 py-0.5 text-center text-xs font-bold" 
+                    />
+                  </div>
+                </div>
+
+                <input 
+                  type="text" 
+                  value={q.question} 
+                  onChange={(e) => handleQuestionChange(idx, "question", e.target.value)} 
+                  className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm font-bold" 
+                />
+
+                <div className
