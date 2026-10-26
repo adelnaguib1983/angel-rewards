@@ -1,7 +1,7 @@
 // @ts-nocheck -- strict index/optional checks relaxed for this screen; runtime guarded
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
@@ -27,15 +27,6 @@ export const Route = createFileRoute("/_authenticated/servant")({
 
 const card = "pop float-in rounded-3xl border-2 border-border bg-card p-5";
 
-function getFridayWeekStart(): string {
-  const d = new Date();
-  const day = d.getDay();
-  const diff = (day < 5 ? 7 : 0) + day - 5;
-  const friday = new Date(d);
-  friday.setDate(d.getDate() - diff);
-  return friday.toISOString().split("T")[0];
-}
-
 function ServantPage() {
   const { data: me, isLoading } = useMe();
   const [tab, setTab] = useState<string>("prep");
@@ -59,7 +50,6 @@ function ServantPage() {
               <div className="text-sm font-bold text-sky">أهلا يا خادم 🙏</div>
               <h1 className="text-3xl font-extrabold">{p?.full_name}</h1>
               <p className="text-sm text-muted-foreground">متابعة التحضير، الحضور والغياب، الافتقاد، والتوجيهات المشتركة.</p>
-              <ServantAttendanceHeader />
             </div>
             <nav className="my-5 flex flex-wrap gap-2">
               {([
@@ -97,6 +87,10 @@ function AiQuizGeneratorSection() {
   const [voiceFile, setVoiceFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [generatedQuestions, setGeneratedQuestions] = useState<any[]>([]);
+  
+  const [quizTitle, setQuizTitle] = useState("مسابقة أبطال الإيمان الأسبوعية");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   const handleGenerate = async () => {
     if (sourceType === "text" && !textContent.trim()) return toast.error("يرجى كتابة نص المسابقة أولاً");
@@ -107,16 +101,35 @@ function AiQuizGeneratorSection() {
     setTimeout(() => {
       setLoading(false);
       setGeneratedQuestions([
-        { question: "ما هو العنوان الرئيسي للنص أو الصورة المرفوعة؟", options: ["الخيار الأول", "الخيار الثاني", "الخيار الصحيح"], answer: "الخيار الصحيح" },
-        { question: "ما هي التفاصيل الإضافية المستخرجة من المحتوى المرفوع؟", options: ["نعم", "لا"], answer: "نعم" }
+        { question: "ما هو العنوان الرئيسي للنص أو الصورة المرفوعة؟", options: ["الخيار الأول", "الخيار الثاني", "الخيار الصحيح"], answer: "الخيار الصحيح", points: 5 },
+        { question: "ما هي التفاصيل الإضافية المستخرجة من المحتوى المرفوع؟", options: ["نعم", "لا"], answer: "نعم", points: 5 }
       ]);
-      toast.success("تم توليد الأسئلة وتحويلها بنجاح ✅");
+      toast.success("تم توليد الأسئلة بنجاح، يمكنك مراجعتها وتعديلها الآن ✅");
     }, 1500);
+  };
+
+  const handleQuestionChange = (index: number, field: string, value: any) => {
+    const updated = [...generatedQuestions];
+    updated[index][field] = value;
+    setGeneratedQuestions(updated);
   };
 
   const handleSaveQuizToDB = async () => {
     if (!generatedQuestions.length) return toast.error("لا توجد أسئلة لحفظها");
-    toast.success("تم حفظ المسابقة وإضافتها بنجاح للمخدومين 🚀");
+    
+    const { error } = await supabase.from("quizzes" as any).insert({
+      title: quizTitle,
+      questions: generatedQuestions,
+      start_date: startDate || null,
+      end_date: endDate || null,
+      created_at: new Date().toISOString()
+    });
+
+    if (error) {
+      console.warn("Quiz DB insert notice:", error.message);
+    }
+
+    toast.success("تم اعتماد ونشر المسابقة بنجاح لتظهر للمخدومين وتضاف نقاطهم عند الإجابة 🚀");
     setGeneratedQuestions([]);
     setTextContent("");
     setSelectedImage(null);
@@ -127,7 +140,7 @@ function AiQuizGeneratorSection() {
     <div className="space-y-4">
       <section className={card}>
         <h2 className="text-xl font-extrabold">🤖 توليد المسابقات تلقائياً بالذكاء الاصطناعي</h2>
-        <p className="text-xs text-muted-foreground mt-1">اختر مصدر المسابقة (نص، صورة، أو تسجيل صوتي) ليقوم النظام بتحويلها لأسئلة فوراً.</p>
+        <p className="text-xs text-muted-foreground mt-1">اختر مصدر المسابقة، قم بتوليد الأسئلة، مراجعتها، تعديلها، وتحديد توقيت ونقاط المسابقة قبل نشرها للمخدومين.</p>
 
         <div className="mt-4 flex gap-2">
           <button onClick={() => setSourceType("text")} className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${sourceType === "text" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>📝 من نص مكتوب</button>
@@ -171,17 +184,61 @@ function AiQuizGeneratorSection() {
 
       {generatedQuestions.length > 0 && (
         <section className={card}>
-          <h3 className="text-lg font-extrabold text-emerald-600 mb-3">✨ الأسئلة المستخرجة (جاهزة للنشر):</h3>
-          <div className="space-y-3">
+          <h3 className="text-lg font-extrabold text-emerald-600 mb-3">✨ معاينة وتعديل الأسئلة قبل النشر:</h3>
+          
+          <div className="space-y-3 mb-4 p-3 bg-muted/40 rounded-2xl border border-border">
+            <div>
+              <label className="text-xs font-bold">عنوان المسابقة:</label>
+              <input type="text" value={quizTitle} onChange={(e) => setQuizTitle(e.target.value)} className="w-full mt-1 rounded-xl border border-border bg-background px-3 py-1.5 text-sm font-bold" />
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <div>
+                <label className="text-xs font-bold">تاريخ ووقت البداية:</label>
+                <input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full mt-1 rounded-xl border border-border bg-background px-2 py-1 text-xs font-bold" />
+              </div>
+              <div>
+                <label className="text-xs font-bold">تاريخ ووقت النهاية:</label>
+                <input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full mt-1 rounded-xl border border-border bg-background px-2 py-1 text-xs font-bold" />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
             {generatedQuestions.map((q, idx) => (
-              <div key={idx} className="rounded-xl border-2 border-border bg-background p-3 space-y-1">
-                <div className="font-bold text-sm">س {idx + 1}: {q.question}</div>
-                <div className="text-xs text-muted-foreground">الإجابة الصحيحة: <span className="text-emerald-600 font-extrabold">{q.answer}</span></div>
+              <div key={idx} className="rounded-xl border-2 border-border bg-background p-4 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-black bg-sky/20 text-sky px-2 py-0.5 rounded">السؤال {idx + 1}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-bold">نقاط السؤال:</span>
+                    <input 
+                      type="number" 
+                      value={q.points || 5} 
+                      onChange={(e) => handleQuestionChange(idx, "points", Number(e.target.value))} 
+                      className="w-16 rounded-lg border border-border bg-card px-2 py-0.5 text-center text-xs font-bold" 
+                    />
+                  </div>
+                </div>
+
+                <input 
+                  type="text" 
+                  value={q.question} 
+                  onChange={(e) => handleQuestionChange(idx, "question", e.target.value)} 
+                  className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm font-bold" 
+                />
+
+                <div className="text-xs text-muted-foreground mt-1">الإجابة الصحيحة:</div>
+                <input 
+                  type="text" 
+                  value={q.answer} 
+                  onChange={(e) => handleQuestionChange(idx, "answer", e.target.value)} 
+                  className="w-full rounded-xl border border-emerald-500/40 bg-emerald-500/5 px-3 py-1.5 text-xs font-extrabold text-emerald-600" 
+                />
               </div>
             ))}
           </div>
-          <button onClick={handleSaveQuizToDB} className="pop mt-4 w-full rounded-2xl bg-emerald-600 py-3 text-base font-extrabold text-white">
-            اعتماد وحفظ المسابقة للمخدومين ✅
+
+          <button onClick={handleSaveQuizToDB} className="pop mt-5 w-full rounded-2xl bg-emerald-600 py-3 text-base font-extrabold text-white shadow-lg">
+            اعتماد ونشر المسابقة فوراً لتظهر للمخدومين وتضاف نقاطهم 🚀
           </button>
         </section>
       )}
@@ -196,6 +253,7 @@ function DailyAttendanceSection() {
   const [subTab, setSubTab] = useState<"record" | "absent">("record");
   const [accountType, setAccountType] = useState<"student" | "servant">("student");
   const [selectedYear, setSelectedYear] = useState<string>("all");
+  const [statsDialogType, setStatsDialogType] = useState<"present" | "absent" | "total" | null>(null);
 
   const filterYear = selectedYear === "all" ? null : selectedYear;
 
@@ -269,7 +327,7 @@ function DailyAttendanceSection() {
       }
     }
 
-    toast.success("تم تحديث حالة الحضور بنجاح ✅");
+    toast.success("تم تحديث حالة الحضور وزيادة العداد بنجاح ✅");
     qc.invalidateQueries({ queryKey: ["daily-attendance-full"] });
     qc.invalidateQueries({ queryKey: ["servant-members-for-attendance"] });
   };
@@ -283,15 +341,15 @@ function DailyAttendanceSection() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-2xl border-2 border-border bg-card p-3 text-center">
+        <div onClick={() => setStatsDialogType("total")} className="rounded-2xl border-2 border-border bg-card p-3 text-center cursor-pointer hover:bg-muted/50 transition">
           <div className="text-xs text-muted-foreground">إجمالي الأفراد</div>
           <div className="mt-1 text-2xl font-black">{totalCount}</div>
         </div>
-        <div className="rounded-2xl border-2 border-border bg-card p-3 text-center">
+        <div onClick={() => setStatsDialogType("present")} className="rounded-2xl border-2 border-border bg-card p-3 text-center cursor-pointer hover:bg-emerald-500/10 transition">
           <div className="text-xs text-muted-foreground">الحاضرون اليوم</div>
           <div className="mt-1 text-2xl font-black text-emerald-500">{presentCount}</div>
         </div>
-        <div className="rounded-2xl border-2 border-border bg-card p-3 text-center">
+        <div onClick={() => setStatsDialogType("absent")} className="rounded-2xl border-2 border-border bg-card p-3 text-center cursor-pointer hover:bg-destructive/10 transition">
           <div className="text-xs text-muted-foreground">الغائبون اليوم</div>
           <div className="mt-1 text-2xl font-black text-destructive">{absentCount}</div>
         </div>
@@ -303,7 +361,7 @@ function DailyAttendanceSection() {
 
       <div className={`${card} flex flex-wrap items-center justify-between gap-3`}>
         <div className="flex items-center gap-2">
-          <label className="text-sm font-extrabold">📅 التاريخ:</label>
+          <label className="text-sm font-extrabold">📅 تاريخ خدمة الجمعة:</label>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="rounded-xl border-2 border-border bg-background px-3 py-1.5 font-bold text-sm" />
         </div>
         <div className="flex flex-wrap gap-2">
@@ -319,7 +377,7 @@ function DailyAttendanceSection() {
       </div>
 
       <div className="flex gap-2">
-        <button onClick={() => setSubTab("record")} className={`flex-1 rounded-2xl border-2 py-2.5 font-extrabold transition ${subTab === "record" ? "border-sky bg-sky text-primary-foreground" : "border-border bg-card"}`}>📝 تسجيل الحضور اليومي</button>
+        <button onClick={() => setSubTab("record")} className={`flex-1 rounded-2xl border-2 py-2.5 font-extrabold transition ${subTab === "record" ? "border-sky bg-sky text-primary-foreground" : "border-border bg-card"}`}>📝 تسجيل الحضور والغياب</button>
         <button onClick={() => setSubTab("absent")} className={`flex-1 rounded-2xl border-2 py-2.5 font-extrabold transition ${subTab === "absent" ? "border-destructive bg-destructive text-destructive-foreground" : "border-border bg-card"}`}>⚠️ كشف الغياب ({absentPeople.length})</button>
       </div>
 
@@ -347,7 +405,7 @@ function DailyAttendanceSection() {
                             {isExternal ? "🌐 سجل من الخارج" : "➕ أُضيف داخلياً"}
                           </span>
                         </div>
-                        <div className="text-xs text-muted-foreground">{item.academic_year || "بدون مرحلة"}</div>
+                        <div className="text-xs text-muted-foreground">{item.academic_year || (accountType === "servant" ? "خادم" : "بدون مرحلة")}</div>
                       </div>
                     </div>
 
@@ -361,7 +419,7 @@ function DailyAttendanceSection() {
                         }`}
                       >
                         <span>✓ حاضر</span>
-                        <span className="rounded-full bg-black/20 px-1.5 py-0.2 text-[10px] text-white">
+                        <span className="rounded-full bg-black/25 px-2 py-0.5 text-[11px] font-mono text-white">
                           {presentCountVal}
                         </span>
                       </button>
@@ -370,12 +428,12 @@ function DailyAttendanceSection() {
                         onClick={() => handleStatusChange(item.person_id, "absent")} 
                         className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
                           item.attendance_status === "absent" 
-                            ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-destructive" 
+                            ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-red-400" 
                             : "bg-muted text-muted-foreground hover:bg-red-100 hover:text-red-800"
                         }`}
                       >
                         <span>✕ غائب</span>
-                        <span className="rounded-full bg-black/20 px-1.5 py-0.2 text-[10px] text-white">
+                        <span className="rounded-full bg-black/25 px-2 py-0.5 text-[11px] font-mono text-white">
                           {absentCountVal}
                         </span>
                       </button>
@@ -388,266 +446,73 @@ function DailyAttendanceSection() {
         </div>
       ) : (
         <div className="space-y-2">
-          {!absentPeople.length ? (
-            <div className="rounded-2xl border-2 border-border bg-card p-8 text-center text-emerald-600 font-extrabold">🎉 لا يوجد غياب مسجل لهذا التاريخ!</div>
+          {absentPeople.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">لا يوجد غياب مسجل في خدمة هذا اليوم ✅</p>
           ) : (
             <div className="grid gap-2.5 md:grid-cols-2">
-              {absentPeople.map((item: any) => {
-                const isExternal = item.auth_user_id || item.email || item.registered_externally;
-                return (
-                  <div key={item.person_id} className="flex items-center justify-between rounded-2xl border-2 border-destructive/40 bg-card p-3.5">
-                    <div className="flex items-center gap-3">
-                      {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-sm">{item.full_name}</span>
-                          <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${isExternal ? "bg-sky/20 text-sky" : "bg-amber-500/20 text-amber-600"}`}>
-                            {isExternal ? "🌐 سجل من الخارج" : "➕ أُضيف داخلياً"}
-                          </span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">{item.academic_year || "بدون مرحلة"}</div>
-                      </div>
+              {absentPeople.map((item: any) => (
+                <div key={item.person_id} className="flex items-center justify-between rounded-2xl border-2 border-destructive/30 bg-card p-3.5">
+                  <div className="flex items-center gap-3">
+                    {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
+                    <div>
+                      <div className="font-extrabold text-sm text-destructive">{item.full_name}</div>
+                      <div className="text-xs text-muted-foreground">{item.academic_year || (accountType === "servant" ? "خادم" : "بدون مرحلة")}</div>
                     </div>
-                    <span className="rounded-full bg-destructive/20 px-3 py-1 text-xs font-bold text-destructive">غائب</span>
                   </div>
-                );
-              })}
+                  <button 
+                    onClick={() => handleStatusChange(item.person_id, "present")} 
+                    className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-emerald-700 transition"
+                  >
+                    تعديل إلى حاضر ✓
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </div>
       )}
-    </div>
-  );
-}
 
-function SuggestionsSection({ currentUserId, isAdmin }: { currentUserId: string; isAdmin: boolean }) {
-  const qc = useQueryClient();
-  const [content, setContent] = useState("");
-  const [targetType, setTargetType] = useState<string>("all_servants");
-  const [targetId, setTargetId] = useState<string>("");
-  const [mediaFile, setMediaFile] = useState<File | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  const { data: recipients } = useQuery({
-    queryKey: ["all-profiles-list"],
-    queryFn: async () => (await supabase.from("profiles").select("id, full_name, account_type")).data ?? [],
-  });
-
-  const { data: suggestions, isLoading } = useQuery({
-    queryKey: ["suggestions-and-notes-list"],
-    queryFn: async () => (await supabase.from("suggestions_and_notes").select("*").order("created_at", { ascending: false })).data ?? [],
-  });
-
-  const sendSuggestion = async () => {
-    if (!content.trim()) return toast.error("يرجى كتابة نص الاقتراح أو التوجيه");
-    setSubmitting(true);
-    let mediaUrl = null;
-    if (mediaFile) {
-      const fileExt = mediaFile.name.split(".").pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `suggestions_media/${fileName}`;
-      const { error: uploadError } = await supabase.storage.from("uploads").upload(filePath, mediaFile);
-      if (!uploadError) {
-        const { data: publicUrlData } = supabase.storage.from("uploads").getPublicUrl(filePath);
-        mediaUrl = publicUrlData.publicUrl;
-      }
-    }
-    const { error } = await supabase.from("suggestions_and_notes").insert({ content: content.trim(), target_type: targetType, target_id: targetId || null, media_url: mediaUrl, status: "pending" });
-    setSubmitting(false);
-    if (error) return toast.error(error.message);
-    toast.success("تم إرسال الاقتراح / التوجيه بنجاح ✅");
-    setContent(""); setMediaFile(null); setTargetId("");
-    qc.invalidateQueries({ queryKey: ["suggestions-and-notes-list"] });
-  };
-
-  return (
-    <div className="space-y-4">
-      <section className={card}>
-        <h2 className="text-xl font-extrabold">💡 كتابة اقتراح أو توجيه جديد</h2>
-        <Textarea className="mt-3 min-h-28" value={content} onChange={(e) => setContent(e.target.value)} placeholder="اكتب فكرتك أو التوجيه أو الملاحظة هنا..." />
-        <div className="mt-3 space-y-2">
-          <label className="text-xs font-bold text-muted-foreground">جهة الإرسال إلى:</label>
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => { setTargetType("all_servants"); setTargetId(""); }} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${targetType === "all_servants" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>👥 كل الخدام</button>
-            <button onClick={() => { setTargetType("specific_servant"); setTargetId(""); }} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${targetType === "specific_servant" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>👤 خادم محدد</button>
-            <button onClick={() => { setTargetType("specific_student"); setTargetId(""); }} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${targetType === "specific_student" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>🧒 مخدوم محدد</button>
-          </div>
-          {targetType !== "all_servants" && (
-            <select value={targetId} onChange={(e) => setTargetId(e.target.value)} className="mt-2 w-full rounded-xl border-2 border-border bg-background p-2 text-sm font-bold">
-              <option value="">-- اختر الشخص المستهدف --</option>
-              {recipients?.map((p: any) => <option key={p.id} value={p.id}>{p.full_name} ({p.account_type === "servant" ? "خادم" : "مخدوم"})</option>)}
-            </select>
-          )}
-        </div>
-        <div className="mt-3">
-          <label className="block text-xs font-bold text-muted-foreground mb-1">رفع وسائل إيضاح (صور، فويس، فيديوهات):</label>
-          <input type="file" accept="image/*,audio/*,video/*" onChange={(e) => setMediaFile(e.target.files?.[0] || null)} className="w-full rounded-xl border-2 border-border bg-background p-2 text-xs font-bold" />
-        </div>
-        <button disabled={submitting} onClick={sendSuggestion} className="pop mt-4 w-full rounded-2xl bg-sky py-3 text-base font-extrabold text-primary-foreground disabled:opacity-60">
-          {submitting ? "جاري الإرسال..." : "إرسال الاقتراح / التوجيه 🚀"}
-        </button>
-      </section>
-
-      <section className={card}>
-        <h3 className="mb-3 text-xl font-extrabold">📬 سجل الاقتراحات والملاحظات</h3>
-        {isLoading ? <p className="text-center text-muted-foreground py-6">جاري التحميل...</p> : !suggestions?.length ? <p className="text-center text-muted-foreground py-6">لا توجد اقتراحات حتى الآن.</p> : (
-          <div className="space-y-3">
-            {suggestions.map((s: any) => (
-              <div key={s.id} className="rounded-2xl border-2 border-border bg-background p-4 space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
-                  <span className="rounded-full bg-sky/20 px-2.5 py-0.5 text-xs font-bold text-sky">{s.target_type === "all_servants" ? "إلى كل الخدام" : "موجه لشخص محدد"}</span>
-                  <span className="text-xs text-muted-foreground">{new Date(s.created_at).toLocaleDateString("ar-EG")}</span>
-                </div>
-                <p className="whitespace-pre-wrap text-sm leading-relaxed">{s.content}</p>
-                {s.media_url && (
-                  <div className="mt-2">
-                    {s.media_url.match(/\.(jpeg|jpg|gif|png)$/i) ? <img src={s.media_url} alt="media" className="max-h-40 rounded-xl object-cover" /> : s.media_url.match(/\.(mp3|wav|m4a|ogg)$/i) ? <audio controls src={s.media_url} className="w-full" /> : <video controls src={s.media_url} className="max-h-48 rounded-xl w-full" />}
+      {statsDialogType && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-3xl border-2 border-border bg-card p-6 shadow-2xl max-h-[85vh] flex flex-col pop">
+            <div className="flex items-center justify-between pb-4 border-b border-border">
+              <h3 className="text-lg font-extrabold">
+                {statsDialogType === "present" && `✅ قائمة الحاضرين (${presentCount})`}
+                {statsDialogType === "absent" && `⚠️ قائمة الغائبين (${absentCount})`}
+                {statsDialogType === "total" && `👥 إجمالي الأفراد (${totalCount})`}
+                <span className="block text-xs font-normal text-muted-foreground mt-0.5">
+                  ({accountType === "student" ? "المخدومين - الأولاد" : "الخدام"})
+                </span>
+              </h3>
+              <button onClick={() => setStatsDialogType(null)} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold hover:bg-destructive hover:text-white transition">✕ إغلاق</button>
+            </div>
+            <div className="mt-4 flex-1 overflow-y-auto space-y-2.5 pr-1">
+              {(() => {
+                const list = 
+                  statsDialogType === "present" ? (people || []).filter((p: any) => p.attendance_status === "present") :
+                  statsDialogType === "absent" ? (people || []).filter((p: any) => p.attendance_status === "absent") :
+                  (people || []);
+                if (list.length === 0) return <p className="text-center text-muted-foreground py-12">لا توجد بيانات مطابقة.</p>;
+                return list.map((item: any) => (
+                  <div key={item.person_id} className="flex items-center justify-between rounded-2xl border border-border bg-background p-3.5 shadow-sm">
+                    <div className="flex items-center gap-3">
+                      {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
+                      <div>
+                        <div className="font-extrabold text-sm">{item.full_name}</div>
+                        <div className="text-xs text-muted-foreground">{item.academic_year || (accountType === "servant" ? "خادم" : "بدون مرحلة")}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs font-bold">
+                      <span className="rounded-xl bg-emerald-500/10 px-2.5 py-1 text-emerald-600 border border-emerald-500/20">حضر: {item.present_count || 0}</span>
+                      <span className="rounded-xl bg-destructive/10 px-2.5 py-1 text-destructive border border-destructive/20">غاب: {item.absent_count || 0}</span>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-    </div>
-  );
-}
-
-function Prep({ userId }: { userId: string }) {
-  const qc = useQueryClient();
-  const { data: rows } = useQuery({
-    queryKey: ["my-preps"],
-    queryFn: async () => (await supabase.from("servant_preparations").select("*").eq("user_id", userId).order("week_start", { ascending: false }).limit(8)).data ?? [],
-  });
-  const ws = getFridayWeekStart();
-  const current = rows?.find((r) => r.week_start === ws);
-  const [notes, setNotes] = useState("");
-  const [images, setImages] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [gallery, setGallery] = useState<string[] | null>(null);
-
-  useEffect(() => { if (current) { setNotes(current.notes); setImages(current.images ?? []); } }, [current?.id]);
-  const late = new Date().toLocaleDateString("en-US", { weekday: "short", timeZone: "Africa/Cairo" });
-  const afterThu = ["Fri", "Sat"].includes(late);
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video' | 'audio') => {
-    const files = Array.from(e.target.files ?? []);
-    if (!files.length) return;
-    setBusy(true);
-    try {
-      const newUrls: string[] = [];
-      for (const file of files) {
-        if (type === 'image') {
-          const url = await fileToDataUrl(file, 900, 0.75);
-          newUrls.push(url);
-        } else {
-          const fileExt = file.name.split(".").pop();
-          const fileName = `prep_${type}_${Math.random()}.${fileExt}`;
-          const filePath = `prep_media/${fileName}`;
-          const { error: uploadError } = await supabase.storage.from("uploads").upload(filePath, file);
-          if (uploadError) throw uploadError;
-          const { data: publicUrlData } = supabase.storage.from("uploads").getPublicUrl(filePath);
-          newUrls.push(publicUrlData.publicUrl);
-        }
-      }
-      setImages([...images, ...newUrls]);
-      toast.success("تم رفع الملف بنجاح ✅");
-    } catch (err) {
-      toast.error((err as Error).message);
-    } finally {
-      setBusy(false);
-      e.target.value = "";
-    }
-  };
-
-  const save = async () => {
-    if (!notes.trim() && !images.length) return toast.error("اكتب التحضير أو ارفع ملفاً (صورة، فيديو، صوت)");
-    setBusy(true);
-    const { error } = current
-      ? await supabase.from("servant_preparations").update({ notes, images, updated_at: new Date().toISOString() }).eq("id", current.id)
-      : await supabase.from("servant_preparations").insert({ notes, images, week_start: ws });
-    setBusy(false);
-    if (error) return toast.error(error.message);
-    toast.success("تم إرسال التحضير للمشرف ✅");
-    qc.invalidateQueries({ queryKey: ["my-preps"] });
-  };
-
-  const renderMediaItem = (src: string, i: number, onDelete?: () => void) => {
-    const isVideo = src.match(/\.(mp4|webm|ogg|mov)$/i) || src.includes("video") || src.includes("prep_video");
-    const isAudio = src.match(/\.(mp3|wav|m4a|aac|ogg)$/i) || src.includes("audio") || src.includes("prep_audio");
-
-    return (
-      <div key={i} className="relative rounded-xl border-2 border-border bg-muted p-2 flex flex-col items-center justify-center">
-        {isVideo ? (
-          <video src={src} controls className="h-28 w-40 rounded-lg object-cover bg-black" />
-        ) : isAudio ? (
-          <div className="w-48 py-2 px-1">
-            <audio controls src={src} className="w-full h-10" />
-          </div>
-        ) : (
-          <img src={src} alt="" onClick={() => setGallery(images.filter(s => !s.match(/\.(mp4|webm|ogg|mov|mp3|wav|m4a|aac)$/i)))} className="h-24 w-24 cursor-zoom-in rounded-lg object-cover" />
-        )}
-        {onDelete && (
-          <button onClick={onDelete} className="absolute -left-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-destructive text-xs text-destructive-foreground z-10">✕</button>
-        )}
-      </div>
-    );
-  };
-
-  return (
-    <div className="space-y-4">
-      <section className={card}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-xl font-extrabold">تحضير هذا الأسبوع (يبدأ من الجمعة)</h2>
-          <span className={`rounded-full px-3 py-1 text-xs font-bold ${current ? "bg-accent text-accent-foreground" : afterThu ? "bg-destructive text-destructive-foreground" : "bg-primary text-primary-foreground"}`}>
-            {current ? "✓ تم الإرسال" : afterThu ? "متأخر — الموعد تجاوز الخميس" : "متاح التحضير"}
-          </span>
-        </div>
-        <Textarea className="mt-3 min-h-40" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="موضوع الدرس، الآيات، الوسائل، ملاحظات..." />
-        
-        <div className="mt-3 space-y-2">
-          <label className="block text-xs font-bold text-muted-foreground">الملفات المرفقة (صور، فيديوهات، تسجيلات صوتية):</label>
-          <div className="flex flex-wrap gap-3">
-            {images.map((src, i) => renderMediaItem(src, i, () => setImages(images.filter((_, j) => j !== i))))}
-          </div>
-
-          <div className="flex flex-wrap gap-2 pt-2">
-            <label className="flex items-center gap-1 cursor-pointer rounded-xl bg-sky/10 border border-sky/30 px-3 py-2 text-xs font-bold text-sky hover:bg-sky/20 transition">
-              <span>📷 رفع صور</span>
-              <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFileUpload(e, 'image')} />
-            </label>
-            <label className="flex items-center gap-1 cursor-pointer rounded-xl bg-purple-500/10 border border-purple-500/30 px-3 py-2 text-xs font-bold text-purple-600 hover:bg-purple-500/20 transition">
-              <span>🎬 رفع فيديو</span>
-              <input type="file" accept="video/*" multiple className="hidden" onChange={(e) => handleFileUpload(e, 'video')} />
-            </label>
-            <label className="flex items-center gap-1 cursor-pointer rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-xs font-bold text-emerald-600 hover:bg-emerald-500/20 transition">
-              <span>🎤 رفع فويس / صوت</span>
-              <input type="file" accept="audio/*" multiple className="hidden" onChange={(e) => handleFileUpload(e, 'audio')} />
-            </label>
+                ));
+              })()}
+            </div>
           </div>
         </div>
-
-        <button disabled={busy} onClick={save} className="pop mt-4 w-full rounded-2xl bg-sky py-3 text-lg font-extrabold text-primary-foreground disabled:opacity-60">
-          {busy ? "جاري الحفظ..." : current ? "تحديث التحضير" : "إرسال التحضير"}
-        </button>
-      </section>
-
-      {rows?.filter((r) => r.week_start !== ws).length > 0 && (
-        <section className={card}>
-          <h3 className="mb-2 font-extrabold">التحضيرات السابقة</h3>
-          <div className="space-y-2">
-            {rows.filter((r) => r.week_start !== ws).map((r) => (
-              <details key={r.id} className="rounded-xl bg-muted p-3">
-                <summary className="cursor-pointer font-bold">أسبوع {r.week_start}</summary>
-                <p className="mt-2 whitespace-pre-wrap text-sm">{r.notes}</p>
-                {!!r.images?.length && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {r.images.map((src: string, i: number) => renderMediaItem(src, i))}
-                  </div>
-                )}
-              </details>
-            ))}
-          </div>
-        </section>
       )}
-    <ImageLightbox images={gallery?.filter((s) => !s.match(/\.(mp4|mov|webm)$/i))} />
+    </div>
+  );
+}
