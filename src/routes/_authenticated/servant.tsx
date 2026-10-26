@@ -650,4 +650,4 @@ function Prep({ userId }: { userId: string }) {
           </div>
         </section>
       )}
-      <ImageLightbox images={gallery?.filter(s => !s.match
+     <ImageLightbox images={gallery?.filter(s => !s.match(/\.(mp4|mov|webm)$/i))} />
