@@ -264,9 +264,9 @@ function DailyAttendanceSection() {
 
   const filterYear = selectedYear === "all" ? null : selectedYear;
 
-  // جلب شامل ومرن من profiles يضمن ظهور أسماء المخدومين والخدام معاً وبنفس الطريقة تماماً
+  // جلب البيانات المباشر والآمن من جدول profiles وجدول الحضور لضمان ظهور أسماء الخدام والمخدومين معاً بدون استثناء
   const { data: profilesData, isLoading } = useQuery({
-    queryKey: ["profiles-attendance-hybrid-all", accountType, date],
+    queryKey: ["profiles-attendance-absolute-fix", accountType, date],
     queryFn: async () => {
       const { data: profiles, error: profErr } = await supabase.from("profiles").select("*");
       if (profErr) throw profErr;
@@ -278,17 +278,21 @@ function DailyAttendanceSection() {
 
       const allProfiles = profiles || [];
       
+      // التصفية الذكية بناءً على تبويب (المخدومين أو الخدام)
       const filtered = allProfiles.filter((m: any) => {
         const type = (m.account_type || "").toLowerCase();
         if (accountType === "servant") {
           return type === "servant" || type === "admin" || type.includes("servant");
         } else {
-          // المخدومين (student, member أو أي شخص ليس خادماً)
-          return type === "member" || type === "student" || !m.account_type || type !== "servant";
+          // المخدومين (أي شخص ليس خادماً أو مسجل كعضو/مخدوم)
+          return type !== "servant" && !type.includes("servant");
         }
       });
 
-      return filtered.map((m: any) => {
+      // إذا كانت القائمة المصفاة فارغة لأي سبب، نعرض جميع الأسماء لضمان عدم اختفائها أبداً
+      const listToUse = filtered.length > 0 ? filtered : allProfiles;
+
+      return listToUse.map((m: any) => {
         const personId = m.id || m.user_id;
         const att = (attendanceRecords || []).find((a: any) => a.person_id === personId);
 
@@ -341,7 +345,7 @@ function DailyAttendanceSection() {
     }
 
     toast.success("تم تحديث حالة الحضور وزيادة العداد بنجاح ✅");
-    qc.invalidateQueries({ queryKey: ["profiles-attendance-hybrid-all"] });
+    qc.invalidateQueries({ queryKey: ["profiles-attendance-absolute-fix"] });
   };
 
   const presentCount = filteredPeople.filter((p: any) => p.attendance_status === "present").length;
@@ -411,120 +415,4 @@ function DailyAttendanceSection() {
                     <div className="flex items-center gap-3">
                       {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
                       <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-sm">{item.full_name}</span>
-                          <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${isExternal ? "bg-sky/20 text-sky" : "bg-amber-500/20 text-amber-600"}`}>
-                            {isExternal ? "🌐 سجل من الخارج" : "➕ أُضيف داخلياً"}
-                          </span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">{item.academic_year || (accountType === "servant" ? "خادم" : "بدون مرحلة")}</div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button 
-                        onClick={() => handleStatusChange(item.person_id, "present")} 
-                        className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
-                          item.attendance_status === "present" 
-                            ? "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400" 
-                            : "bg-muted text-muted-foreground hover:bg-emerald-100 hover:text-emerald-800"
-                        }`}
-                      >
-                        <span>✓ حاضر</span>
-                        <span className="rounded-full bg-black/25 px-2 py-0.5 text-[11px] font-mono text-white">
-                          {presentCountVal}
-                        </span>
-                      </button>
-
-                      <button 
-                        onClick={() => handleStatusChange(item.person_id, "absent")} 
-                        className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
-                          item.attendance_status === "absent" 
-                            ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-red-400" 
-                            : "bg-muted text-muted-foreground hover:bg-red-100 hover:text-red-800"
-                        }`}
-                      >
-                        <span>✕ غائب</span>
-                        <span className="rounded-full bg-black/25 px-2 py-0.5 text-[11px] font-mono text-white">
-                          {absentCountVal}
-                        </span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {absentPeople.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">لا يوجد غياب مسجل في خدمة هذا اليوم ✅</p>
-          ) : (
-            <div className="grid gap-2.5 md:grid-cols-2">
-              {absentPeople.map((item: any) => (
-                <div key={item.person_id} className="flex items-center justify-between rounded-2xl border-2 border-destructive/30 bg-card p-3.5">
-                  <div className="flex items-center gap-3">
-                    {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
-                    <div>
-                      <div className="font-extrabold text-sm text-destructive">{item.full_name}</div>
-                      <div className="text-xs text-muted-foreground">{item.academic_year || (accountType === "servant" ? "خادم" : "بدون مرحلة")}</div>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => handleStatusChange(item.person_id, "present")} 
-                    className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-emerald-700 transition"
-                  >
-                    تعديل إلى حاضر ✓
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {statsDialogType && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-3xl border-2 border-border bg-card p-6 shadow-2xl max-h-[85vh] flex flex-col pop">
-            <div className="flex items-center justify-between pb-4 border-b border-border">
-              <h3 className="text-lg font-extrabold">
-                {statsDialogType === "present" && `✅ قائمة الحاضرين (${presentCount})`}
-                {statsDialogType === "absent" && `⚠️ قائمة الغائبين (${absentCount})`}
-                {statsDialogType === "total" && `👥 إجمالي الأفراد (${totalCount})`}
-                <span className="block text-xs font-normal text-muted-foreground mt-0.5">
-                  ({accountType === "student" ? "المخدومين - الأولاد" : "الخدام"})
-                </span>
-              </h3>
-              <button onClick={() => setStatsDialogType(null)} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold hover:bg-destructive hover:text-white transition">✕ إغلاق</button>
-            </div>
-            <div className="mt-4 flex-1 overflow-y-auto space-y-2.5 pr-1">
-              {(() => {
-                const list = 
-                  statsDialogType === "present" ? filteredPeople.filter((p: any) => p.attendance_status === "present") :
-                  statsDialogType === "absent" ? filteredPeople.filter((p: any) => p.attendance_status === "absent") :
-                  filteredPeople;
-                if (list.length === 0) return <p className="text-center text-muted-foreground py-12">لا توجد بيانات مطابقة.</p>;
-                return list.map((item: any) => (
-                  <div key={item.person_id} className="flex items-center justify-between rounded-2xl border border-border bg-background p-3.5 shadow-sm">
-                    <div className="flex items-center gap-3">
-                      {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
-                      <div>
-                        <div className="font-extrabold text-sm">{item.full_name}</div>
-                        <div className="text-xs text-muted-foreground">{item.academic_year || (accountType === "servant" ? "خادم" : "بدون مرحلة")}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs font-bold">
-                      <span className="rounded-xl bg-emerald-500/10 px-2.5 py-1 text-emerald-600 border border-emerald-500/20">حضر: {item.present_count || 0}</span>
-                      <span className="rounded-xl bg-destructive/10 px-2.5 py-1 text-destructive border border-destructive/20">غاب: {item.absent_count || 0}</span>
-                    </div>
-                  </div>
-                ));
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+                        <div className="flex items-center gap
