@@ -339,9 +339,8 @@ function DailyAttendanceSection() {
 
   const filterYear = selectedYear === "all" ? null : selectedYear;
 
-  // جلب شامل لضمان ظهور أسماء الخدام والمخدومين مع عدادات الحضور والغياب بدقة تامة
   const { data: profilesData, isLoading } = useQuery({
-    queryKey: ["profiles-attendance-hybrid-comprehensive", accountType, date],
+    queryKey: ["profiles-attendance-fixed-view", accountType, date],
     queryFn: async () => {
       const { data: profiles, error: profErr } = await supabase.from("profiles").select("*");
       if (profErr) throw profErr;
@@ -419,7 +418,7 @@ function DailyAttendanceSection() {
     }
 
     toast.success("تم تحديث حالة الحضور وزيادة العداد بنجاح ✅");
-    qc.invalidateQueries({ queryKey: ["profiles-attendance-hybrid-comprehensive"] });
+    qc.invalidateQueries({ queryKey: ["profiles-attendance-fixed-view"] });
   };
 
   const presentCount = filteredPeople.filter((p: any) => p.attendance_status === "present").length;
