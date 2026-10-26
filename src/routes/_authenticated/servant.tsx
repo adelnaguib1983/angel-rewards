@@ -235,7 +235,63 @@ function DailyAttendanceSection() {
     enabled: accountType === "student",
   });
 
-  const people = (() => {
+  {people.map((item: any) => {
+            const isExternal = item.auth_user_id || item.email || item.registered_externally;
+            
+            // متغيرات العدادات لكل شخص (حضور وغياب)
+            const presentCount = item.present_count || 0; 
+            const absentCount = item.absent_count || 0;
+
+            return (
+              <div key={item.person_id} className="flex items-center justify-between rounded-2xl border-2 border-border bg-card p-3.5">
+                <div className="flex items-center gap-3">
+                  {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-sm">{item.full_name}</span>
+                      <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${isExternal ? "bg-sky/20 text-sky" : "bg-amber-500/20 text-amber-600"}`}>
+                        {isExternal ? "🌐 سجل من الخارج" : "➕ أُضيف داخلياً"}
+                      </span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">{item.academic_year || "بدون مرحلة"}</div>
+                  </div>
+                </div>
+                
+                {/* الأزرار مع العدادات المتغيرة بجانبها */}
+                <div className="flex items-center gap-2">
+                  {/* زر حاضر مع العداد */}
+                  <button 
+                    onClick={() => handleStatusChange(item.person_id, "present")} 
+                    className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                      item.attendance_status === "present" 
+                        ? "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400" 
+                        : "bg-muted text-muted-foreground hover:bg-emerald-100 hover:text-emerald-800"
+                    }`}
+                  >
+                    <span>✓ حاضر</span>
+                    <span className="rounded-full bg-black/20 px-1.5 py-0.2 text-[10px] text-white">
+                      {presentCount}
+                    </span>
+                  </button>
+
+                  {/* زر غائب مع العداد */}
+                  <button 
+                    onClick={() => handleStatusChange(item.person_id, "absent")} 
+                    className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                      item.attendance_status === "absent" 
+                        ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-destructive" 
+                        : "bg-muted text-muted-foreground hover:bg-red-100 hover:text-red-800"
+                    }`}
+                  >
+                    <span>✕ غائب</span>
+                    <span className="rounded-full bg-black/20 px-1.5 py-0.2 text-[10px] text-white">
+                      {absentCount}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
     if (accountType === "student" && servantMembersData && servantMembersData.length > 0) {
       return servantMembersData
         .filter((m: any) => !filterYear || m.academic_year === filterYear)
