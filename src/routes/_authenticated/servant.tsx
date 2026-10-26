@@ -264,54 +264,23 @@ function DailyAttendanceSection() {
 
   const filterYear = selectedYear === "all" ? null : selectedYear;
 
-  // جلب البيانات مع ضمان عرض جميع الأفراد والخدام بمرونة تامة
-  const { data: profilesData, isLoading } = useQuery({
-    queryKey: ["profiles-attendance-final", accountType, date],
+  // استدعاء دالة RPC الأساسية المتصلة بقاعدة البيانات لجلب الأسماء والعدادات
+  const { data: rpcPeople, isLoading } = useQuery({
+    queryKey: ["daily-attendance-original-rpc", date, accountType],
     queryFn: async () => {
-      const { data: profiles, error: profErr } = await supabase.from("profiles").select("*");
-      if (profErr) throw profErr;
-
-      const { data: attendanceRecords } = await supabase
-        .from("daily_attendance")
-        .select("*")
-        .eq("attendance_date", date);
-
-      const allProfiles = profiles || [];
-      
-      const filtered = allProfiles.filter((m: any) => {
-        const type = (m.account_type || "").toLowerCase();
-        if (accountType === "servant") {
-          return type === "servant" || type === "admin" || type.includes("servant");
-        } else {
-          return type === "member" || type === "student" || !m.account_type || type !== "servant";
-        }
+      const { data, error } = await supabase.rpc("get_daily_attendance", { 
+        _date: date, 
+        _account_type: accountType 
       });
-
-      const listToUse = filtered.length > 0 ? filtered : allProfiles;
-
-      return listToUse.map((m: any) => {
-        const personId = m.id || m.user_id;
-        const att = (attendanceRecords || []).find((a: any) => a.person_id === personId);
-
-        return {
-          person_id: personId,
-          full_name: m.full_name || m.name || "بدون اسم",
-          avatar: m.avatar || "👤",
-          photo_url: m.photo_url,
-          academic_year: m.academic_year || m.grade || "مرحلة عامة",
-          attendance_status: att ? att.status : null,
-          present_count: m.present_count || 0,
-          absent_count: m.absent_count || 0,
-          auth_user_id: m.auth_user_id,
-          email: m.email,
-          registered_externally: m.registered_externally
-        };
-      });
+      if (error) {
+        console.error("RPC Error:", error);
+        return [];
+      }
+      return data || [];
     },
   });
 
-  const people = profilesData || [];
-  const filteredPeople = filterYear ? people.filter((p: any) => p.academic_year === filterYear) : people;
+  const people = (rpcPeople || []).filter((p: any) => !filterYear || p.academic_year === filterYear);
 
   const handleStatusChange = async (personId: string, status: "present" | "absent") => {
     const { error } = await supabase.from("daily_attendance").upsert({ 
@@ -342,14 +311,14 @@ function DailyAttendanceSection() {
     }
 
     toast.success("تم تحديث حالة الحضور وزيادة العداد بنجاح ✅");
-    qc.invalidateQueries({ queryKey: ["profiles-attendance-final"] });
+    qc.invalidateQueries({ queryKey: ["daily-attendance-original-rpc"] });
   };
 
-  const presentCount = filteredPeople.filter((p: any) => p.attendance_status === "present").length;
-  const absentCount = filteredPeople.filter((p: any) => p.attendance_status === "absent").length;
-  const totalCount = filteredPeople.length;
+  const presentCount = people.filter((p: any) => p.attendance_status === "present").length;
+  const absentCount = people.filter((p: any) => p.attendance_status === "absent").length;
+  const totalCount = people.length;
   const percentage = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
-  const absentPeople = filteredPeople.filter((p: any) => p.attendance_status === "absent");
+  const absentPeople = people.filter((p: any) => p.attendance_status === "absent");
 
   return (
     <div className="space-y-4">
@@ -398,11 +367,11 @@ function DailyAttendanceSection() {
         <div className="space-y-2">
           {isLoading ? (
             <p className="text-center text-muted-foreground py-8">جاري التحميل...</p>
-          ) : !filteredPeople.length ? (
-            <p className="text-center text-muted-foreground py-8">لا توجد بيانات مسجلة للأفراد.</p>
+          ) : !people.length ? (
+            <p className="text-center text-muted-foreground py-8">لا توجد أسئلة أو بيانات مسجلة للأفراد.</p>
           ) : (
             <div className="grid gap-2.5 md:grid-cols-2">
-              {filteredPeople.map((item: any) => {
+              {people.map((item: any) => {
                 const isExternal = item.auth_user_id || item.email || item.registered_externally;
                 const presentCountVal = item.present_count || 0; 
                 const absentCountVal = item.absent_count || 0;
@@ -502,9 +471,9 @@ function DailyAttendanceSection() {
             <div className="mt-4 flex-1 overflow-y-auto space-y-2.5 pr-1">
               {(() => {
                 const list = 
-                  statsDialogType === "present" ? filteredPeople.filter((p: any) => p.attendance_status === "present") :
-                  statsDialogType === "absent" ? filteredPeople.filter((p: any) => p.attendance_status === "absent") :
-                  filteredPeople;
+                  statsDialogType === "present" ? people.filter((p: any) => p.attendance_status === "present") :
+                  statsDialogType === "absent" ? people.filter((p: any) => p.attendance_status === "absent") :
+                  people;
                 if (list.length === 0) return <p className="text-center text-muted-foreground py-12">لا توجد بيانات مطابقة.</p>;
                 return list.map((item: any) => (
                   <div key={item.person_id} className="flex items-center justify-between rounded-2xl border border-border bg-background p-3.5 shadow-sm">
