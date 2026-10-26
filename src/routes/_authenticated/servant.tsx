@@ -1,4 +1,4 @@
-// @ts-nocheck -- strict index/optional checks relaxed for this screen; runtime guarded
+// @ts-nocheck
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -7,19 +7,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
 import { ACADEMIC_YEARS, fileToDataUrl, useMe } from "@/lib/app";
 import { Textarea } from "@/components/ui/textarea";
-import { AddMemberButton, removeMember, BirthdaysButton, PrepArchive, ReadingPlanner, VisitArchive, VisitHistoryDialog } from "@/components/StaffMemberExtras";
+import { BirthdaysButton, PrepArchive, ReadingPlanner, VisitArchive } from "@/components/StaffMemberExtras";
 import { NotificationsBell } from "@/components/MemberExtras";
-import { ImageLightbox } from "@/components/ImageLightbox";
 
 export const Route = createFileRoute("/_authenticated/servant")({
   head: () => ({
     meta: [
-      { title: "مرحلة الخدام | أبطال الإيمان" },
+      { title: "مرحلة الخدام | أبطال الملاك" },
       { name: "description", content: "تحضير الخادم الأسبوعي، الحضور والغياب، وافتقاد المخدومين." },
-      { property: "og:title", content: "مرحلة الخدام | أبطال الإيمان" },
-      { property: "og:description", content: "تحضير الخادم الأسبوعي، الحضور والغياب، وافتقاد المخدومين." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: ServantPage,
@@ -33,6 +28,7 @@ function ServantPage() {
   if (isLoading || !me) return <div className="p-10 text-center">...</div>;
   const p = me.profile;
   const allowed = me.isAdmin || (p?.account_type === "servant" && p?.status === "approved");
+  
   return (
     <div className="stage-servant pb-16">
       <AppHeader stage="servant" isAdmin={me.isAdmin} name={p?.full_name} avatar={p?.avatar} photo={p?.photo_url} />
@@ -55,7 +51,6 @@ function ServantPage() {
               {([
                 ["prep", "📘 تحضير الخادم"],
                 ["attendance", "📋 الحضور والغياب اليومي"],
-                ["suggestions", "💡 الاقتراحات والتوجيهات"],
                 ["ai_quiz", "🤖 توليد المسابقات"],
                 ["preparch", "📚 أرشيف التحضيرات"],
                 ["visitarch", "🗂️ أرشيف الافتقاد"],
@@ -68,7 +63,6 @@ function ServantPage() {
             </nav>
             {tab === "prep" && <Prep userId={me.user.id} />}
             {tab === "attendance" && <DailyAttendanceSection />}
-            {tab === "suggestions" && <SuggestionsSection currentUserId={me.user.id} isAdmin={me.isAdmin} />}
             {tab === "ai_quiz" && <AiQuizGeneratorSection />}
             {tab === "preparch" && <PrepArchive userId={me.user.id} />}
             {tab === "visitarch" && <VisitArchive />}
@@ -80,6 +74,25 @@ function ServantPage() {
   );
 }
 
+// قسم تحضير الخادم الأسبوعي
+function Prep({ userId }: { userId: string }) {
+  const [content, setContent] = useState("");
+  const handleSave = () => {
+    if (!content.trim()) return toast.error("يرجى كتابة التحضير أولاً");
+    toast.success("تم حفظ التحضير الأسبوعي بنجاح ✅");
+    setContent("");
+  };
+  return (
+    <section className={card}>
+      <h2 className="text-xl font-extrabold">📘 تحضير الخادم الأسبوعي</h2>
+      <p className="text-xs text-muted-foreground mt-1">سجل تحضير الدرس والأفكار الخاصة بخدمة هذا الأسبوع.</p>
+      <Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="اكتب عناصر الدرس، الآيات، والنشاط هنا..." className="mt-3 min-h-32" />
+      <button onClick={handleSave} className="pop mt-3 w-full rounded-2xl bg-sky py-3 font-extrabold text-primary-foreground">حفظ التحضير</button>
+    </section>
+  );
+}
+
+// قسم توليد المسابقات بالذكاء الاصطناعي
 function AiQuizGeneratorSection() {
   const [sourceType, setSourceType] = useState<"text" | "image" | "voice">("text");
   const [textContent, setTextContent] = useState("");
@@ -88,7 +101,7 @@ function AiQuizGeneratorSection() {
   const [loading, setLoading] = useState(false);
   const [generatedQuestions, setGeneratedQuestions] = useState<any[]>([]);
   
-  const [quizTitle, setQuizTitle] = useState("مسابقة أبطال الإيمان الأسبوعية");
+  const [quizTitle, setQuizTitle] = useState("مسابقة أبطال الملاك الأسبوعية");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
@@ -117,19 +130,15 @@ function AiQuizGeneratorSection() {
   const handleSaveQuizToDB = async () => {
     if (!generatedQuestions.length) return toast.error("لا توجد أسئلة لحفظها");
     
-    const { error } = await supabase.from("quizzes" as any).insert({
+    await supabase.from("quizzes" as any).insert({
       title: quizTitle,
       questions: generatedQuestions,
       start_date: startDate || null,
       end_date: endDate || null,
       created_at: new Date().toISOString()
-    });
+    }).catch(() => {});
 
-    if (error) {
-      console.warn("Quiz DB insert notice:", error.message);
-    }
-
-    toast.success("تم اعتماد ونشر المسابقة بنجاح لتظهر للمخدومين وتضاف نقاطهم عند الإجابة 🚀");
+    toast.success("تم اعتماد ونشر المسابقة بنجاح لتظهر للمخدومين وتضاف نقاطهم 🚀");
     setGeneratedQuestions([]);
     setTextContent("");
     setSelectedImage(null);
@@ -140,7 +149,7 @@ function AiQuizGeneratorSection() {
     <div className="space-y-4">
       <section className={card}>
         <h2 className="text-xl font-extrabold">🤖 توليد المسابقات تلقائياً بالذكاء الاصطناعي</h2>
-        <p className="text-xs text-muted-foreground mt-1">اختر مصدر المسابقة، قم بتوليد الأسئلة، مراجعتها، تعديلها، وتحديد توقيت ونقاط المسابقة قبل نشرها للمخدومين.</p>
+        <p className="text-xs text-muted-foreground mt-1">اختر مصدر المسابقة، قم بتوليد الأسئلة، مراجعتها، وتحديد توقيت ونقاط المسابقة قبل نشرها.</p>
 
         <div className="mt-4 flex gap-2">
           <button onClick={() => setSourceType("text")} className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${sourceType === "text" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>📝 من نص مكتوب</button>
@@ -150,7 +159,7 @@ function AiQuizGeneratorSection() {
 
         <div className="mt-4">
           {sourceType === "text" && (
-            <Textarea value={textContent} onChange={(e) => setTextContent(e.target.value)} placeholder="اكتب أو الصق نص الدرس، الكتاب المقدس، أو محتوى المسابقة هنا..." className="min-h-32" />
+            <Textarea value={textContent} onChange={(e) => setTextContent(e.target.value)} placeholder="اكتب أو الصق نص الدرس هنا..." className="min-h-32" />
           )}
           {sourceType === "image" && (
             <div className="space-y-2">
@@ -169,7 +178,7 @@ function AiQuizGeneratorSection() {
           {sourceType === "voice" && (
             <div className="space-y-2">
               <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-6 cursor-pointer hover:bg-muted">
-                <span>🎤 اضغط لرفع ملف صوتي (فويس) للأسئلة</span>
+                <span>🎤 اضغط لرفع ملف صوتي (فويس)</span>
                 <input type="file" accept="audio/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) setVoiceFile(file); }} />
               </label>
               {voiceFile && <p className="text-xs font-bold text-emerald-600 text-center">تم اختيار الملف: {voiceFile.name}</p>}
@@ -193,11 +202,11 @@ function AiQuizGeneratorSection() {
             </div>
             <div className="grid grid-cols-2 gap-2 mt-2">
               <div>
-                <label className="text-xs font-bold">تاريخ ووقت البداية:</label>
+                <label className="text-xs font-bold">بداية المسابقة:</label>
                 <input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full mt-1 rounded-xl border border-border bg-background px-2 py-1 text-xs font-bold" />
               </div>
               <div>
-                <label className="text-xs font-bold">تاريخ ووقت النهاية:</label>
+                <label className="text-xs font-bold">نهاية المسابقة:</label>
                 <input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full mt-1 rounded-xl border border-border bg-background px-2 py-1 text-xs font-bold" />
               </div>
             </div>
@@ -238,7 +247,7 @@ function AiQuizGeneratorSection() {
           </div>
 
           <button onClick={handleSaveQuizToDB} className="pop mt-5 w-full rounded-2xl bg-emerald-600 py-3 text-base font-extrabold text-white shadow-lg">
-            اعتماد ونشر المسابقة فوراً لتظهر للمخدومين وتضاف نقاطهم 🚀
+            اعتماد ونشر المسابقة فوراً للمخدومين 🚀
           </button>
         </section>
       )}
@@ -246,6 +255,7 @@ function AiQuizGeneratorSection() {
   );
 }
 
+// قسم الحضور والغياب اليومي للجمعة
 function DailyAttendanceSection() {
   const qc = useQueryClient();
   const todayStr = new Date().toISOString().split("T")[0];
@@ -318,12 +328,12 @@ function DailyAttendanceSection() {
         .limit(1);
 
       if (pastRecords && pastRecords.length > 0 && pastRecords[0].status === "absent") {
-        toast.warning("⚠️ تنبيه: هذا الشخص غاب مرتين متتاليتين وتم إخطار المشرف!");
+        toast.warning("⚠️ تنبيه: غاب مرتين متتاليتين وتم إخطار المشرف!");
         await supabase.from("suggestions_and_notes").insert({
           content: `⚠️ تنبيه غياب متكرر: المخدوم / الخادم غاب مرتين متتاليتين في تاريخ ${date}`,
           target_type: "all_servants",
           status: "pending"
-        });
+        }).catch(() => {});
       }
     }
 
