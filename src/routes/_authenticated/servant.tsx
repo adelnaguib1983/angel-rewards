@@ -264,55 +264,69 @@ function DailyAttendanceSection() {
 
   const filterYear = selectedYear === "all" ? null : selectedYear;
 
-  const { data: rpcPeople, isLoading: rpcLoading } = useQuery({
-    queryKey: ["daily-attendance-full", date, accountType, filterYear],
+  // جلب الأفراد مباشرة من جدول profiles وجلب حضور اليوم المحدد
+  const { data: profilesData, isLoading } = useQuery({
+    queryKey: ["profiles-attendance-direct", accountType, date],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_daily_attendance", { _date: date, _account_type: accountType });
-      if (error) throw error;
-      let list = data || [];
-      if (filterYear) list = list.filter((p: any) => p.academic_year === filterYear);
-      return list;
+      // 1. جلب الملفات الشخصية حسب النوع
+      const targetType = accountType === "student" ? "member" : "servant";
+      const { data: profiles, error: profErr } = await supabase
+        .from("profiles")
+        .select("*");
+      
+      if (profErr) throw profErr;
+      
+      // تصفية حسب نوع الحساب (مخدوم أو خادم)
+      const filteredProfiles = (profiles || []).filter((p: any) => {
+        if (accountType === "student") {
+          return p.account_type === "member" || !p.account_type || p.account_type === "student";
+        } else {
+          return p.account_type === "servant";
+        }
+      });
+
+      // 2. جلب سجلات الحضور لتاريخ اليوم المحدد
+      const { data: attendanceRecords, error: attErr } = await supabase
+        .from("daily_attendance")
+        .select("*")
+        .eq("attendance_date", date);
+
+      if (attErr) console.warn(attErr);
+
+      // 3. دمج البيانات وحساب إحصائيات الحضور والغياب لكل شخص
+      const result = filteredProfiles.map((m: any) => {
+        const personId = m.id || m.user_id;
+        const att = (attendanceRecords || []).find((a: any) => a.person_id === personId);
+        
+        return {
+          person_id: personId,
+          full_name: m.full_name || "بدون اسم",
+          avatar: m.avatar || "👤",
+          photo_url: m.photo_url,
+          academic_year: m.academic_year,
+          attendance_status: att ? att.status : null, // "present" أو "absent" أو null
+          present_count: m.present_count || 0,
+          absent_count: m.absent_count || 0,
+          auth_user_id: m.auth_user_id,
+          email: m.email,
+          registered_externally: m.registered_externally
+        };
+      });
+
+      return result;
     },
   });
 
-  const { data: servantMembersData } = useQuery({
-    queryKey: ["servant-members-for-attendance"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("*");
-      if (error) return [];
-      return data || [];
-    },
-    enabled: accountType === "student",
-  });
-
-  const people = (() => {
-    if (accountType === "student" && servantMembersData && servantMembersData.length > 0) {
-      return servantMembersData
-        .filter((m: any) => !filterYear || m.academic_year === filterYear)
-        .map((m: any) => {
-          const existing = (rpcPeople || []).find((p: any) => p.person_id === m.id || p.person_id === m.user_id);
-          return {
-            person_id: m.id || m.user_id,
-            full_name: m.full_name,
-            avatar: m.avatar || "👤",
-            photo_url: m.photo_url,
-            academic_year: m.academic_year,
-            attendance_status: existing?.attendance_status || null,
-            auth_user_id: m.auth_user_id,
-            email: m.email,
-            registered_externally: m.registered_externally,
-            present_count: m.present_count || 0,
-            absent_count: m.absent_count || 0,
-          };
-        });
-    }
-    return rpcPeople || [];
-  })();
-
-  const isLoading = rpcLoading;
+  const people = profilesData || [];
+  const filteredPeople = filterYear ? people.filter((p: any) => p.academic_year === filterYear) : people;
 
   const handleStatusChange = async (personId: string, status: "present" | "absent") => {
-    const { error } = await supabase.from("daily_attendance").upsert({ person_id: personId, attendance_date: date, status: status }, { onConflict: "person_id,attendance_date" });
+    const { error } = await supabase.from("daily_attendance").upsert({ 
+      person_id: personId, 
+      attendance_date: date, 
+      status: status 
+    }, { onConflict: "person_id,attendance_date" });
+
     if (error) return toast.error(error.message);
 
     if (status === "absent") {
@@ -335,15 +349,14 @@ function DailyAttendanceSection() {
     }
 
     toast.success("تم تحديث حالة الحضور وزيادة العداد بنجاح ✅");
-    qc.invalidateQueries({ queryKey: ["daily-attendance-full"] });
-    qc.invalidateQueries({ queryKey: ["servant-members-for-attendance"] });
+    qc.invalidateQueries({ queryKey: ["profiles-attendance-direct"] });
   };
 
-  const presentCount = (people || []).filter((p: any) => p.attendance_status === "present").length;
-  const absentCount = (people || []).filter((p: any) => p.attendance_status === "absent").length;
-  const totalCount = (people || []).length;
+  const presentCount = filteredPeople.filter((p: any) => p.attendance_status === "present").length;
+  const absentCount = filteredPeople.filter((p: any) => p.attendance_status === "absent").length;
+  const totalCount = filteredPeople.length;
   const percentage = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
-  const absentPeople = (people || []).filter((p: any) => p.attendance_status === "absent");
+  const absentPeople = filteredPeople.filter((p: any) => p.attendance_status === "absent");
 
   return (
     <div className="space-y-4">
@@ -392,11 +405,11 @@ function DailyAttendanceSection() {
         <div className="space-y-2">
           {isLoading ? (
             <p className="text-center text-muted-foreground py-8">جاري التحميل...</p>
-          ) : !people?.length ? (
-            <p className="text-center text-muted-foreground py-8">لا توجد بيانات مسجلة.</p>
+          ) : !filteredPeople.length ? (
+            <p className="text-center text-muted-foreground py-8">لا توجد بيانات مسجلة للأفراد.</p>
           ) : (
             <div className="grid gap-2.5 md:grid-cols-2">
-              {people.map((item: any) => {
+              {filteredPeople.map((item: any) => {
                 const isExternal = item.auth_user_id || item.email || item.registered_externally;
                 const presentCountVal = item.present_count || 0; 
                 const absentCountVal = item.absent_count || 0;
@@ -496,9 +509,9 @@ function DailyAttendanceSection() {
             <div className="mt-4 flex-1 overflow-y-auto space-y-2.5 pr-1">
               {(() => {
                 const list = 
-                  statsDialogType === "present" ? (people || []).filter((p: any) => p.attendance_status === "present") :
-                  statsDialogType === "absent" ? (people || []).filter((p: any) => p.attendance_status === "absent") :
-                  (people || []);
+                  statsDialogType === "present" ? filteredPeople.filter((p: any) => p.attendance_status === "present") :
+                  statsDialogType === "absent" ? filteredPeople.filter((p: any) => p.attendance_status === "absent") :
+                  filteredPeople;
                 if (list.length === 0) return <p className="text-center text-muted-foreground py-12">لا توجد بيانات مطابقة.</p>;
                 return list.map((item: any) => (
                   <div key={item.person_id} className="flex items-center justify-between rounded-2xl border border-border bg-background p-3.5 shadow-sm">
