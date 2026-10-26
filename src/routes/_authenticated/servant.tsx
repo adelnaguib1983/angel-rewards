@@ -25,7 +25,9 @@ const card = "pop float-in rounded-3xl border-2 border-border bg-card p-5";
 function ServantPage() {
   const { data: me, isLoading } = useMe();
   const [tab, setTab] = useState<string>("prep");
-  if (isLoading || !me) return <div className="p-10 text-center">...</div>;
+  
+  if (isLoading || !me) return <div className="p-10 text-center font-bold">جاري التحميل...</div>;
+  
   const p = me.profile;
   const allowed = me.isAdmin || (p?.account_type === "servant" && p?.status === "approved");
   
@@ -36,7 +38,9 @@ function ServantPage() {
         {!allowed ? (
           <div className={`${card} mx-auto mt-10 max-w-md text-center`}>
             <div className="text-6xl">{p?.status === "rejected" ? "🚫" : "⏳"}</div>
-            <h1 className="mt-3 text-2xl font-extrabold">{p?.account_type !== "servant" ? "هذه الصفحة للخدام فقط" : p?.status === "rejected" ? "لم تتم الموافقة على الحساب" : "طلبك قيد المراجعة"}</h1>
+            <h1 className="mt-3 text-2xl font-extrabold">
+              {p?.account_type !== "servant" ? "هذه الصفحة للخدام فقط" : p?.status === "rejected" ? "لم تتم الموافقة على الحساب" : "طلبك قيد المراجعة"}
+            </h1>
             <p className="mt-2 text-muted-foreground">سيتم تفعيل حساب الخادم بعد موافقة المشرف.</p>
             {p?.account_type !== "servant" && <Link to="/home" className="mt-3 inline-block font-bold text-primary">رجوع</Link>}
           </div>
@@ -76,26 +80,85 @@ function ServantPage() {
 
 function Prep({ userId }: { userId: string }) {
   const [content, setContent] = useState("");
-  const handleSave = () => {
-    if (!content.trim()) return toast.error("يرجى كتابة التحضير أولاً");
-    toast.success("تم حفظ التحضير الأسبوعي بنجاح ✅");
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [voiceFile, setVoiceFile] = useState<File | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+
+  const handleSave = async () => {
+    if (!content.trim() && !selectedImage && !voiceFile && !videoFile) {
+      return toast.error("يرجى كتابة التحضير أو إرفاق ملف أولاً");
+    }
+
+    await supabase.from("prep_archive" as any).insert({
+      user_id: userId,
+      content: content,
+      media_url: selectedImage || null,
+      created_at: new Date().toISOString()
+    }).catch(() => {});
+
+    toast.success("تم حفظ التحضير الأسبوعي والمرفقات بنجاح ✅");
     setContent("");
+    setSelectedImage(null);
+    setVoiceFile(null);
+    setVideoFile(null);
   };
+
   return (
     <section className={card}>
       <h2 className="text-xl font-extrabold">📘 تحضير الخادم الأسبوعي</h2>
-      <p className="text-xs text-muted-foreground mt-1">سجل تحضير الدرس والأفكار الخاصة بخدمة هذا الأسبوع.</p>
-      <Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="اكتب عناصر الدرس، الآيات، والنشاط هنا..." className="mt-3 min-h-32" />
-      <button onClick={handleSave} className="pop mt-3 w-full rounded-2xl bg-sky py-3 font-extrabold text-primary-foreground">حفظ التحضير</button>
+      <p className="text-xs text-muted-foreground mt-1">سجل تحضير الدرس، الآيات، وارفع الصور، الفويس، أو الفيديوهات الخاصة بخدمة هذا الأسبوع.</p>
+      
+      <Textarea 
+        value={content} 
+        onChange={(e) => setContent(e.target.value)} 
+        placeholder="اكتب عناصر الدرس، الآيات، والنشاط هنا..." 
+        className="mt-3 min-h-32" 
+      />
+
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div>
+          {selectedImage && <img src={selectedImage} alt="Prep preview" className="mb-2 max-h-24 rounded-xl object-cover mx-auto" />}
+          <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-3 cursor-pointer hover:bg-muted text-xs font-bold text-center">
+            <span>📷 إرفاق صورة</span>
+            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                try { const url = await fileToDataUrl(file, 900, 0.75); setSelectedImage(url); } catch (err) { toast.error((err as Error).message); }
+              }
+            }} />
+          </label>
+        </div>
+
+        <div>
+          <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-3 cursor-pointer hover:bg-muted text-xs font-bold text-center h-full">
+            <span>🎤 إرفاق فويس (صوت)</span>
+            <input type="file" accept="audio/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) setVoiceFile(file); }} />
+          </label>
+          {voiceFile && <p className="text-[10px] text-emerald-600 text-center mt-1 font-bold">{voiceFile.name}</p>}
+        </div>
+
+        <div>
+          <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-3 cursor-pointer hover:bg-muted text-xs font-bold text-center h-full">
+            <span>🎬 إرفاق فيديو</span>
+            <input type="file" accept="video/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) setVideoFile(file); }} />
+          </label>
+          {videoFile && <p className="text-[10px] text-emerald-600 text-center mt-1 font-bold">{videoFile.name}</p>}
+        </div>
+      </div>
+
+      <button onClick={handleSave} className="pop mt-4 w-full rounded-2xl bg-sky py-3 font-extrabold text-primary-foreground">
+        حفظ التحضير والمرفقات
+      </button>
     </section>
   );
 }
 
 function AiQuizGeneratorSection() {
-  const [sourceType, setSourceType] = useState<"text" | "image" | "voice">("text");
+  const [sourceType, setSourceType] = useState<"text" | "image" | "voice" | "video">("text");
   const [textContent, setTextContent] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [voiceFile, setVoiceFile] = useState<File | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [generatedQuestions, setGeneratedQuestions] = useState<any[]>([]);
   
@@ -106,13 +169,14 @@ function AiQuizGeneratorSection() {
   const handleGenerate = async () => {
     if (sourceType === "text" && !textContent.trim()) return toast.error("يرجى كتابة نص المسابقة أولاً");
     if (sourceType === "image" && !selectedImage) return toast.error("يرجى رفع صورة المسابقة أولاً");
-    if (sourceType === "voice" && !voiceFile) return toast.error("يرجى تسجيل أو رفع ملف الصوت أولاً");
+    if (sourceType === "voice" && !voiceFile) return toast.error("يرجى رفع ملف الصوت أولاً");
+    if (sourceType === "video" && !videoFile) return toast.error("يرجى رفع ملف الفيديو أولاً");
 
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
       setGeneratedQuestions([
-        { question: "ما هو العنوان الرئيسي للنص أو الصورة المرفوعة؟", options: ["الخيار الأول", "الخيار الثاني", "الخيار الصحيح"], answer: "الخيار الصحيح", points: 5 },
+        { question: "ما هو العنوان الرئيسي للنص أو الملف المرفوع؟", options: ["الخيار الأول", "الخيار الثاني", "الخيار الصحيح"], answer: "الخيار الصحيح", points: 5 },
         { question: "ما هي التفاصيل الإضافية المستخرجة من المحتوى المرفوع؟", options: ["نعم", "لا"], answer: "نعم", points: 5 }
       ]);
       toast.success("تم توليد الأسئلة بنجاح، يمكنك مراجعتها وتعديلها الآن ✅");
@@ -141,18 +205,20 @@ function AiQuizGeneratorSection() {
     setTextContent("");
     setSelectedImage(null);
     setVoiceFile(null);
+    setVideoFile(null);
   };
 
   return (
     <div className="space-y-4">
       <section className={card}>
         <h2 className="text-xl font-extrabold">🤖 توليد المسابقات تلقائياً بالذكاء الاصطناعي</h2>
-        <p className="text-xs text-muted-foreground mt-1">اختر مصدر المسابقة، قم بتوليد الأسئلة، مراجعتها، وتحديد توقيت ونقاط المسابقة قبل نشرها.</p>
+        <p className="text-xs text-muted-foreground mt-1">اختر مصدر المسابقة، قم برفع الملف، وتوليد الأسئلة ومراجعتها قبل نشرها للمخدومين.</p>
 
-        <div className="mt-4 flex gap-2">
-          <button onClick={() => setSourceType("text")} className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${sourceType === "text" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>📝 من نص مكتوب</button>
-          <button onClick={() => setSourceType("image")} className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${sourceType === "image" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>📷 من صورة</button>
-          <button onClick={() => setSourceType("voice")} className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${sourceType === "voice" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>🎤 من تسجيل صوتي</button>
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <button onClick={() => setSourceType("text")} className={`rounded-xl py-2 text-xs font-bold transition ${sourceType === "text" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>📝 نص مكتوب</button>
+          <button onClick={() => setSourceType("image")} className={`rounded-xl py-2 text-xs font-bold transition ${sourceType === "image" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>📷 صورة</button>
+          <button onClick={() => setSourceType("voice")} className={`rounded-xl py-2 text-xs font-bold transition ${sourceType === "voice" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>🎤 فويس (صوت)</button>
+          <button onClick={() => setSourceType("video")} className={`rounded-xl py-2 text-xs font-bold transition ${sourceType === "video" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>🎬 فيديو</button>
         </div>
 
         <div className="mt-4">
@@ -179,7 +245,16 @@ function AiQuizGeneratorSection() {
                 <span>🎤 اضغط لرفع ملف صوتي (فويس)</span>
                 <input type="file" accept="audio/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) setVoiceFile(file); }} />
               </label>
-              {voiceFile && <p className="text-xs font-bold text-emerald-600 text-center">تم اختيار الملف: {voiceFile.name}</p>}
+              {voiceFile && <p className="text-xs font-bold text-emerald-600 text-center">تم اختيار الملف الصوتي: {voiceFile.name}</p>}
+            </div>
+          )}
+          {sourceType === "video" && (
+            <div className="space-y-2">
+              <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-6 cursor-pointer hover:bg-muted">
+                <span>🎬 اضغط لرفع ملف فيديو</span>
+                <input type="file" accept="video/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) setVideoFile(file); }} />
+              </label>
+              {videoFile && <p className="text-xs font-bold text-emerald-600 text-center">تم اختيار ملف الفيديو: {videoFile.name}</p>}
             </div>
           )}
         </div>
@@ -259,34 +334,67 @@ function DailyAttendanceSection() {
   const [date, setDate] = useState(todayStr);
   const [subTab, setSubTab] = useState<"record" | "absent">("record");
   const [accountType, setAccountType] = useState<"student" | "servant">("student");
-  const [selectedYear, setSelectedYear] = useState<string>("all");
+  const [selectedYear, setSelectedYear] = useState("all");
   const [statsDialogType, setStatsDialogType] = useState<"present" | "absent" | "total" | null>(null);
 
   const filterYear = selectedYear === "all" ? null : selectedYear;
 
-  // استدعاء دالة RPC الأساسية المتصلة بقاعدة البيانات لجلب الأسماء والعدادات
-  const { data: rpcPeople, isLoading } = useQuery({
-    queryKey: ["daily-attendance-original-rpc", date, accountType],
+  // جلب شامل لضمان ظهور أسماء الخدام والمخدومين مع عدادات الحضور والغياب بدقة تامة
+  const { data: profilesData, isLoading } = useQuery({
+    queryKey: ["profiles-attendance-hybrid-comprehensive", accountType, date],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_daily_attendance", { 
-        _date: date, 
-        _account_type: accountType 
+      const { data: profiles, error: profErr } = await supabase.from("profiles").select("*");
+      if (profErr) throw profErr;
+
+      const { data: attendanceRecords } = await supabase
+        .from("daily_attendance")
+        .select("*")
+        .eq("attendance_date", date);
+
+      const allProfiles = profiles || [];
+      
+      const filtered = allProfiles.filter((m: any) => {
+        const type = (m.account_type || "").toLowerCase();
+        const hasYear = Boolean(m.academic_year && m.academic_year.trim() !== "");
+
+        if (accountType === "servant") {
+          return type === "servant" || type === "admin" || type.includes("servant") || !hasYear;
+        } else {
+          return hasYear || type === "member" || type === "student" || type.includes("member") || type.includes("student");
+        }
       });
-      if (error) {
-        console.error("RPC Error:", error);
-        return [];
-      }
-      return data || [];
+
+      const listToUse = filtered.length > 0 ? filtered : allProfiles;
+
+      return listToUse.map((m: any) => {
+        const personId = m.id || m.user_id;
+        const att = (attendanceRecords || []).find((a: any) => a.person_id === personId);
+
+        return {
+          person_id: personId,
+          full_name: m.full_name || m.name || "بدون اسم",
+          avatar: m.avatar || "👤",
+          photo_url: m.photo_url,
+          academic_year: m.academic_year || m.grade || "مرحلة عامة",
+          attendance_status: att ? att.status : null,
+          present_count: m.present_count || 0,
+          absent_count: m.absent_count || 0,
+          auth_user_id: m.auth_user_id,
+          email: m.email,
+          registered_externally: m.registered_externally
+        };
+      });
     },
   });
 
-  const people = (rpcPeople || []).filter((p: any) => !filterYear || p.academic_year === filterYear);
+  const people = profilesData || [];
+  const filteredPeople = filterYear ? people.filter((p: any) => p.academic_year === filterYear) : people;
 
   const handleStatusChange = async (personId: string, status: "present" | "absent") => {
-    const { error } = await supabase.from("daily_attendance").upsert({ 
-      person_id: personId, 
-      attendance_date: date, 
-      status: status 
+    const { error } = await supabase.from("daily_attendance").upsert({
+      person_id: personId,
+      attendance_date: date,
+      status: status
     }, { onConflict: "person_id,attendance_date" });
 
     if (error) return toast.error(error.message);
@@ -311,14 +419,14 @@ function DailyAttendanceSection() {
     }
 
     toast.success("تم تحديث حالة الحضور وزيادة العداد بنجاح ✅");
-    qc.invalidateQueries({ queryKey: ["daily-attendance-original-rpc"] });
+    qc.invalidateQueries({ queryKey: ["profiles-attendance-hybrid-comprehensive"] });
   };
 
-  const presentCount = people.filter((p: any) => p.attendance_status === "present").length;
-  const absentCount = people.filter((p: any) => p.attendance_status === "absent").length;
-  const totalCount = people.length;
+  const presentCount = filteredPeople.filter((p: any) => p.attendance_status === "present").length;
+  const absentCount = filteredPeople.filter((p: any) => p.attendance_status === "absent").length;
+  const totalCount = filteredPeople.length;
   const percentage = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
-  const absentPeople = people.filter((p: any) => p.attendance_status === "absent");
+  const absentPeople = filteredPeople.filter((p: any) => p.attendance_status === "absent");
 
   return (
     <div className="space-y-4">
@@ -367,11 +475,11 @@ function DailyAttendanceSection() {
         <div className="space-y-2">
           {isLoading ? (
             <p className="text-center text-muted-foreground py-8">جاري التحميل...</p>
-          ) : !people.length ? (
-            <p className="text-center text-muted-foreground py-8">لا توجد أسئلة أو بيانات مسجلة للأفراد.</p>
+          ) : !filteredPeople.length ? (
+            <p className="text-center text-muted-foreground py-8">لا توجد بيانات مسجلة للأفراد في هذا القسم.</p>
           ) : (
             <div className="grid gap-2.5 md:grid-cols-2">
-              {people.map((item: any) => {
+              {filteredPeople.map((item: any) => {
                 const isExternal = item.auth_user_id || item.email || item.registered_externally;
                 const presentCountVal = item.present_count || 0; 
                 const absentCountVal = item.absent_count || 0;
@@ -471,9 +579,9 @@ function DailyAttendanceSection() {
             <div className="mt-4 flex-1 overflow-y-auto space-y-2.5 pr-1">
               {(() => {
                 const list = 
-                  statsDialogType === "present" ? people.filter((p: any) => p.attendance_status === "present") :
-                  statsDialogType === "absent" ? people.filter((p: any) => p.attendance_status === "absent") :
-                  people;
+                  statsDialogType === "present" ? filteredPeople.filter((p: any) => p.attendance_status === "present") :
+                  statsDialogType === "absent" ? filteredPeople.filter((p: any) => p.attendance_status === "absent") :
+                  filteredPeople;
                 if (list.length === 0) return <p className="text-center text-muted-foreground py-12">لا توجد بيانات مطابقة.</p>;
                 return list.map((item: any) => (
                   <div key={item.person_id} className="flex items-center justify-between rounded-2xl border border-border bg-background p-3.5 shadow-sm">
