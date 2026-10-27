@@ -40,7 +40,7 @@ function useMembers() {
 }
 
 const TABS = [
-  ["summary", "📊 الملخص الأسبوعي"], ["announcements", "📣 الإعلانات"], ["requests", "📝 طلبات التسجيل"], ["members", "👥 المخدومون"], ["servants", "📘 الخدام والافتقاد"],
+  ["summary", "📊 الملخص الأسبوعي"], ["announcements", "📣 الإعلانات"], ["requests", "📝 طلبات التسجيل"], ["members", "👥 المخدومون"], ["servants", "📘 الخدام والافتقاد"], ["absence", "📋 الحضور والغياب الأسبوعي"],
   ["activities", "✅ الأنشطة"], ["redeem", "🎁 طلبات الهدايا"], ["log", "📒 سجل النقاط"],
   ["archive", "🗂️ الأرشيف والمقارنة"], ["gifts", "🛍️ الهدايا"], ["badges", "🏅 الأوسمة والنقاط"], ["notif", "🔔 مركز التنبيهات"], ["quiz", "🧠 المسابقات"], ["visitarch", "🗂️ أرشيف الافتقاد"], ["read", "📖 القراءات اليومية"],
   ["audit", "🕵️ سجل التدقيق"], ["staff", "🔑 الصلاحيات"],
@@ -95,7 +95,7 @@ function Admin() {
         {tab === "requests" && <Requests />}
         {tab === "members" && <Members />}
         {tab === "servants" && <ServantsTab />}
-       
+        {tab === "absence" && <AbsenceTab />}
         {tab === "activities" && <Activities />}
         {tab === "redeem" && <Redemptions />}
         {tab === "log" && <AdjLog />}
@@ -390,4 +390,944 @@ function Members() {
   const [q, setQ] = useState("");
   const [adj, setAdj] = useState<Member | null>(null);
   const [open, setOpen] = useState<string | null>(null);
-  const [year, setYear] = useState<string>("all
+  const [year, setYear] = useState<string>("all");
+  const [edit, setEdit] = useState<any>(null);
+  const [amount, setAmount] = useState(10);
+  const [reason, setReason] = useState("");
+  const pmap = Object.fromEntries((profiles ?? []).map((p) => [p.id, p]));
+  const approved = (members ?? []).filter((m) => m.status === "approved");
+  const yearOf = (m: Member) => pmap[m.id]?.academic_year ?? m.academic_year ?? "";
+  const list = approved.filter((m) => (year === "all" || yearOf(m) === year) && m.full_name.includes(q));
+
+  async function saveAdj() {
+    if (!adj || !reason.trim() || !amount) return toast.error("اكتب المقدار والسبب");
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from("point_adjustments").insert({ user_id: adj.id, amount, reason: reason.trim(), admin_id: user!.id });
+    if (error) return toast.error(error.message);
+    toast.success("تم تعديل النقاط وتسجيل السبب"); setAdj(null); setReason(""); qc.invalidateQueries();
+  }
+
+  return (
+    <div>
+      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {[["all", "الكل", approved.length], ...ACADEMIC_YEARS.map((y) => [y, `فصل ${y}`, approved.filter((m) => yearOf(m) === y).length])].map(([k, label, n]) => (
+          <button key={k as string} onClick={() => setYear(k as string)} className={`pop rounded-2xl p-3 text-center font-extrabold ${year === k ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+            <div className="text-sm">{label}</div><div className="text-2xl">{n as number}</div>
+          </button>
+        ))}
+      </div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><Input placeholder="بحث بالاسم..." value={q} onChange={(e) => setQ(e.target.value)} className="max-w-xs" /><AddMemberButton defaultYear={year !== "all" ? year : undefined} /></div>
+      <div className="space-y-2">
+        {list.length === 0 && <p className="text-muted-foreground">لا يوجد مخدومون في هذا الفصل.</p>}
+        {list.map((m) => (
+          <div key={m.id} className={card}>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-3xl">{m.avatar}</span>
+              <div className="flex-1"><button onClick={() => setHist({ id: m.id, name: m.full_name })} className="font-bold text-primary underline-offset-4 hover:underline" title="سجل الافتقادات">{m.full_name}</button><div className="text-xs text-muted-foreground">{yearOf(m)} {m.class_name ?? ""}</div></div>
+              <div className="text-center"><div className="text-xs text-muted-foreground">النقاط</div><b className="text-primary">{m.points}</b></div>
+              <div className="text-center"><div className="text-xs text-muted-foreground">الرصيد</div><b>{m.balance}</b></div>
+              <button onClick={() => setOpen(open === m.id ? null : m.id)} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold">التفاصيل</button>
+              <button onClick={() => setEdit({ id: m.id, full_name: m.full_name, academic_year: yearOf(m) || "أولى إعدادي" })} className="rounded-xl bg-accent px-3 py-1.5 text-sm font-bold text-accent-foreground">✏️ تعديل</button>
+              <button onClick={() => { setAdj(m); setAmount(10); }} className="rounded-xl bg-secondary px-3 py-1.5 text-sm font-bold text-secondary-foreground">± النقاط</button>
+              <button onClick={() => removeMember(m.id, m.full_name, () => qc.invalidateQueries())} className="rounded-xl bg-destructive px-3 py-1.5 text-sm font-bold text-destructive-foreground">🗑️ حذف</button>
+            </div>
+            {open === m.id && pmap[m.id] && <Contact p={pmap[m.id]} />}
+          </div>
+        ))}
+      </div>
+      <VisitHistoryDialog member={hist} onClose={() => setHist(null)} />
+      <PersonDialog person={edit} mode={edit ? "edit" : null} onClose={() => setEdit(null)} />
+      <Dialog open={!!adj} onOpenChange={(o) => !o && setAdj(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>تعديل نقاط {adj?.full_name}</DialogTitle></DialogHeader>
+          <label className="text-sm">المقدار (سالب للخصم)</label>
+          <Input type="number" value={amount} onChange={(e) => setAmount(parseInt(e.target.value) || 0)} />
+          <label className="text-sm">السبب (مطلوب)</label>
+          <Input value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} placeholder="مثال: مساعدة في تنظيم الحفل" />
+          <button onClick={saveAdj} className="rounded-2xl bg-primary py-3 font-extrabold text-primary-foreground">حفظ</button>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/* ---------- Activities review ---------- */
+function Activities() {
+  const qc = useQueryClient();
+  const { data: members } = useMembers();
+  const { data: settings } = useSettings();
+  const names = nameMap(members);
+  const [review, setReview] = useState<{ id: string; points: number; status: string } | null>(null);
+  const [reason, setReason] = useState("");
+  const { data } = useQuery({
+    queryKey: ["admin-logs"],
+    queryFn: async () => (await supabase.from("activity_logs").select("*").order("created_at", { ascending: false }).limit(200)).data ?? [],
+  });
+  const save = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("admin_review_log", { _log_id: review!.id, _points: review!.points, _status: review!.status, _reason: reason });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("تم الحفظ في السجل"); setReview(null); setReason(""); qc.invalidateQueries(); },
+    onError: (e) => toast.error((e as Error).message),
+  });
+  const s = Object.fromEntries((settings ?? []).map((x) => [x.key, x]));
+  return (
+    <div className="space-y-2">
+      {data?.map((l) => (
+        <div key={l.id} className={`${card} flex flex-wrap items-center gap-3`}>
+          <span className="text-2xl">{s[l.activity]?.emoji}</span>
+          <div className="flex-1 min-w-48">
+            <b>{names[l.user_id]?.full_name}</b> · {s[l.activity]?.label}
+            <div className="text-xs text-muted-foreground">الأسبوع {l.week} · {MONTHS[l.month - 1]} {l.year} · سُجّل {cairoDate(l.created_at)}</div>
+            {l.verse && <div className="mt-1 text-sm">«{l.verse}»</div>}
+            {l.admin_note && <div className="text-xs text-primary">ملاحظة: {l.admin_note}</div>}
+          </div>
+          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${l.status === "approved" ? "bg-accent text-accent-foreground" : "bg-destructive text-destructive-foreground"}`}>{l.status === "approved" ? `${l.points} نقطة` : "مرفوض"}</span>
+          <button onClick={() => { setReview({ id: l.id, points: l.points, status: l.status }); setReason(""); }} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold">مراجعة</button>
+        </div>
+      ))}
+      <Dialog open={!!review} onOpenChange={(o) => !o && setReview(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>مراجعة الإنجاز</DialogTitle></DialogHeader>
+          {review && (
+            <>
+              <div className="flex gap-2">
+                {(["approved", "rejected"] as const).map((st) => (
+                  <button key={st} onClick={() => setReview({ ...review, status: st })} className={`flex-1 rounded-xl py-2 font-bold ${review.status === st ? (st === "approved" ? "bg-accent text-accent-foreground" : "bg-destructive text-destructive-foreground") : "bg-muted"}`}>{st === "approved" ? "مقبول" : "مرفوض"}</button>
+                ))}
+              </div>
+              <label className="text-sm">النقاط</label>
+              <Input type="number" min={0} value={review.points} onChange={(e) => setReview({ ...review, points: Math.max(0, parseInt(e.target.value) || 0) })} />
+              <label className="text-sm">سبب التغيير (مطلوب)</label>
+              <Input value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} />
+              <button disabled={!reason.trim() || save.isPending} onClick={() => save.mutate()} className="rounded-2xl bg-primary py-3 font-extrabold text-primary-foreground disabled:opacity-50">حفظ</button>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/* ---------- Redemptions ---------- */
+function Redemptions() {
+  const qc = useQueryClient();
+  const { data: members } = useMembers();
+  const names = nameMap(members);
+  const [filter, setFilter] = useState("pending");
+  const { data } = useQuery({
+    queryKey: ["admin-red"],
+    queryFn: async () => (await supabase.from("redemptions").select("*, gifts(name, emoji)").order("created_at", { ascending: false })).data ?? [],
+  });
+  const set = async (id: string, status: string) => {
+    const note = status === "rejected" ? prompt("سبب الرفض؟") ?? "" : null;
+    const { error } = await supabase.rpc("admin_set_redemption", { _id: id, _status: status, _note: note as string });
+    if (error) return toast.error(error.message);
+    toast.success(`تم التحديث: ${REDEEM_STATUS[status].label}`); qc.invalidateQueries();
+  };
+  const list = data?.filter((r) => filter === "all" || r.status === filter) ?? [];
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap gap-2">
+        {[["pending", "قيد المراجعة"], ["approved", "مقبول"], ["delivered", "تم التسليم"], ["rejected", "مرفوض"], ["all", "الكل"]].map(([k, l]) => (
+          <button key={k} onClick={() => setFilter(k)} className={`rounded-xl px-3 py-1.5 text-sm font-bold ${filter === k ? "bg-secondary text-secondary-foreground" : "bg-card"}`}>
+            {l} ({k === "all" ? data?.length ?? 0 : data?.filter((r) => r.status === k).length ?? 0})
+          </button>
+        ))}
+      </div>
+      {!list.length && <p className="text-muted-foreground">لا توجد طلبات.</p>}
+      <div className="space-y-2">
+        {list.map((r) => (
+          <div key={r.id} className={`${card} flex flex-wrap items-center gap-3`}>
+            <span className="text-3xl">{r.gifts?.emoji}</span>
+            <div className="flex-1"><b>{names[r.user_id]?.full_name}</b> طلب <b>{r.gifts?.name}</b>
+              <div className="text-xs text-muted-foreground">{r.cost} نقطة · {cairoDate(r.created_at)}{r.admin_note ? ` · ${r.admin_note}` : ""}</div></div>
+            <span className={`rounded-full px-3 py-1 text-xs font-bold ${REDEEM_STATUS[r.status]?.cls}`}>{REDEEM_STATUS[r.status]?.label}</span>
+            {r.status === "pending" && <button onClick={() => set(r.id, "approved")} className="rounded-xl bg-sky px-3 py-1.5 text-sm font-bold text-primary-foreground">قبول</button>}
+            {(r.status === "pending" || r.status === "approved") && <button onClick={() => set(r.id, "delivered")} className="rounded-xl bg-accent px-3 py-1.5 text-sm font-bold text-accent-foreground">تم التسليم</button>}
+            {r.status !== "rejected" && r.status !== "delivered" && <button onClick={() => set(r.id, "rejected")} className="rounded-xl bg-destructive px-3 py-1.5 text-sm font-bold text-destructive-foreground">رفض</button>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Adjustments log ---------- */
+function AdjLog() {
+  const { data: members } = useMembers();
+  const names = nameMap(members);
+  const [who, setWho] = useState("");
+  const { data } = useQuery({
+    queryKey: ["admin-adj"],
+    queryFn: async () => (await supabase.from("point_adjustments").select("*").order("created_at", { ascending: false }).limit(300)).data ?? [],
+  });
+  const list = data?.filter((a) => !who || a.user_id === who) ?? [];
+  return (
+    <div>
+      <select value={who} onChange={(e) => setWho(e.target.value)} className="mb-3 h-9 rounded-md border border-input bg-card px-2 text-sm">
+        <option value="">كل الأعضاء</option>
+        {members?.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+      </select>
+      {!list.length && <p className="text-muted-foreground">لا توجد تعديلات بعد.</p>}
+      <div className="overflow-x-auto rounded-3xl border-2 border-border bg-card">
+        <table className="w-full text-sm">
+          <thead className="bg-muted"><tr><th className="p-2 text-right">التاريخ</th><th className="p-2 text-right">العضو</th><th className="p-2">التغيير</th><th className="p-2 text-right">السبب</th><th className="p-2 text-right">المشرف</th><th className="p-2 text-right">النوع</th></tr></thead>
+          <tbody>
+            {list.map((a) => (
+              <tr key={a.id} className="border-t border-border">
+                <td className="p-2">{cairoDate(a.created_at)}</td>
+                <td className="p-2">{names[a.user_id]?.full_name}</td>
+                <td className={`p-2 text-center font-bold ${a.amount >= 0 ? "text-accent" : "text-destructive"}`}>{a.amount > 0 ? "+" : ""}{a.amount}</td>
+                <td className="p-2">{a.reason}</td>
+                <td className="p-2">{a.admin_id ? names[a.admin_id]?.full_name : ""}</td>
+                <td className="p-2 text-xs text-muted-foreground">{a.log_id ? "مراجعة إنجاز" : "تعديل يدوي"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Gifts ---------- */
+function Gifts() {
+  const qc = useQueryClient();
+  const { data } = useQuery({ queryKey: ["admin-gifts"], queryFn: async () => (await supabase.from("gifts").select("*").order("cost")).data ?? [] });
+  const [f, setF] = useState({ name: "", emoji: "🎁", description: "", cost: 100, stock: 10 });
+  const add = async () => {
+    if (!f.name.trim()) return toast.error("اكتب اسم الهدية");
+    const { error } = await supabase.from("gifts").insert(f);
+    if (error) return toast.error(error.message);
+    setF({ name: "", emoji: "🎁", description: "", cost: 100, stock: 10 }); qc.invalidateQueries();
+  };
+  const upd = async (id: string, patch: Record<string, unknown>) => {
+    const { error } = await supabase.from("gifts").update(patch).eq("id", id);
+    if (error) toast.error(error.message); else qc.invalidateQueries();
+  };
+  return (
+    <div className="space-y-4">
+      <div className={`${card} grid gap-2 md:grid-cols-6`}>
+        <Input value={f.emoji} onChange={(e) => setF({ ...f, emoji: e.target.value })} placeholder="🎁" />
+        <Input className="md:col-span-2" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="اسم الهدية" />
+        <Input type="number" value={f.cost} onChange={(e) => setF({ ...f, cost: +e.target.value })} placeholder="النقاط" />
+        <Input type="number" value={f.stock} onChange={(e) => setF({ ...f, stock: +e.target.value })} placeholder="الكمية" />
+        <button onClick={add} className="rounded-xl bg-primary font-bold text-primary-foreground">+ إضافة</button>
+        <Input className="md:col-span-6" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} placeholder="وصف (اختياري)" />
+      </div>
+      {data?.map((g) => (
+        <div key={g.id} className={`${card} flex flex-wrap items-center gap-3 ${g.active ? "" : "opacity-50"}`}>
+          <span className="text-3xl">{g.emoji}</span>
+          <b className="flex-1">{g.name}</b>
+          <label className="text-xs">النقاط <Input type="number" className="w-24" defaultValue={g.cost} onBlur={(e) => +e.target.value !== g.cost && upd(g.id, { cost: +e.target.value })} /></label>
+          <label className="text-xs">الكمية <Input type="number" className="w-20" defaultValue={g.stock} onBlur={(e) => +e.target.value !== g.stock && upd(g.id, { stock: +e.target.value })} /></label>
+          <button onClick={() => upd(g.id, { active: !g.active })} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold">{g.active ? "إخفاء" : "إظهار"}</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ---------- Badges & activity points ---------- */
+function BadgesAndPoints() {
+  const qc = useQueryClient();
+  const { data: settings } = useSettings();
+  const { data: badges } = useQuery({ queryKey: ["badges"], queryFn: async () => (await supabase.from("badges").select("*").order("threshold")).data ?? [] });
+  const [f, setF] = useState({ name: "", emoji: "🏅", description: "", threshold: 100 });
+  const [na, setNa] = useState({ label: "", emoji: "⭐", points: 10 });
+  const addActivity = async () => {
+    if (!na.label.trim()) return toast.error("اكتب اسم النشاط");
+    const key = "a_" + Date.now().toString(36);
+    const { error } = await supabase.from("activity_settings").insert({ key, label: na.label.trim(), emoji: na.emoji || "⭐", points: na.points, sort: (settings?.length ?? 0) + 1 });
+    if (error) return toast.error(error.message);
+    toast.success("تمت إضافة النشاط"); setNa({ label: "", emoji: "⭐", points: 10 }); qc.invalidateQueries({ queryKey: ["settings"] });
+  };
+  const addBadge = async () => {
+    if (!f.name.trim()) return;
+    const { error } = await supabase.from("badges").insert(f);
+    if (error) return toast.error(error.message);
+    setF({ name: "", emoji: "🏅", description: "", threshold: 100 }); qc.invalidateQueries();
+  };
+  return (
+    <div className="grid gap-5 md:grid-cols-2">
+      <div className={card}>
+        <h3 className="mb-3 font-extrabold">نقاط كل نشاط</h3>
+        {settings?.map((s) => (
+          <div key={s.key} className="mb-2 flex items-center gap-2">
+            <span className="flex-1">{s.emoji} {s.label}</span>
+            <Input type="number" className="w-24" defaultValue={s.points} onBlur={async (e) => {
+              const v = +e.target.value; if (v === s.points) return;
+              const { error } = await supabase.from("activity_settings").update({ points: v }).eq("key", s.key);
+              if (error) toast.error(error.message); else { toast.success("تم"); qc.invalidateQueries({ queryKey: ["settings"] }); }
+            }} />
+          </div>
+        ))}
+        <p className="text-xs text-muted-foreground">التغيير يطبق على التسجيلات الجديدة فقط.</p>
+        <h4 className="mt-4 mb-2 font-extrabold">➕ نشاط جديد</h4>
+        <div className="grid grid-cols-6 gap-2">
+          <Input value={na.emoji} onChange={(e) => setNa({ ...na, emoji: e.target.value })} />
+          <Input className="col-span-3" value={na.label} onChange={(e) => setNa({ ...na, label: e.target.value })} placeholder="اسم النشاط" />
+          <Input type="number" value={na.points} onChange={(e) => setNa({ ...na, points: +e.target.value })} title="النقاط" />
+          <button onClick={addActivity} className="rounded-xl bg-primary font-bold text-primary-foreground">إضافة</button>
+        </div>
+      </div>
+      <div className={card}>
+        <h3 className="mb-3 font-extrabold">الأوسمة</h3>
+        <div className="mb-3 grid grid-cols-4 gap-2">
+          <Input value={f.emoji} onChange={(e) => setF({ ...f, emoji: e.target.value })} />
+          <Input className="col-span-2" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="اسم الوسام" />
+          <Input type="number" value={f.threshold} onChange={(e) => setF({ ...f, threshold: +e.target.value })} />
+          <Input className="col-span-3" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} placeholder="وصف" />
+          <button onClick={addBadge} className="rounded-xl bg-primary font-bold text-primary-foreground">+ إضافة</button>
+        </div>
+        {badges?.map((b) => (
+          <div key={b.id} className="flex items-center gap-2 border-t border-border py-2">
+            <span className="text-2xl">{b.emoji}</span><span className="flex-1">{b.name}</span><span className="text-sm">{b.threshold} نقطة</span>
+            <button onClick={async () => { await supabase.from("badges").delete().eq("id", b.id); qc.invalidateQueries(); }} className="text-sm text-destructive">حذف</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Notifications ---------- */
+function Notifications() {
+  const qc = useQueryClient();
+  const [selected, setSelected] = useState<string | null>(null);
+  const [item, setItem] = useState(null);
+  const { data } = useQuery({ queryKey: ["admin-notif"], queryFn: async () => (await supabase.from("notifications").select("*").order("created_at", { ascending: false }).limit(100)).data ?? [] });
+  const { data: preps } = useQuery({ queryKey: ["notif-prep-status"], queryFn: async () => (await supabase.rpc("admin_prep_status", { _offset: 0 })).data ?? [] });
+  const { data: memberAbsence } = useQuery({ queryKey: ["notif-member-absence"], queryFn: async () => (await supabase.rpc("admin_absence_by_type", { _offset: 0, _type: "member" })).data ?? [] });
+  const { data: servantAbsence } = useQuery({ queryKey: ["notif-servant-absence"], queryFn: async () => (await supabase.rpc("admin_absence_by_type", { _offset: 0, _type: "servant" })).data ?? [] });
+  const missingPrep = (preps ?? []).filter((p) => !p.submitted);
+  const categories = [
+    { key: "prep", icon: "📘", label: "تحضير الخدام", rows: (data ?? []).filter((n) => n.kind === "prep") },
+    { key: "visitation", icon: "📞", label: "افتقاد الخدام للمخدومين", rows: (data ?? []).filter((n) => n.kind === "visitation") },
+    { key: "activity", icon: "✅", label: "أنشطة المخدومين", rows: (data ?? []).filter((n) => n.kind === "activity") },
+    { key: "suggestion", icon: "💡", label: "اقتراحات المخدومين", rows: (data ?? []).filter((n) => n.kind === "suggestion") },
+    { key: "signup", icon: "📝", label: "طلبات التسجيل الجديدة", rows: (data ?? []).filter((n) => n.kind === "signup") },
+    { key: "servant_absence", icon: "🚷", label: "غياب الخدام", rows: (servantAbsence ?? []).map((r) => ({ id: `sa-${r.id}`, message: `${r.full_name} غائب هذا الأسبوع`, read: false, created_at: new Date().toISOString(), synthetic: true })) },
+    { key: "member_absence", icon: "🚫", label: "غياب المخدومين", rows: (memberAbsence ?? []).map((r) => ({ id: `ma-${r.id}`, message: `${r.full_name} · ${r.academic_year ?? "بدون مرحلة"}`, read: false, created_at: new Date().toISOString(), synthetic: true })) },
+    { key: "missing_prep", icon: "⏰", label: "لم يرسلوا التحضير", rows: missingPrep.map((r) => ({ id: `mp-${r.user_id}`, message: `${r.full_name} لم يرسل تحضير هذا الأسبوع`, read: false, created_at: new Date().toISOString(), synthetic: true })) },
+  ];
+  const active = categories.find((c) => c.key === selected);
+  const openCategory = async (key: string) => {
+    setSelected(key);
+    if (["prep", "visitation", "activity", "signup", "suggestion"].includes(key)) {
+      await supabase.from("notifications").update({ read: true }).eq("kind", key).eq("read", false);
+      qc.invalidateQueries({ queryKey: ["admin-notif"] });
+      qc.invalidateQueries({ queryKey: ["unread"] });
+    }
+  };
+  return (
+    <div className="space-y-4">
+      <h2 className="text-2xl font-extrabold">التنبيهات حسب النوع</h2>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {categories.map((c) => {
+          const unread = c.rows.filter((r) => !r.read).length;
+          return <button key={c.key} onClick={() => openCategory(c.key)} className="pop relative min-h-32 rounded-2xl border-2 border-border bg-card p-4 text-center transition hover:border-primary hover:bg-muted">
+            <span className="block text-4xl" aria-hidden="true">{c.icon}</span>
+            <span className="mt-2 block text-sm font-extrabold">{c.label}</span>
+            <span className="mt-1 block text-xs text-muted-foreground">{c.rows.length} تنبيه</span>
+            {!!unread && <Dot n={unread} />}
+          </button>;
+        })}
+      </div>
+      <Dialog open={!!active} onOpenChange={(o) => !o && setSelected(null)}><DialogContent>
+        <DialogHeader><DialogTitle>{active?.icon} {active?.label}</DialogTitle></DialogHeader>
+        <div className="max-h-[65vh] space-y-2 overflow-y-auto">
+          {!active?.rows.length && <p className="text-muted-foreground">لا توجد تنبيهات في هذا القسم.</p>}
+          {active?.rows.map((n) => <div key={n.id} role="button" onClick={() => setItem(n)} className="cursor-pointer rounded-xl bg-muted p-3 text-sm hover:ring-2 hover:ring-primary"><div className="font-bold">{n.message}</div>{!n.synthetic && <div className="mt-1 text-[11px] text-muted-foreground">{new Date(n.created_at).toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })}</div>}</div>)}
+        </div>
+      </DialogContent></Dialog>
+      {item?.kind === "suggestion" && item.ref_id ? <SuggestionDetail id={item.ref_id} onClose={() => setItem(null)} /> : item?.kind === "prep" && item.ref_id ? <PrepDetail id={item.ref_id} onClose={() => setItem(null)} /> : (
+        <Dialog open={!!item} onOpenChange={(o) => !o && setItem(null)}><DialogContent>
+          <DialogHeader><DialogTitle>{active?.icon} تفاصيل التنبيه</DialogTitle></DialogHeader>
+          <p className="whitespace-pre-wrap leading-7">{item?.message}</p>
+          {item && !item.synthetic && <div className="text-xs text-muted-foreground">{new Date(item.created_at).toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })}</div>}
+          {item?.synthetic && <p className="text-xs text-muted-foreground">تنبيه أسبوعي محسوب من بيانات هذا الأسبوع — التفاصيل الكاملة في تبويب «الحضور والغياب الأسبوعي» أو «الخدام والافتقاد».</p>}
+        </DialogContent></Dialog>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Archive + comparison chart ---------- */
+function Archive() {
+  const WEEKS = 8;
+  const [open, setOpen] = useState<number | null>(null);
+  const { data: members } = useMembers();
+  const names = nameMap(members);
+  const weeks = Array.from({ length: WEEKS }, (_, i) => cairoWeek(i + 1));
+  const { data: logs } = useQuery({
+    queryKey: ["admin-archive"],
+    queryFn: async () => {
+      const from = new Date(new Date(weeks[WEEKS - 1][0]).getTime() - 86400000).toISOString();
+      const { data, error } = await supabase.from("activity_logs").select("user_id, points, created_at").eq("status", "approved").gte("created_at", from);
+      if (error) throw error;
+      return data;
+    },
+  });
+  const perWeek = weeks.map((days, i) => {
+    const wl = (logs ?? []).filter((l) => days.includes(cairoDate(l.created_at)));
+    const byUser: Record<string, number> = {};
+    wl.forEach((l) => { byUser[l.user_id] = (byUser[l.user_id] ?? 0) + l.points; });
+    const groups: Record<string, number> = {};
+    Object.entries(byUser).forEach(([u, pts]) => { const g = names[u]?.academic_year ?? "غير محدد"; groups[g] = (groups[g] ?? 0) + pts; });
+    const sorted = Object.entries(byUser).sort((a, b) => b[1] - a[1]);
+    const top = sorted.slice(0, 3).map(([u, pts]) => ({ u, pts, rank: sorted.findIndex((r) => r[1] === pts) + 1 }));
+    return { offset: i + 1, days, total: wl.length, points: wl.reduce((a, l) => a + l.points, 0), groups, top };
+  });
+  const groupNames = Array.from(new Set(perWeek.flatMap((w) => Object.keys(w.groups))));
+  const chronological = [...perWeek].reverse();
+  const colors = ["var(--primary)", "var(--secondary)", "var(--accent)", "var(--sky)", "var(--chart-5)", "var(--muted-foreground)"];
+  const max = Math.max(1, ...chronological.flatMap((w) => groupNames.map((g) => w.groups[g] ?? 0)));
+  const groupRank = (w: (typeof perWeek)[number], g: string) => {
+    const vals = groupNames.map((x) => w.groups[x] ?? 0).sort((a, b) => b - a);
+    return vals.indexOf(w.groups[g] ?? 0) + 1;
+  };
+
+  if (open) return (
+    <div>
+      <button onClick={() => setOpen(null)} className="mb-3 rounded-xl bg-muted px-3 py-1.5 text-sm font-bold">→ رجوع للأرشيف</button>
+      <Summary initialOffset={open} />
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      <div className={card}>
+        <h3 className="mb-1 font-extrabold">مقارنة نقاط المجموعات (العام الدراسي) عبر آخر {WEEKS} أسابيع</h3>
+        <p className="mb-3 text-xs text-muted-foreground">الرقم داخل العمود = ترتيب المجموعة في ذلك الأسبوع</p>
+        {!groupNames.length ? <p className="text-muted-foreground">لا توجد بيانات بعد.</p> : (
+          <>
+            <div className="flex h-56 items-end gap-3 overflow-x-auto border-b border-border pb-1">
+              {chronological.map((w) => (
+                <div key={w.offset} className="flex min-w-20 flex-1 flex-col items-center">
+                  <div className="flex h-48 items-end gap-0.5">
+                    {groupNames.map((g, gi) => {
+                      const v = w.groups[g] ?? 0;
+                      return (
+                        <div key={g} title={`${g}: ${v} نقطة`} className="relative w-3 rounded-t" style={{ height: `${(v / max) * 100}%`, background: colors[gi % colors.length], minHeight: v ? 4 : 0 }}>
+                          {v > 0 && <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-bold">{groupRank(w, g)}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-1 text-[10px] text-muted-foreground">{w.days[0].slice(5)}</div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-3 text-xs">
+              {groupNames.map((g, gi) => <span key={g} className="flex items-center gap-1"><span className="h-3 w-3 rounded" style={{ background: colors[gi % colors.length] }} />{g}</span>)}
+            </div>
+          </>
+        )}
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        {perWeek.map((w) => (
+          <button key={w.offset} onClick={() => setOpen(w.offset)} className={`${card} text-right hover:border-primary`}>
+            <div className="flex justify-between"><b>الأحد {w.days[0]} → السبت {w.days[6]}</b><span className="text-xs text-muted-foreground">{w.total} نشاط · {w.points} نقطة</span></div>
+            <div className="mt-2 space-y-1 text-sm">
+              {!w.top.length && <span className="text-muted-foreground">لا توجد أنشطة</span>}
+              {w.top.map((t) => <div key={t.u}>{["🥇", "🥈", "🥉"][t.rank - 1] ?? t.rank} {names[t.u]?.full_name} — {t.pts}</div>)}
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Audit log (owner) ---------- */
+function Audit() {
+  const { data: members } = useMembers();
+  const names = nameMap(members);
+  const [admin, setAdmin] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const { data } = useQuery({
+    queryKey: ["audit"],
+    queryFn: async () => (await supabase.from("contact_access_log").select("*").order("created_at", { ascending: false }).limit(1000)).data ?? [],
+  });
+  const admins = Array.from(new Set((data ?? []).map((a) => a.admin_id)));
+  const list = (data ?? []).filter((a) => (!admin || a.admin_id === admin) && (!from || cairoDate(a.created_at) >= from) && (!to || cairoDate(a.created_at) <= to));
+  const fmt = (d: string) => new Date(d).toLocaleString("ar-EG", { timeZone: "Africa/Cairo" });
+  function exportCsv() {
+    const esc = (v: unknown) => `"${String(v).replace(/"/g, '""')}"`;
+    const rows = [["التاريخ والوقت (القاهرة)", "المشرف", "العضو"], ...list.map((a) => [fmt(a.created_at), names[a.admin_id]?.full_name ?? a.admin_id, names[a.member_id]?.full_name ?? a.member_id])];
+    const blob = new Blob(["\uFEFF" + rows.map((r) => r.map(esc).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
+    const el = document.createElement("a"); el.href = URL.createObjectURL(blob); el.download = `contact-audit-${cairoDate(new Date())}.csv`; el.click();
+  }
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap items-end gap-2">
+        <label className="text-xs">المشرف
+          <select value={admin} onChange={(e) => setAdmin(e.target.value)} className="block h-9 rounded-md border border-input bg-card px-2 text-sm">
+            <option value="">الكل</option>
+            {admins.map((id) => <option key={id} value={id}>{names[id]?.full_name ?? id}</option>)}
+          </select></label>
+        <label className="text-xs">من <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+        <label className="text-xs">إلى <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+        <button onClick={exportCsv} className="h-9 rounded-xl bg-accent px-4 font-bold text-accent-foreground">⬇️ تصدير CSV</button>
+      </div>
+      {!list.length && <p className="text-muted-foreground">لا توجد سجلات.</p>}
+      <div className="overflow-x-auto rounded-3xl border-2 border-border bg-card">
+        <table className="w-full text-sm">
+          <thead className="bg-muted"><tr><th className="p-2 text-right">التاريخ والوقت</th><th className="p-2 text-right">المشرف</th><th className="p-2 text-right">اطّلع على بيانات</th></tr></thead>
+          <tbody>{list.map((a) => (
+            <tr key={a.id} className="border-t border-border"><td className="p-2">{fmt(a.created_at)}</td><td className="p-2">{names[a.admin_id]?.full_name}</td><td className="p-2">{names[a.member_id]?.full_name}</td></tr>
+          ))}</tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Staff permissions (owner) ---------- */
+function Staff() {
+  const qc = useQueryClient();
+  const [q, setQ] = useState("");
+  const { data } = useQuery({ queryKey: ["staff"], queryFn: async () => { const { data, error } = await supabase.rpc("owner_list_staff"); if (error) throw error; return data; } });
+  const set = async (u: string, isAdmin: boolean, view: boolean) => {
+    const { error } = await supabase.rpc("owner_set_staff", { _user: u, _is_admin: isAdmin, _can_view: view });
+    if (error) return toast.error(error.message);
+    toast.success("تم تحديث الصلاحيات"); qc.invalidateQueries();
+  };
+  return (
+    <div>
+      <p className="mb-3 text-sm text-muted-foreground">أنت المشرف المسؤول. حدّد من يكون مشرفًا، ومن يُسمح له بالاطلاع على بيانات التواصل (كل اطلاع يُسجَّل).</p>
+      <Input placeholder="بحث بالاسم..." value={q} onChange={(e) => setQ(e.target.value)} className="mb-3 max-w-xs" />
+      <div className="space-y-2">
+        {data?.filter((s) => s.full_name.includes(q)).map((s) => (
+          <div key={s.user_id} className={`${card} flex flex-wrap items-center gap-3`}>
+            <span className="text-2xl">{s.avatar}</span>
+            <b className="flex-1">{s.full_name} {s.is_owner && <span className="text-xs text-primary">(المسؤول)</span>}</b>
+            {!s.is_owner && (
+              <>
+                <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={s.is_admin} onChange={(e) => set(s.user_id, e.target.checked, e.target.checked && s.can_view_contacts)} /> مشرف</label>
+                <label className={`flex items-center gap-1 text-sm ${s.is_admin ? "" : "opacity-40"}`}><input type="checkbox" disabled={!s.is_admin} checked={s.can_view_contacts} onChange={(e) => set(s.user_id, true, e.target.checked)} /> الاطلاع على بيانات التواصل</label>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Quizzes ---------- */
+function AdminQuizzes() {
+  const qc = useQueryClient();
+  const blank = () => ({ question: "", options: ["", "", "", ""], correct: null, points: 5, image_url: null });
+  const [opens, setOpens] = useState("");
+  const [closes, setCloses] = useState("");
+  const [qimg, setQimg] = useState<string | null>(null);
+  const pickImg = async (e, cb) => { const f = e.target.files?.[0]; if (!f) return; try { cb(await fileToDataUrl(f, 900, 0.75)); } catch (err) { toast.error(err.message); } e.target.value = ""; };
+  const [title, setTitle] = useState("");
+  const [qs, setQs] = useState([blank()]);
+  const [results, setResults] = useState<{ id: string; title: string } | null>(null);
+  const { data: quizzes } = useQuery({ queryKey: ["admin-quizzes"], queryFn: async () => (await supabase.from("quizzes").select("*").order("created_at", { ascending: false })).data ?? [] });
+  const { data: res } = useQuery({ queryKey: ["quiz-res", results?.id], enabled: !!results, queryFn: async () => (await supabase.rpc("admin_quiz_results", { _quiz: results.id })).data ?? [] });
+  const upd = (i, patch) => setQs(qs.map((q, j) => (j === i ? { ...q, ...patch } : q)));
+  const create = async () => {
+    if (!title.trim()) return toast.error("اكتب عنوان المسابقة");
+    const missing = qs.findIndex((q) => q.correct === null || q.correct === undefined || !q.options[q.correct]?.trim());
+    if (missing >= 0) return toast.error(`حدد الإجابة الصحيحة يدويًا للسؤال ${missing + 1} قبل النشر`);
+    const clean = qs.map((q) => { const opts = q.options.map((o) => o.trim()); const kept = opts.filter(Boolean); return { ...q, options: kept, correct: kept.indexOf(opts[q.correct]) }; });
+    if (opens && closes && new Date(closes) <= new Date(opens)) return toast.error("وقت القفل لازم يكون بعد وقت الفتح");
+    if (clean.some((q) => !q.question.trim() || q.options.length < 2 || q.correct >= q.options.length)) return toast.error("كل سؤال يحتاج نصًا واختيارين على الأقل وإجابة صحيحة");
+    const { data: auth } = await supabase.auth.getUser();
+    const { data: z, error } = await supabase.from("quizzes").insert({ title: title.trim(), created_by: auth.user.id, published: false, image_url: qimg, opens_at: opens ? new Date(opens).toISOString() : null, closes_at: closes ? new Date(closes).toISOString() : null }).select("id").single();
+    if (error) return toast.error(error.message);
+    const { error: e2 } = await supabase.from("quiz_questions").insert(clean.map((q, i) => ({ quiz_id: z.id, question: q.question.trim(), options: q.options, correct: q.correct, points: q.points || 0, sort: i, image_url: q.image_url })));
+    if (e2) { await supabase.from("quizzes").delete().eq("id", z.id); return toast.error(e2.message); }
+    const { error: e3 } = await supabase.from("quizzes").update({ published: true }).eq("id", z.id);
+    if (e3) return toast.error(e3.message);
+    toast.success("تم نشر المسابقة"); setTitle(""); setQs([blank()]); setOpens(""); setCloses(""); setQimg(null); qc.invalidateQueries({ queryKey: ["admin-quizzes"] });
+  };
+  return (
+    <div className="space-y-5">
+      <section className={card}>
+        <h2 className="mb-3 text-xl font-extrabold">مسابقة جديدة</h2>
+        <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="عنوان المسابقة (مثال: مسابقة الأسبوع الأول)" />
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          <label className="text-xs font-bold">⏰ وقت الفتح<Input type="datetime-local" value={opens} onChange={(e) => setOpens(e.target.value)} /></label>
+          <label className="text-xs font-bold">🔒 وقت القفل<Input type="datetime-local" value={closes} onChange={(e) => setCloses(e.target.value)} /></label>
+          <label className="cursor-pointer rounded-xl border-2 border-dashed border-border p-2 text-center text-xs font-bold hover:bg-muted">{qimg ? <img src={qimg} alt="" className="mx-auto h-12 rounded" /> : "📷 صورة المسابقة"}<input type="file" accept="image/*" className="hidden" onChange={(e) => pickImg(e, setQimg)} /></label>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">اترك الوقت فارغًا لتفتح فورًا ولا تُقفل. التصحيح تلقائي بعد كل سؤال والنقاط تُضاف للمجموع، والمخدوم لا يستطيع إعادة الحل.</p>
+        {qs.map((q, i) => (
+          <div key={i} className="mt-3 rounded-2xl bg-muted p-3">
+            <div className="flex gap-2"><Input value={q.question} onChange={(e) => upd(i, { question: e.target.value })} placeholder={`السؤال ${i + 1}`} />
+              <Input type="number" className="w-20" value={q.points} onChange={(e) => upd(i, { points: +e.target.value })} title="الدرجة" />
+              <label className="cursor-pointer rounded-lg bg-card px-2 py-1 text-lg" title="صورة للسؤال">📷<input type="file" accept="image/*" className="hidden" onChange={(e) => pickImg(e, (u) => upd(i, { image_url: u }))} /></label>
+              {qs.length > 1 && <button onClick={() => setQs(qs.filter((_, j) => j !== i))} className="text-destructive">✕</button>}</div>
+            {q.image_url && <div className="mt-2 flex items-center gap-2"><img src={q.image_url} alt="" className="h-16 rounded-lg" /><button onClick={() => upd(i, { image_url: null })} className="text-xs text-destructive">إزالة</button></div>}
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">{q.options.map((o, k) => (
+              <label key={k} className="flex items-center gap-2"><input type="radio" checked={q.correct === k} onChange={() => upd(i, { correct: k })} title="الإجابة الصحيحة" />
+                <Input value={o} onChange={(e) => upd(i, { options: q.options.map((x, m) => (m === k ? e.target.value : x)) })} placeholder={`اختيار ${k + 1}`} /></label>
+            ))}</div>
+            <p className={`mt-1 text-xs font-bold ${q.correct === null ? "text-destructive" : "text-accent"}`}>{q.correct === null ? "⚠️ لم تحدد الإجابة الصحيحة بعد — اضغط الدائرة بجوارها" : `✓ الإجابة الصحيحة: اختيار ${q.correct + 1}`}</p>
+          </div>
+        ))}
+        <div className="mt-3 flex gap-2"><button onClick={() => setQs([...qs, blank()])} className="rounded-xl bg-muted px-4 py-2 font-bold">+ سؤال</button>
+          <button onClick={create} disabled={qs.some((q) => q.correct === null)} className="rounded-xl bg-primary px-5 py-2 font-extrabold text-primary-foreground disabled:opacity-50">نشر المسابقة</button></div>
+      </section>
+      <QuizLeague />
+      <section className="space-y-2">{quizzes?.map((z) => (
+        <div key={z.id} className={`${card} flex flex-wrap items-center justify-between gap-2`}>
+          <span className="font-extrabold">🧠 {z.title} <span className="text-xs text-muted-foreground">{new Date(z.created_at).toLocaleDateString("ar-EG")}{z.opens_at && ` · يفتح ${new Date(z.opens_at).toLocaleString("ar-EG")}`}{z.closes_at && ` · يقفل ${new Date(z.closes_at).toLocaleString("ar-EG")}`}</span></span>
+          <div className="flex gap-2"><button onClick={() => setResults({ id: z.id, title: z.title })} className="rounded-xl bg-secondary px-3 py-1.5 text-sm font-bold text-secondary-foreground">النتائج</button>
+            <button onClick={async () => { const { error } = await supabase.from("quizzes").update({ published: !z.published }).eq("id", z.id); if (error) return toast.error(error.message); qc.invalidateQueries({ queryKey: ["admin-quizzes"] }); }} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold">{z.published ? "إخفاء" : "إظهار"}</button>
+            <button onClick={async () => { if (!confirm(`حذف مسابقة «${z.title}» نهائيًا؟`)) return; const { error } = await supabase.from("quizzes").delete().eq("id", z.id); if (error) return toast.error("لا يمكن حذف مسابقة شارك فيها مخدومون — استخدم إخفاء"); qc.invalidateQueries({ queryKey: ["admin-quizzes"] }); }} className="rounded-xl bg-destructive px-3 py-1.5 text-sm font-bold text-destructive-foreground">🗑️</button></div>
+        </div>
+      ))}</section>
+      <Dialog open={!!results} onOpenChange={(o) => !o && setResults(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>نتائج: {results?.title}</DialogTitle></DialogHeader>
+          <div className="max-h-96 space-y-1 overflow-y-auto">
+            {!res?.length && <p className="text-muted-foreground">لم يشارك أحد بعد.</p>}
+            {res?.map((r, i) => <div key={i} className="flex justify-between rounded-xl bg-muted p-2 text-sm"><span className="font-bold">{i + 1}. {r.full_name}</span><span>{r.score} / {r.max_score}</span></div>)}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function WeekPicker({ off, setOff }: { off: number; setOff: (n: number) => void }) {
+  return <div className="flex gap-2">{[["0", "هذا الأسبوع"], ["1", "الأسبوع الماضي"], ["2", "منذ أسبوعين"]].map(([k, l]) => (
+    <button key={k} onClick={() => setOff(+k)} className={`rounded-xl px-3 py-1.5 text-sm font-bold ${off === +k ? "bg-secondary text-secondary-foreground" : "bg-card"}`}>{l}</button>))}</div>;
+}
+
+function ServantsTab() {
+  const [off, setOff] = useState(0);
+  const [view, setView] = useState<string[] | null>(null);
+  const [prep, setPrep] = useState(null);
+  const [arch, setArch] = useState(null);
+  const { data: preps } = useQuery({ queryKey: ["admin-prep", off], queryFn: async () => { const { data, error } = await supabase.rpc("admin_prep_status", { _offset: off }); if (error) throw error; return data; } });
+  const { data: visits } = useQuery({ queryKey: ["admin-visits", off], queryFn: async () => (await supabase.rpc("admin_visit_report", { _offset: off })).data ?? [] });
+  const missing = preps?.filter((p) => !p.submitted) ?? [];
+  const csv = () => {
+    const rows = [["الخادم", "المخدوم", "المرحلة", "الطريقة", "الملاحظات", "التاريخ"], ...(visits ?? []).map((v) => [v.servant, v.member, v.academic_year ?? "", v.method, v.note, new Date(v.created_at).toLocaleString("ar-EG")])];
+    const blob = new Blob(["\ufeff" + rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n")], { type: "text/csv" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `visits-week-${off}.csv`; a.click();
+  };
+  return (
+    <div className="space-y-5">
+      <ServantsManager />
+      <WeekPicker off={off} setOff={setOff} />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <button onClick={() => document.getElementById("servant-preps")?.scrollIntoView({ behavior: "smooth" })} className="pop rounded-3xl bg-accent p-4 text-right text-accent-foreground"><div className="text-sm font-bold">أرسلوا التحضير</div><div className="font-display text-4xl font-extrabold">{(preps?.length ?? 0) - missing.length}</div></button>
+        <button onClick={() => document.getElementById("servant-preps")?.scrollIntoView({ behavior: "smooth" })} className="pop rounded-3xl bg-destructive p-4 text-right text-destructive-foreground"><div className="text-sm font-bold">لم يرسلوا (الموعد الخميس)</div><div className="font-display text-4xl font-extrabold">{missing.length}</div></button>
+        <button onClick={() => document.getElementById("visit-report")?.scrollIntoView({ behavior: "smooth" })} className="pop rounded-3xl bg-sky p-4 text-right text-primary-foreground"><div className="text-sm font-bold">مرات الافتقاد</div><div className="font-display text-4xl font-extrabold">{visits?.length ?? 0}</div></button>
+      </div>
+      {!preps?.length && <p className="text-muted-foreground">لا يوجد خدام معتمدون بعد. الخادم يسجّل من صفحة الدخول «خادم» ثم توافق عليه من «طلبات التسجيل».</p>}
+      <div id="servant-preps" className="grid scroll-mt-4 gap-3 md:grid-cols-2">{preps?.map((p) => (
+        <div key={p.user_id} role="button" tabIndex={0} onClick={() => p.submitted && setPrep(p)} className={`${card} cursor-pointer text-right ${p.submitted ? "hover:border-primary" : "ring-2 ring-destructive"}`}>
+          <div className="flex items-center justify-between"><button onClick={() => setArch({ id: p.user_id, name: p.full_name })} className="font-bold text-primary hover:underline" title="أرشيف التحضيرات">📘 {p.full_name}</button>
+            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${p.submitted ? "bg-accent text-accent-foreground" : "bg-destructive text-destructive-foreground"}`}>{p.submitted ? "✓ أرسل التحضير" : "✗ لم يرسل"}</span></div>
+          <div className="mt-1 text-xs text-muted-foreground">افتقد {p.visits} مخدوم{p.submitted_at && ` · ${new Date(p.submitted_at).toLocaleString("ar-EG")}`}</div>
+          {p.notes && <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm">{p.notes}</p>}
+          {!!p.images?.length && <div className="mt-2 flex flex-wrap gap-2">{p.images.map((s, i) => <img key={i} src={s} alt="" className="h-16 w-16 rounded-lg object-cover" />)}</div>}
+        </div>
+      ))}</div>
+      <section id="visit-report" className={`${card} scroll-mt-4`}>
+        <div className="mb-2 flex items-center justify-between"><h2 className="text-xl font-extrabold">📞 تقرير الافتقاد الأسبوعي</h2><button onClick={csv} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold">⬇️ CSV</button></div>
+        {!visits?.length && <p className="text-muted-foreground">لا يوجد افتقاد مسجّل في هذا الأسبوع.</p>}
+        <div className="space-y-1">{visits?.map((v, i) => (
+          <button key={i} onClick={() => setArch({ visit: v })} className="w-full rounded-xl bg-muted p-2 text-right text-sm hover:ring-2 hover:ring-primary"><b>{v.member}</b> <span className="text-xs text-muted-foreground">({v.academic_year ?? "—"})</span> ← {v.servant} · {{ call: "📞", visit: "🏠", message: "💬" }[v.method] ?? v.method}{v.note && <div className="text-xs">{v.note}</div>}</button>
+        ))}</div>
+      </section>
+      <Dialog open={!!arch} onOpenChange={(o) => !o && setArch(null)}><DialogContent className="max-w-2xl"><div className="max-h-[75vh] overflow-y-auto">{arch?.visit ? <><DialogHeader><DialogTitle>تفاصيل الافتقاد</DialogTitle></DialogHeader><p className="font-bold">{arch.visit.member} ← {arch.visit.servant}</p><p>{arch.visit.note || "بدون ملاحظات"}</p><div className="text-xs text-muted-foreground">{new Date(arch.visit.created_at).toLocaleString("ar-EG")}</div></> : arch && <PrepArchive userId={arch.id} name={arch.name} />}</div></DialogContent></Dialog>
+      <Dialog open={!!prep} onOpenChange={(o) => !o && setPrep(null)}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>📘 تحضير {prep?.full_name}</DialogTitle></DialogHeader><div className="max-h-[65vh] overflow-y-auto"><p className="whitespace-pre-wrap leading-7">{prep?.notes || "بدون نص"}</p>{!!prep?.images?.length && <button onClick={() => setView(prep.images)} className="mt-3 rounded-xl bg-primary px-4 py-2 font-bold text-primary-foreground">فتح الصور ({prep.images.length})</button>}</div></DialogContent></Dialog>
+      <p className="text-xs text-muted-foreground">اضغط اسم الخادم لعرض أرشيف تحضيراته كاملًا.</p>
+      <ImageLightbox images={view} title="صور التحضير" onClose={() => setView(null)} />
+    </div>
+  );
+}
+
+// دالة لتوليد التسلسل التاريخي لأيام الجمعة فقط
+function getFridayList() {
+  const fridays = [];
+  let d = new Date();
+  const day = d.getDay();
+  const diff = (day >= 5 ? day - 5 : day + 2);
+  d.setDate(d.getDate() - diff);
+
+  for (let i = -4; i < 12; i++) {
+    const tempDate = new Date(d);
+    tempDate.setDate(d.getDate() - (i * 7));
+    const dateStr = tempDate.toISOString().split("T")[0];
+    fridays.push(dateStr);
+  }
+  fridays.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+  return fridays;
+}
+
+function AbsenceTab() {
+  const qc = useQueryClient();
+  const fridaysList = useMemo(() => getFridayList(), []);
+  const [date, setDate] = useState(fridaysList[0] || new Date().toISOString().split("T")[0]);
+  const [accountType, setAccountType] = useState<"student" | "servant">("student");
+  const [selectedYear, setSelectedYear] = useState("all");
+  const [statsDialogType, setStatsDialogType] = useState<"present" | "absent" | "total" | null>(null);
+
+  const filterYear = selectedYear === "all" ? null : selectedYear;
+
+  const { data: profilesData, isLoading } = useQuery({
+    queryKey: ["admin-attendance-complete", accountType, date],
+    queryFn: async () => {
+      const { data: profiles, error: profErr } = await supabase.from("profiles").select("*");
+      if (profErr) throw profErr;
+
+      const { data: attendanceRecords } = await supabase
+        .from("daily_attendance")
+        .select("*")
+        .eq("attendance_date", date);
+
+      const { data: allAttendanceRecords } = await supabase
+        .from("daily_attendance")
+        .select("person_id, status");
+
+      const countsMap: Record<string, { present: number, absent: number }> = {};
+      (allAttendanceRecords || []).forEach((rec: any) => {
+        if (!countsMap[rec.person_id]) {
+          countsMap[rec.person_id] = { present: 0, absent: 0 };
+        }
+        if (rec.status === 'present') countsMap[rec.person_id].present++;
+        if (rec.status === 'absent') countsMap[rec.person_id].absent++;
+      });
+
+      const allProfiles = profiles || [];
+      
+      const filtered = allProfiles.filter((m: any) => {
+        const type = (m.account_type || "").toLowerCase();
+        const hasYear = Boolean(m.academic_year && m.academic_year.trim() !== "");
+
+        if (accountType === "servant") {
+          return type.includes("servant") || type.includes("admin") || !hasYear;
+        } else {
+          return hasYear || type.includes("student") || type.includes("member") || type === "";
+        }
+      });
+
+      const listToUse = filtered.length > 0 ? filtered : allProfiles;
+
+      return listToUse.map((m: any) => {
+        const personId = m.id || m.user_id;
+        const att = (attendanceRecords || []).find((a: any) => a.person_id === personId);
+        const personCounts = countsMap[personId] || { present: 0, absent: 0 };
+
+        return {
+          person_id: personId,
+          full_name: m.full_name || m.name || m.username || "بدون اسم",
+          avatar: m.avatar || "👤",
+          photo_url: m.photo_url,
+          academic_year: m.academic_year || m.grade || "مرحلة عامة",
+          attendance_status: att ? att.status : null,
+          present_count: personCounts.present,
+          absent_count: personCounts.absent,
+          auth_user_id: m.auth_user_id,
+          email: m.email,
+          registered_externally: m.registered_externally
+        };
+      });
+    },
+  });
+
+  const people = profilesData || [];
+  const filteredPeople = filterYear ? people.filter((p: any) => p.academic_year === filterYear) : people;
+
+  const handleStatusChange = async (personId: string, status: "present" | "absent") => {
+    const { error } = await supabase.from("daily_attendance").upsert({
+      person_id: personId,
+      attendance_date: date,
+      status: status
+    }, { onConflict: "person_id,attendance_date" });
+
+    if (error) return toast.error(error.message);
+
+    if (status === "absent") {
+      const { data: pastRecords } = await supabase
+        .from("daily_attendance")
+        .select("status, attendance_date")
+        .eq("person_id", personId)
+        .neq("attendance_date", date)
+        .order("attendance_date", { ascending: false })
+        .limit(1);
+
+      if (pastRecords && pastRecords.length > 0 && pastRecords[0].status === "absent") {
+        toast.warning("⚠️ تنبيه: غاب مرتين متتاليتين وتم إخطار المشرف!");
+        await supabase.from("suggestions_and_notes").insert({
+          content: `⚠️ تنبيه غياب متكرر: المخدوم / الخادم غاب مرتين متتاليتين في خدمة الجمعة تاريخ ${date}`,
+          target_type: "all_servants",
+          status: "pending"
+        }).catch(() => {});
+      }
+    }
+
+    toast.success("تم تحديث حالة الحضور وزيادة العداد بنجاح ✅");
+    qc.invalidateQueries({ queryKey: ["admin-attendance-complete"] });
+  };
+
+  const presentCount = filteredPeople.filter((p: any) => p.attendance_status === "present").length;
+  const absentCount = filteredPeople.filter((p: any) => p.attendance_status === "absent").length;
+  const totalCount = filteredPeople.length;
+  const percentage = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div onClick={() => setStatsDialogType("total")} className="rounded-2xl border-2 border-border bg-card p-3 text-center cursor-pointer hover:bg-muted/50 transition">
+          <div className="text-xs text-muted-foreground">إجمالي الأفراد</div>
+          <div className="mt-1 text-2xl font-black">{totalCount}</div>
+        </div>
+        <div onClick={() => setStatsDialogType("present")} className="rounded-2xl border-2 border-border bg-card p-3 text-center cursor-pointer hover:bg-emerald-500/10 transition">
+          <div className="text-xs text-muted-foreground">الحاضرون في الجمعة</div>
+          <div className="mt-1 text-2xl font-black text-emerald-500">{presentCount}</div>
+        </div>
+        <div onClick={() => setStatsDialogType("absent")} className="rounded-2xl border-2 border-border bg-card p-3 text-center cursor-pointer hover:bg-destructive/10 transition">
+          <div className="text-xs text-muted-foreground">الغائبون في الجمعة</div>
+          <div className="mt-1 text-2xl font-black text-destructive">{absentCount}</div>
+        </div>
+        <div className="rounded-2xl border-2 border-border bg-card p-3 text-center">
+          <div className="text-xs text-muted-foreground">نسبة الحضور</div>
+          <div className="mt-1 text-2xl font-black text-sky">{percentage}%</div>
+        </div>
+      </div>
+
+      <div className={`${card} flex flex-wrap items-center justify-between gap-3`}>
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-extrabold">📅 تاريخ خدمة الجمعة:</label>
+          <select 
+            value={date} 
+            onChange={(e) => setDate(e.target.value)} 
+            className="rounded-xl border-2 border-border bg-background px-3 py-1.5 font-bold text-sm"
+          >
+            {fridaysList.map((f) => (
+              <option key={f} value={f}>
+                جمعة {f}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => setAccountType("student")} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${accountType === "student" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>📁 فولدر المخدومين</button>
+          <button onClick={() => setAccountType("servant")} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${accountType === "servant" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>📁 فولدر الخدام</button>
+        </div>
+        <div className="flex items-center gap-2">
+          <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="rounded-xl border-2 border-border bg-background px-3 py-1.5 text-xs font-bold">
+            <option value="all">كل المراحل</option>
+            {ACADEMIC_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {isLoading ? (
+          <p className="text-center text-muted-foreground py-8">جاري التحميل...</p>
+        ) : !filteredPeople.length ? (
+          <p className="text-center text-muted-foreground py-8">لا توجد بيانات مسجلة للأفراد في هذا القسم.</p>
+        ) : (
+          <div className="grid gap-2.5 md:grid-cols-2">
+            {filteredPeople.map((item: any) => {
+              const presentCountVal = item.present_count || 0; 
+              const absentCountVal = item.absent_count || 0;
+
+              return (
+                <div key={item.person_id} className="flex items-center justify-between rounded-2xl border-2 border-border bg-card p-3.5">
+                  <div className="flex items-center gap-3">
+                    {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-sm">{item.full_name}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">{item.academic_year || (accountType === "servant" ? "خادم" : "بدون مرحلة")}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => handleStatusChange(item.person_id, "present")} 
+                      className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                        item.attendance_status === "present" 
+                          ? "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400" 
+                          : "bg-muted text-muted-foreground hover:bg-emerald-100 hover:text-emerald-800"
+                      }`}
+                    >
+                      <span>✓ حاضر</span>
+                      <span className="rounded-full bg-black/25 px-2 py-0.5 text-[11px] font-mono text-white">
+                        {presentCountVal}
+                      </span>
+                    </button>
+
+                    <button 
+                      onClick={() => handleStatusChange(item.person_id, "absent")} 
+                      className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                        item.attendance_status === "absent" 
+                          ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-red-400" 
+                          : "bg-muted text-muted-foreground hover:bg-red-100 hover:text-red-800"
+                      }`}
+                    >
+                      <span>✕ غائب</span>
+                      <span className="rounded-full bg-black/25 px-2 py-0.5 text-[11px] font-mono text-white">
+                        {absentCountVal}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {statsDialogType && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-3xl border-2 border-border bg-card p-6 shadow-2xl max-h-[85vh] flex flex-col pop">
+            <div className="flex items-center justify-between pb-4 border-b border-border">
+              <h3 className="text-lg font-extrabold">
+                {statsDialogType === "present" && `✅ قائمة الحاضرين (${presentCount})`}
+                {statsDialogType === "absent" && `⚠️ قائمة الغائبين (${absentCount})`}
+                {statsDialogType === "total" && `👥 إجمالي الأفراد (${totalCount})`}
+                <span className="block text-xs font-normal text-muted-foreground mt-0.5">
+                  ({accountType === "student" ? "المخدومين - الأولاد" : "الخدام"})
+                </span>
+              </h3>
+              <button onClick={() => setStatsDialogType(null)} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold hover:bg-destructive hover:text-white transition">✕ إغلاق</button>
+            </div>
+            <div className="mt-4 flex-1 overflow-y-auto space-y-2.5 pr-1">
+              {(() => {
+                const list = 
+                  statsDialogType === "present" ? filteredPeople.filter((p: any) => p.attendance_status === "present") :
+                  statsDialogType === "absent" ? filteredPeople.filter((p: any) => p.attendance_status === "absent") :
+                  filteredPeople;
+                if (list.length === 0) return <p className="text-center text-muted-foreground py-12">لا توجد بيانات مطابقة.</p>;
+                return list.map((item: any) => (
+                  <div key={item.person_id} className="flex items-center justify-between rounded-2xl border border-border bg-background p-3.5 shadow-sm">
+                    <div className="flex items-center gap-3">
+                      {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
+                      <div>
+                        <div className="font-extrabold text-sm">{item.full_name}</div>
+                        <div className="text-xs text-muted-foreground">{item.academic_year || (accountType === "servant" ? "خادم" : "بدون مرحلة")}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs font-bold">
+                      <span className="rounded-xl bg-emerald-500/10 px-2.5 py-1 text-emerald-600 border border-emerald-500/20">حضر: {item.present_count || 0}</span>
+                      <span className="rounded-xl bg-destructive/10 px-2.5 py-1 text-destructive border border-destructive/20">غاب: {item.absent_count || 0}</span>
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
