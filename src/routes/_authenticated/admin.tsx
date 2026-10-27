@@ -1,4 +1,4 @@
-// @ts-nocheck -- strict index/optional checks relaxed for this screen; runtime guarded
+// @ts-nocheck
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -175,4 +175,59 @@ function Announcements() {
           <label className="text-sm font-bold">تاريخ النشاط أو الرحلة (اختياري)<Input className="mt-1" type="date" value={form.event_date} onChange={(e) => setForm({ ...form, event_date: e.target.value })} /></label>
           <label className="text-sm font-bold md:col-span-2">التفاصيل<textarea className="mt-1 min-h-28 w-full rounded-xl border border-input bg-transparent px-3 py-2 text-sm" maxLength={1500} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="اكتب المكان والموعد وأي تفاصيل مهمة" /></label>
           <div className="md:col-span-2 flex flex-wrap items-center gap-3">
-            <label className="cursor-pointer rounded-xl border-2 border-dashed border-border px-4 py-2 text-sm font-bold
+            <label className="cursor-pointer rounded-xl border-2 border-dashed border-border px-4 py-2 text-sm font-bold hover:bg-muted">📷 {form.image_url ? "تغيير الصورة" : "إضافة صورة"}
+              <input type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; try { setForm({ ...form, image_url: await fileToDataUrl(f, 1000, 0.75) }); } catch (err) { toast.error((err as Error).message); } }} /></label>
+            {form.image_url && <><img src={form.image_url} alt="" className="h-16 rounded-xl object-cover" /><button onClick={() => setForm({ ...form, image_url: "" })} className="text-sm text-destructive">إزالة</button></>}
+          </div>
+          <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={form.published} onChange={(e) => setForm({ ...form, published: e.target.checked })} /> ظاهر للمخدومين</label>
+          <div className="flex gap-2 md:justify-end"><button onClick={save} className="rounded-xl bg-primary px-5 py-2 font-extrabold text-primary-foreground">{editing ? "حفظ التعديل" : "نشر الإعلان"}</button>{editing && <button onClick={() => { setEditing(null); setForm(empty); }} className="rounded-xl bg-muted px-4 py-2 font-bold">إلغاء</button>}</div>
+        </div>
+      </section>
+      <section>
+        <h2 className="mb-3 text-xl font-extrabold">الإعلانات السابقة</h2>
+        {isLoading && <p className="text-muted-foreground">جاري التحميل...</p>}
+        {!isLoading && !data?.length && <p className="text-muted-foreground">لا توجد إعلانات بعد.</p>}
+        <div className="space-y-3">{data?.map((item) => (
+          <article key={item.id} className={`${card} grid grid-cols-[minmax(0,1fr)_auto] gap-3`}>
+            <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-extrabold">📌 {item.title}</h3><span className={`rounded-full px-2 py-0.5 text-xs font-bold ${item.published ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"}`}>{item.published ? "ظاهر" : "مخفي"}</span>{item.event_date && <span className="text-xs text-muted-foreground">📅 {item.event_date}</span>}</div>{item.image_url && <img src={item.image_url} alt="" className="mt-2 max-h-40 rounded-xl object-cover" />}<p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{item.body}</p></div>
+            <div className="flex shrink-0 flex-col gap-2"><button onClick={() => setSignupsFor({ id: item.id, title: item.title })} className="rounded-xl bg-primary px-3 py-1.5 text-sm font-bold text-primary-foreground">🙋 المسجلون</button><button onClick={() => edit(item)} className="rounded-xl bg-secondary px-3 py-1.5 text-sm font-bold text-secondary-foreground">تعديل</button><button onClick={() => toggle(item.id, !item.published)} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold">{item.published ? "إخفاء" : "إظهار"}</button><button onClick={() => remove(item.id)} className="rounded-xl bg-destructive px-3 py-1.5 text-sm font-bold text-destructive-foreground">حذف</button></div>
+          </article>
+        ))}</div>
+      </section>
+      <Dialog open={!!signupsFor} onOpenChange={(o) => !o && setSignupsFor(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>المسجلون في: {signupsFor?.title} ({signups?.length ?? 0})</DialogTitle></DialogHeader>
+          <div className="max-h-96 space-y-1 overflow-y-auto">
+            {!signups?.length && <p className="text-muted-foreground">لا يوجد مسجلون بعد.</p>}
+            {signups?.map((r, i) => <div key={r.user_id} className="flex justify-between gap-2 rounded-xl bg-muted p-2 text-sm"><span className="font-bold">{i + 1}. {r.full_name}</span><span className="text-muted-foreground">{r.academic_year ?? ""} · {new Date(r.created_at).toLocaleString("ar-EG")}</span></div>)}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/* ---------- Weekly summary ---------- */
+function Summary({ initialOffset = 0 }: { initialOffset?: number }) {
+  const [offset, setOffset] = useState(initialOffset);
+  const [year, setYear] = useState("");
+  const days = cairoWeek(offset);
+  const { data: members } = useMembers();
+  const { data: settings } = useSettings();
+  const { data: allLogs } = useQuery({
+    queryKey: ["admin-week-logs", offset],
+    queryFn: async () => {
+      const from = new Date(new Date(days[0]).getTime() - 86400000).toISOString();
+      const to = new Date(new Date(days[6]).getTime() + 2 * 86400000).toISOString();
+      const { data, error } = await supabase.from("activity_logs").select("*").gte("created_at", from).lt("created_at", to).eq("status", "approved");
+      if (error) throw error;
+      return data.filter((l) => days.includes(cairoDate(l.created_at)));
+    },
+  });
+  const yearOf = nameMap(members);
+  const logs = (allLogs ?? []).filter((l) => !year || yearOf[l.user_id]?.academic_year === year);
+  const byMember = useMemo(() => {
+    const m: Record<string, { points: number; count: number; acts: Record<string, number> }> = {};
+    logs.forEach((l) => {
+      m[l.user_id] ??= { points: 0, count: 0, acts: {} };
+      m[l.user_id].points += l.points; m[l.user_id].count++;
