@@ -359,7 +359,11 @@ function DailyAttendanceSection() {
   const { data: profilesData, isLoading } = useQuery({
     queryKey: ["profiles-attendance-all-fixed", accountType, date],
     queryFn: async () => {
-      const { data: profiles, error: profErr } = await supabase.from("profiles").select("*");
+      const { data: profiles, error: profErr } = await supabase
+  .from("profiles")
+  .select("id, full_name, avatar, photo_url, academic_year, account_type, status")
+  .eq("status", "approved");
+
       if (profErr) throw profErr;
 
       const { data: attendanceRecords } = await supabase
