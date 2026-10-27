@@ -40,7 +40,7 @@ function useMembers() {
 }
 
 const TABS = [
-  ["summary", "📊 الملخص الأسبوعي"], ["announcements", "📣 الإعلانات"], ["requests", "📝 طلبات التسجيل"], ["members", "👥 المخدومون"], ["servants", "📘 الخدام والافتقاد"], ["absence", "🚫 الغياب الأسبوعي"],
+  ["summary", "📊 الملخص الأسبوعي"], ["announcements", "📣 الإعلانات"], ["requests", "📝 طلبات التسجيل"], ["members", "👥 المخدومون"], ["servants", "📘 الخدام والافتقاد"], ["absence", "📋 الحضور والغياب الأسبوعي"],
   ["activities", "✅ الأنشطة"], ["redeem", "🎁 طلبات الهدايا"], ["log", "📒 سجل النقاط"],
   ["archive", "🗂️ الأرشيف والمقارنة"], ["gifts", "🛍️ الهدايا"], ["badges", "🏅 الأوسمة والنقاط"], ["notif", "🔔 مركز التنبيهات"], ["quiz", "🧠 المسابقات"], ["visitarch", "🗂️ أرشيف الافتقاد"], ["read", "📖 القراءات اليومية"],
   ["audit", "🕵️ سجل التدقيق"], ["staff", "🔑 الصلاحيات"],
@@ -748,7 +748,7 @@ function Notifications() {
           <DialogHeader><DialogTitle>{active?.icon} تفاصيل التنبيه</DialogTitle></DialogHeader>
           <p className="whitespace-pre-wrap leading-7">{item?.message}</p>
           {item && !item.synthetic && <div className="text-xs text-muted-foreground">{new Date(item.created_at).toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })}</div>}
-          {item?.synthetic && <p className="text-xs text-muted-foreground">تنبيه أسبوعي محسوب من بيانات هذا الأسبوع — التفاصيل الكاملة في تبويب «الغياب الأسبوعي» أو «الخدام والافتقاد».</p>}
+          {item?.synthetic && <p className="text-xs text-muted-foreground">تنبيه أسبوعي محسوب من بيانات هذا الأسبوع — التفاصيل الكاملة في تبويب «الحضور والغياب الأسبوعي» أو «الخدام والافتقاد».</p>}
         </DialogContent></Dialog>
       )}
     </div>
@@ -785,7 +785,6 @@ function Archive() {
   const chronological = [...perWeek].reverse();
   const colors = ["var(--primary)", "var(--secondary)", "var(--accent)", "var(--sky)", "var(--chart-5)", "var(--muted-foreground)"];
   const max = Math.max(1, ...chronological.flatMap((w) => groupNames.map((g) => w.groups[g] ?? 0)));
-  // group rank per week
   const groupRank = (w: (typeof perWeek)[number], g: string) => {
     const vals = groupNames.map((x) => w.groups[x] ?? 0).sort((a, b) => b - a);
     return vals.indexOf(w.groups[g] ?? 0) + 1;
@@ -942,7 +941,6 @@ function AdminQuizzes() {
     if (opens && closes && new Date(closes) <= new Date(opens)) return toast.error("وقت القفل لازم يكون بعد وقت الفتح");
     if (clean.some((q) => !q.question.trim() || q.options.length < 2 || q.correct >= q.options.length)) return toast.error("كل سؤال يحتاج نصًا واختيارين على الأقل وإجابة صحيحة");
     const { data: auth } = await supabase.auth.getUser();
-    // Create hidden first so members never see (or get notified about) a quiz without questions.
     const { data: z, error } = await supabase.from("quizzes").insert({ title: title.trim(), created_by: auth.user.id, published: false, image_url: qimg, opens_at: opens ? new Date(opens).toISOString() : null, closes_at: closes ? new Date(closes).toISOString() : null }).select("id").single();
     if (error) return toast.error(error.message);
     const { error: e2 } = await supabase.from("quiz_questions").insert(clean.map((q, i) => ({ quiz_id: z.id, question: q.question.trim(), options: q.options, correct: q.correct, points: q.points || 0, sort: i, image_url: q.image_url })));
@@ -1053,35 +1051,283 @@ function ServantsTab() {
   );
 }
 
+// دالة لتوليد التسلسل التاريخي لأيام الجمعة فقط
+function getFridayList() {
+  const fridays = [];
+  let d = new Date();
+  const day = d.getDay();
+  const diff = (day >= 5 ? day - 5 : day + 2);
+  d.setDate(d.getDate() - diff);
+
+  for (let i = -4; i < 12; i++) {
+    const tempDate = new Date(d);
+    tempDate.setDate(d.getDate() - (i * 7));
+    const dateStr = tempDate.toISOString().split("T")[0];
+    fridays.push(dateStr);
+  }
+  fridays.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+  return fridays;
+}
+
 function AbsenceTab() {
-  const [off, setOff] = useState(0);
-  const [type, setType] = useState<"member" | "servant">("member");
-  const [hist, setHist] = useState(null);
-  const { data } = useQuery({ queryKey: ["admin-absence", off, type], queryFn: async () => { const { data, error } = await supabase.rpc("admin_absence_by_type", { _offset: off, _type: type }); if (error) throw error; return data; } });
-  const notify = async (y: string) => {
-    const { data: n, error } = await supabase.rpc("admin_notify_absent", { _year: y });
+  const qc = useQueryClient();
+  const fridaysList = useMemo(() => getFridayList(), []);
+  const [date, setDate] = useState(fridaysList[0] || new Date().toISOString().split("T")[0]);
+  const [accountType, setAccountType] = useState<"student" | "servant">("student");
+  const [selectedYear, setSelectedYear] = useState("all");
+  const [statsDialogType, setStatsDialogType] = useState<"present" | "absent" | "total" | null>(null);
+
+  const filterYear = selectedYear === "all" ? null : selectedYear;
+
+  const { data: profilesData, isLoading } = useQuery({
+    queryKey: ["admin-attendance-complete", accountType, date],
+    queryFn: async () => {
+      const { data: profiles, error: profErr } = await supabase.from("profiles").select("*");
+      if (profErr) throw profErr;
+
+      const { data: attendanceRecords } = await supabase
+        .from("daily_attendance")
+        .select("*")
+        .eq("attendance_date", date);
+
+      const { data: allAttendanceRecords } = await supabase
+        .from("daily_attendance")
+        .select("person_id, status");
+
+      const countsMap: Record<string, { present: number, absent: number }> = {};
+      (allAttendanceRecords || []).forEach((rec: any) => {
+        if (!countsMap[rec.person_id]) {
+          countsMap[rec.person_id] = { present: 0, absent: 0 };
+        }
+        if (rec.status === 'present') countsMap[rec.person_id].present++;
+        if (rec.status === 'absent') countsMap[rec.person_id].absent++;
+      });
+
+      const allProfiles = profiles || [];
+      
+      const filtered = allProfiles.filter((m: any) => {
+        const type = (m.account_type || "").toLowerCase();
+        const hasYear = Boolean(m.academic_year && m.academic_year.trim() !== "");
+
+        if (accountType === "servant") {
+          return type.includes("servant") || type.includes("admin") || !hasYear;
+        } else {
+          return hasYear || type.includes("student") || type.includes("member") || type === "";
+        }
+      });
+
+      const listToUse = filtered.length > 0 ? filtered : allProfiles;
+
+      return listToUse.map((m: any) => {
+        const personId = m.id || m.user_id;
+        const att = (attendanceRecords || []).find((a: any) => a.person_id === personId);
+        const personCounts = countsMap[personId] || { present: 0, absent: 0 };
+
+        return {
+          person_id: personId,
+          full_name: m.full_name || m.name || m.username || "بدون اسم",
+          avatar: m.avatar || "👤",
+          photo_url: m.photo_url,
+          academic_year: m.academic_year || m.grade || "مرحلة عامة",
+          attendance_status: att ? att.status : null,
+          present_count: personCounts.present,
+          absent_count: personCounts.absent,
+          auth_user_id: m.auth_user_id,
+          email: m.email,
+          registered_externally: m.registered_externally
+        };
+      });
+    },
+  });
+
+  const people = profilesData || [];
+  const filteredPeople = filterYear ? people.filter((p: any) => p.academic_year === filterYear) : people;
+
+  const handleStatusChange = async (personId: string, status: "present" | "absent") => {
+    const { error } = await supabase.from("daily_attendance").upsert({
+      person_id: personId,
+      attendance_date: date,
+      status: status
+    }, { onConflict: "person_id,attendance_date" });
+
     if (error) return toast.error(error.message);
-    toast.success(`تم إرسال إشعار الغياب إلى ${n} مخدوم`);
+
+    if (status === "absent") {
+      const { data: pastRecords } = await supabase
+        .from("daily_attendance")
+        .select("status, attendance_date")
+        .eq("person_id", personId)
+        .neq("attendance_date", date)
+        .order("attendance_date", { ascending: false })
+        .limit(1);
+
+      if (pastRecords && pastRecords.length > 0 && pastRecords[0].status === "absent") {
+        toast.warning("⚠️ تنبيه: غاب مرتين متتاليتين وتم إخطار المشرف!");
+        await supabase.from("suggestions_and_notes").insert({
+          content: `⚠️ تنبيه غياب متكرر: المخدوم / الخادم غاب مرتين متتاليتين في خدمة الجمعة تاريخ ${date}`,
+          target_type: "all_servants",
+          status: "pending"
+        }).catch(() => {});
+      }
+    }
+
+    toast.success("تم تحديث حالة الحضور وزيادة العداد بنجاح ✅");
+    qc.invalidateQueries({ queryKey: ["admin-attendance-complete"] });
   };
+
+  const presentCount = filteredPeople.filter((p: any) => p.attendance_status === "present").length;
+  const absentCount = filteredPeople.filter((p: any) => p.attendance_status === "absent").length;
+  const totalCount = filteredPeople.length;
+  const percentage = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
+
   return (
     <div className="space-y-4">
-      <WeekPicker off={off} setOff={setOff} />
-      <div className="flex gap-2"><button onClick={() => setType("member")} className={`rounded-xl px-4 py-2 font-bold ${type === "member" ? "bg-primary text-primary-foreground" : "bg-card"}`}>👥 غياب المخدومين</button><button onClick={() => setType("servant")} className={`rounded-xl px-4 py-2 font-bold ${type === "servant" ? "bg-sky text-primary-foreground" : "bg-card"}`}>📘 غياب الخدام</button></div>
-      <p className="text-xs text-muted-foreground">{type === "member" ? "الغائب = مخدوم معتمد لم يسجّل أي نشاط خلال الأسبوع من الأحد إلى السبت." : "الغائب = خادم معتمد لم يسجّل حضوره خلال الأسبوع."}</p>
-      <div className={`grid gap-4 ${type === "member" ? "md:grid-cols-3" : "md:grid-cols-2"}`}>{(type === "member" ? ACADEMIC_YEARS : ["الخدام"]).map((y, i) => {
-        const rows = type === "member" ? (data ?? []).filter((r) => r.academic_year === y) : (data ?? []);
-        return (
-          <section key={y} className={card} style={{ animationDelay: `${i * 0.08}s` }}>
-            <div className="mb-2 flex items-center justify-between"><h3 className="text-lg font-extrabold">{y}</h3><span className="rounded-full bg-destructive px-2 py-0.5 text-xs font-bold text-destructive-foreground">{rows.length} غائب</span></div>
-            <div className="max-h-72 space-y-1 overflow-y-auto">{rows.map((r) => (
-              <div key={r.id} className="flex justify-between rounded-xl bg-muted p-2 text-sm"><button onClick={() => type === "member" && setHist({ id: r.id, name: r.full_name })} className="font-bold text-primary hover:underline">{r.full_name}</button><span className="text-xs">{r.visited ? "✅ تم افتقاده" : "⏳ بدون افتقاد"}</span></div>
-            ))}{!rows.length && <p className="text-sm text-muted-foreground">لا يوجد غياب 🎉</p>}</div>
-             {type === "member" && off === 0 && !!rows.length && <button onClick={() => notify(y)} className="mt-3 w-full rounded-xl bg-secondary py-2 text-sm font-bold text-secondary-foreground">🔔 إرسال إشعار الغياب</button>}
-          </section>
-        );
-      })}</div>
-      <VisitHistoryDialog member={hist} onClose={() => setHist(null)} />
-      {type === "member" && (data ?? []).some((r) => !ACADEMIC_YEARS.includes(r.academic_year)) && <p className="text-xs text-muted-foreground">يوجد {(data ?? []).filter((r) => !ACADEMIC_YEARS.includes(r.academic_year)).length} غائب بدون مرحلة محددة أو بمرحلة قديمة.</p>}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div onClick={() => setStatsDialogType("total")} className="rounded-2xl border-2 border-border bg-card p-3 text-center cursor-pointer hover:bg-muted/50 transition">
+          <div className="text-xs text-muted-foreground">إجمالي الأفراد</div>
+          <div className="mt-1 text-2xl font-black">{totalCount}</div>
+        </div>
+        <div onClick={() => setStatsDialogType("present")} className="rounded-2xl border-2 border-border bg-card p-3 text-center cursor-pointer hover:bg-emerald-500/10 transition">
+          <div className="text-xs text-muted-foreground">الحاضرون في الجمعة</div>
+          <div className="mt-1 text-2xl font-black text-emerald-500">{presentCount}</div>
+        </div>
+        <div onClick={() => setStatsDialogType("absent")} className="rounded-2xl border-2 border-border bg-card p-3 text-center cursor-pointer hover:bg-destructive/10 transition">
+          <div className="text-xs text-muted-foreground">الغائبون في الجمعة</div>
+          <div className="mt-1 text-2xl font-black text-destructive">{absentCount}</div>
+        </div>
+        <div className="rounded-2xl border-2 border-border bg-card p-3 text-center">
+          <div className="text-xs text-muted-foreground">نسبة الحضور</div>
+          <div className="mt-1 text-2xl font-black text-sky">{percentage}%</div>
+        </div>
+      </div>
+
+      <div className={`${card} flex flex-wrap items-center justify-between gap-3`}>
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-extrabold">📅 تاريخ خدمة الجمعة:</label>
+          <select 
+            value={date} 
+            onChange={(e) => setDate(e.target.value)} 
+            className="rounded-xl border-2 border-border bg-background px-3 py-1.5 font-bold text-sm"
+          >
+            {fridaysList.map((f) => (
+              <option key={f} value={f}>
+                جمعة {f}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => setAccountType("student")} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${accountType === "student" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>📁 فولدر المخدومين</button>
+          <button onClick={() => setAccountType("servant")} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${accountType === "servant" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>📁 فولدر الخدام</button>
+        </div>
+        <div className="flex items-center gap-2">
+          <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="rounded-xl border-2 border-border bg-background px-3 py-1.5 text-xs font-bold">
+            <option value="all">كل المراحل</option>
+            {ACADEMIC_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {isLoading ? (
+          <p className="text-center text-muted-foreground py-8">جاري التحميل...</p>
+        ) : !filteredPeople.length ? (
+          <p className="text-center text-muted-foreground py-8">لا توجد بيانات مسجلة للأفراد في هذا القسم.</p>
+        ) : (
+          <div className="grid gap-2.5 md:grid-cols-2">
+            {filteredPeople.map((item: any) => {
+              const presentCountVal = item.present_count || 0; 
+              const absentCountVal = item.absent_count || 0;
+
+              return (
+                <div key={item.person_id} className="flex items-center justify-between rounded-2xl border-2 border-border bg-card p-3.5">
+                  <div className="flex items-center gap-3">
+                    {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-sm">{item.full_name}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">{item.academic_year || (accountType === "servant" ? "خادم" : "بدون مرحلة")}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => handleStatusChange(item.person_id, "present")} 
+                      className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                        item.attendance_status === "present" 
+                          ? "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400" 
+                          : "bg-muted text-muted-foreground hover:bg-emerald-100 hover:text-emerald-800"
+                      }`}
+                    >
+                      <span>✓ حاضر</span>
+                      <span className="rounded-full bg-black/25 px-2 py-0.5 text-[11px] font-mono text-white">
+                        {presentCountVal}
+                      </span>
+                    </button>
+
+                    <button 
+                      onClick={() => handleStatusChange(item.person_id, "absent")} 
+                      className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                        item.attendance_status === "absent" 
+                          ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-red-400" 
+                          : "bg-muted text-muted-foreground hover:bg-red-100 hover:text-red-800"
+                      }`}
+                    >
+                      <span>✕ غائب</span>
+                      <span className="rounded-full bg-black/25 px-2 py-0.5 text-[11px] font-mono text-white">
+                        {absentCountVal}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {statsDialogType && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-3xl border-2 border-border bg-card p-6 shadow-2xl max-h-[85vh] flex flex-col pop">
+            <div className="flex items-center justify-between pb-4 border-b border-border">
+              <h3 className="text-lg font-extrabold">
+                {statsDialogType === "present" && `✅ قائمة الحاضرين (${presentCount})`}
+                {statsDialogType === "absent" && `⚠️ قائمة الغائبين (${absentCount})`}
+                {statsDialogType === "total" && `👥 إجمالي الأفراد (${totalCount})`}
+                <span className="block text-xs font-normal text-muted-foreground mt-0.5">
+                  ({accountType === "student" ? "المخدومين - الأولاد" : "الخدام"})
+                </span>
+              </h3>
+              <button onClick={() => setStatsDialogType(null)} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold hover:bg-destructive hover:text-white transition">✕ إغلاق</button>
+            </div>
+            <div className="mt-4 flex-1 overflow-y-auto space-y-2.5 pr-1">
+              {(() => {
+                const list = 
+                  statsDialogType === "present" ? filteredPeople.filter((p: any) => p.attendance_status === "present") :
+                  statsDialogType === "absent" ? filteredPeople.filter((p: any) => p.attendance_status === "absent") :
+                  filteredPeople;
+                if (list.length === 0) return <p className="text-center text-muted-foreground py-12">لا توجد بيانات مطابقة.</p>;
+                return list.map((item: any) => (
+                  <div key={item.person_id} className="flex items-center justify-between rounded-2xl border border-border bg-background p-3.5 shadow-sm">
+                    <div className="flex items-center gap-3">
+                      {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
+                      <div>
+                        <div className="font-extrabold text-sm">{item.full_name}</div>
+                        <div className="text-xs text-muted-foreground">{item.academic_year || (accountType === "servant" ? "خادم" : "بدون مرحلة")}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs font-bold">
+                      <span className="rounded-xl bg-emerald-500/10 px-2.5 py-1 text-emerald-600 border border-emerald-500/20">حضر: {item.present_count || 0}</span>
+                      <span className="rounded-xl bg-destructive/10 px-2.5 py-1 text-destructive border border-destructive/20">غاب: {item.absent_count || 0}</span>
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
