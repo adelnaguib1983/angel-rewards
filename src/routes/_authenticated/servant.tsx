@@ -328,7 +328,6 @@ function AiQuizGeneratorSection() {
   );
 }
 
-// دالة لتوليد التسلسل التاريخي لأيام الجمعة فقط
 function getFridayList() {
   const fridays = [];
   let d = new Date();
@@ -358,7 +357,7 @@ function DailyAttendanceSection() {
   const filterYear = selectedYear === "all" ? null : selectedYear;
 
   const { data: profilesData, isLoading } = useQuery({
-    queryKey: ["profiles-attendance-complete-600lines", accountType, date],
+    queryKey: ["profiles-attendance-all-fixed", accountType, date],
     queryFn: async () => {
       const { data: profiles, error: profErr } = await supabase.from("profiles").select("*");
       if (profErr) throw profErr;
@@ -388,9 +387,9 @@ function DailyAttendanceSection() {
         const hasYear = Boolean(m.academic_year && m.academic_year.trim() !== "");
 
         if (accountType === "servant") {
-          return type === "servant" || type === "admin" || type.includes("servant") || !hasYear;
+          return type.includes("servant") || type.includes("admin") || !hasYear;
         } else {
-          return hasYear || type === "member" || type === "student" || type.includes("member") || type.includes("student");
+          return hasYear || type.includes("student") || type.includes("member") || type === "";
         }
       });
 
@@ -403,7 +402,7 @@ function DailyAttendanceSection() {
 
         return {
           person_id: personId,
-          full_name: m.full_name || m.name || "بدون اسم",
+          full_name: m.full_name || m.name || m.username || "بدون اسم",
           avatar: m.avatar || "👤",
           photo_url: m.photo_url,
           academic_year: m.academic_year || m.grade || "مرحلة عامة",
@@ -450,7 +449,7 @@ function DailyAttendanceSection() {
     }
 
     toast.success("تم تحديث حالة الحضور وزيادة العداد بنجاح ✅");
-    qc.invalidateQueries({ queryKey: ["profiles-attendance-complete-600lines"] });
+    qc.invalidateQueries({ queryKey: ["profiles-attendance-all-fixed"] });
   };
 
   const presentCount = filteredPeople.filter((p: any) => p.attendance_status === "present").length;
