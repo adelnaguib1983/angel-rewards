@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/_authenticated/servant")({
   head: () => ({
     meta: [
       { title: "مرحلة الخدام | أبطال الملاك" },
-      { name: "description", content: "تحضير الخادم الأسبوعي، الحضور والغياب، وافتقاد المخدومين." },
+      { name: "description", content: "تحضير الخادم الأسبوعي، الحضور والغياب الأسبوعي، وافتقاد المخدومين." },
     ],
   }),
   component: ServantPage,
@@ -49,12 +49,12 @@ function ServantPage() {
             <div className="rounded-3xl bg-gradient-to-l from-sky/40 via-card to-card p-5 pop float-in">
               <div className="text-sm font-bold text-sky">أهلا يا خادم 🙏</div>
               <h1 className="text-3xl font-extrabold">{p?.full_name}</h1>
-              <p className="text-sm text-muted-foreground">متابعة التحضير، الحضور والغياب، الافتقاد، والتوجيهات المشتركة.</p>
+              <p className="text-sm text-muted-foreground">متابعة التحضير، الحضور والغياب الأسبوعي، الافتقاد، والتوجيهات المشتركة.</p>
             </div>
             <nav className="my-5 flex flex-wrap gap-2">
               {([
                 ["prep", "📘 تحضير الخادم"],
-                ["attendance", "📋 الحضور والغياب اليومي"],
+                ["attendance", "📋 الحضور والغياب الأسبوعي"],
                 ["ai_quiz", "🤖 توليد المسابقات"],
                 ["preparch", "📚 أرشيف التحضيرات"],
                 ["visitarch", "🗂️ أرشيف الافتقاد"],
@@ -328,10 +328,28 @@ function AiQuizGeneratorSection() {
   );
 }
 
+// دالة لتوليد التسلسل التاريخي لأيام الجمعة فقط
+function getFridayList() {
+  const fridays = [];
+  let d = new Date();
+  const day = d.getDay();
+  const diff = (day >= 5 ? day - 5 : day + 2);
+  d.setDate(d.getDate() - diff);
+
+  for (let i = -4; i < 12; i++) {
+    const tempDate = new Date(d);
+    tempDate.setDate(d.getDate() - (i * 7));
+    const dateStr = tempDate.toISOString().split("T")[0];
+    fridays.push(dateStr);
+  }
+  fridays.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+  return fridays;
+}
+
 function DailyAttendanceSection() {
   const qc = useQueryClient();
-  const todayStr = new Date().toISOString().split("T")[0];
-  const [date, setDate] = useState(todayStr);
+  const fridaysList = useMemo(() => getFridayList(), []);
+  const [date, setDate] = useState(fridaysList[0] || new Date().toISOString().split("T")[0]);
   const [subTab, setSubTab] = useState<"record" | "absent">("record");
   const [accountType, setAccountType] = useState<"student" | "servant">("student");
   const [selectedYear, setSelectedYear] = useState("all");
@@ -349,6 +367,19 @@ function DailyAttendanceSection() {
         .from("daily_attendance")
         .select("*")
         .eq("attendance_date", date);
+
+      const { data: allAttendanceRecords } = await supabase
+        .from("daily_attendance")
+        .select("person_id, status");
+
+      const countsMap: Record<string, { present: number, absent: number }> = {};
+      (allAttendanceRecords || []).forEach((rec: any) => {
+        if (!countsMap[rec.person_id]) {
+          countsMap[rec.person_id] = { present: 0, absent: 0 };
+        }
+        if (rec.status === 'present') countsMap[rec.person_id].present++;
+        if (rec.status === 'absent') countsMap[rec.person_id].absent++;
+      });
 
       const allProfiles = profiles || [];
       
@@ -368,6 +399,7 @@ function DailyAttendanceSection() {
       return listToUse.map((m: any) => {
         const personId = m.id || m.user_id;
         const att = (attendanceRecords || []).find((a: any) => a.person_id === personId);
+        const personCounts = countsMap[personId] || { present: 0, absent: 0 };
 
         return {
           person_id: personId,
@@ -376,8 +408,8 @@ function DailyAttendanceSection() {
           photo_url: m.photo_url,
           academic_year: m.academic_year || m.grade || "مرحلة عامة",
           attendance_status: att ? att.status : null,
-          present_count: m.present_count || 0,
-          absent_count: m.absent_count || 0,
+          present_count: personCounts.present,
+          absent_count: personCounts.absent,
           auth_user_id: m.auth_user_id,
           email: m.email,
           registered_externally: m.registered_externally
@@ -410,7 +442,7 @@ function DailyAttendanceSection() {
       if (pastRecords && pastRecords.length > 0 && pastRecords[0].status === "absent") {
         toast.warning("⚠️ تنبيه: غاب مرتين متتاليتين وتم إخطار المشرف!");
         await supabase.from("suggestions_and_notes").insert({
-          content: `⚠️ تنبيه غياب متكرر: المخدوم / الخادم غاب مرتين متتاليتين في تاريخ ${date}`,
+          content: `⚠️ تنبيه غياب متكرر: المخدوم / الخادم غاب مرتين متتاليتين في خدمة الجمعة تاريخ ${date}`,
           target_type: "all_servants",
           status: "pending"
         }).catch(() => {});
@@ -435,11 +467,11 @@ function DailyAttendanceSection() {
           <div className="mt-1 text-2xl font-black">{totalCount}</div>
         </div>
         <div onClick={() => setStatsDialogType("present")} className="rounded-2xl border-2 border-border bg-card p-3 text-center cursor-pointer hover:bg-emerald-500/10 transition">
-          <div className="text-xs text-muted-foreground">الحاضرون اليوم</div>
+          <div className="text-xs text-muted-foreground">الحاضرون في الجمعة</div>
           <div className="mt-1 text-2xl font-black text-emerald-500">{presentCount}</div>
         </div>
         <div onClick={() => setStatsDialogType("absent")} className="rounded-2xl border-2 border-border bg-card p-3 text-center cursor-pointer hover:bg-destructive/10 transition">
-          <div className="text-xs text-muted-foreground">الغائبون اليوم</div>
+          <div className="text-xs text-muted-foreground">الغائبون في الجمعة</div>
           <div className="mt-1 text-2xl font-black text-destructive">{absentCount}</div>
         </div>
         <div className="rounded-2xl border-2 border-border bg-card p-3 text-center">
@@ -451,7 +483,17 @@ function DailyAttendanceSection() {
       <div className={`${card} flex flex-wrap items-center justify-between gap-3`}>
         <div className="flex items-center gap-2">
           <label className="text-sm font-extrabold">📅 تاريخ خدمة الجمعة:</label>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="rounded-xl border-2 border-border bg-background px-3 py-1.5 font-bold text-sm" />
+          <select 
+            value={date} 
+            onChange={(e) => setDate(e.target.value)} 
+            className="rounded-xl border-2 border-border bg-background px-3 py-1.5 font-bold text-sm"
+          >
+            {fridaysList.map((f) => (
+              <option key={f} value={f}>
+                جمعة {f}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={() => setAccountType("student")} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${accountType === "student" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>المخدومين (الأولاد)</button>
@@ -466,7 +508,7 @@ function DailyAttendanceSection() {
       </div>
 
       <div className="flex gap-2">
-        <button onClick={() => setSubTab("record")} className={`flex-1 rounded-2xl border-2 py-2.5 font-extrabold transition ${subTab === "record" ? "border-sky bg-sky text-primary-foreground" : "border-border bg-card"}`}>📝 تسجيل الحضور والغياب</button>
+        <button onClick={() => setSubTab("record")} className={`flex-1 rounded-2xl border-2 py-2.5 font-extrabold transition ${subTab === "record" ? "border-sky bg-sky text-primary-foreground" : "border-border bg-card"}`}>📝 تسجيل الحضور والغياب الأسبوعي</button>
         <button onClick={() => setSubTab("absent")} className={`flex-1 rounded-2xl border-2 py-2.5 font-extrabold transition ${subTab === "absent" ? "border-destructive bg-destructive text-destructive-foreground" : "border-border bg-card"}`}>⚠️ كشف الغياب ({absentPeople.length})</button>
       </div>
 
