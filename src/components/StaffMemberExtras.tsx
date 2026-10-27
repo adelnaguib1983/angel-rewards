@@ -160,30 +160,4 @@ export function SuggestionForm() {
       </div>
       <button disabled={busy} onClick={send} className="pop mt-3 w-full rounded-2xl bg-primary py-3 font-extrabold text-primary-foreground disabled:opacity-60">{busy ? "..." : "إرسال الاقتراح"}</button>
       {!!mine?.length && <div className="mt-4 space-y-2"><h3 className="font-bold">اقتراحاتي السابقة</h3>{mine.map((s) => (
-        <div key={s.id} className="rounded-xl bg-muted p-2 text-sm"><p className="whitespace-pre-wrap">{s.body}</p><div className="text-[10px] text-muted-foreground">{fmt(s.created_at)}</div></div>
-      ))}</div>}
-    </section>
-  );
-}
-
-export function SuggestionDetail({ id, onClose }: { id: string | null; onClose: () => void }) {
-  const [gallery, setGallery] = useState<string[] | null>(null);
-  const { data } = useQuery({ queryKey: ["suggestion", id], enabled: !!id, queryFn: async () => (await supabase.from("suggestions").select("*").eq("id", id).maybeSingle()).data });
-  return (
-    <Dialog open={!!id} onOpenChange={(o) => !o && onClose()}><DialogContent>
-      <DialogHeader><DialogTitle>💡 تفاصيل الاقتراح</DialogTitle></DialogHeader>
-      <div className="max-h-[65vh] space-y-2 overflow-y-auto">
-        {!data ? <p className="text-muted-foreground">جاري التحميل...</p> : <>
-          <div className="text-xs text-muted-foreground">{fmt(data.created_at)}</div>
-          <p className="whitespace-pre-wrap leading-7">{data.body}</p>
-          {data.images?.map((s, i) => <img key={i} src={s} alt="" onClick={() => setGallery(data.images)} className="w-full cursor-zoom-in rounded-xl" />)}
-        </>}
-      </div>
-    </DialogContent><ImageLightbox images={gallery} title="صور الاقتراح" onClose={() => setGallery(null)} /></Dialog>
-  );
-}
-
-export function PrepDetail({ id, onClose }: { id: string | null; onClose: () => void }) {
-  const [gallery, setGallery] = useState<string[] | null>(null);
-  const { data } = useQuery({ queryKey: ["prep-detail", id], enabled: !!id, queryFn: async () => (await supabase.from("servant_preparations").select("*,profiles:user_id(full_name)").eq("id", id).maybeSingle()).data });
-  return <><Dialog open={!!id} onOpenChange={(o) => !o && onClose()}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>📘 تحضير {data?.profiles?.full_name ?? "الخادم"}</DialogTitle></DialogHeader><div className="max-h-[65vh] overflow-y-auto"><div className="text-xs text-muted-foreground">أسبوع {data
+        <div key={s.id} className="rounded-xl bg-muted p-2 text-sm"><p className="whitespace-pre-wrap">{s.body}</p><div className="text-[10px] text-muted-foreground">{
