@@ -356,7 +356,6 @@ export function AddMemberButton({ defaultYear }: { defaultYear?: string }) {
   const inp = "w-full rounded-xl border-2 border-border bg-background px-3 py-2";
   
   const save = async () => {
-    // إجبار البيانات الإلزامية الأربعة للمخدومين
     if (!f.name.trim()) return toast.error("الاسم بالكامل مطلوب");
     if (!f.birth) return toast.error("تاريخ الميلاد مطلوب");
     if (!f.phone.trim()) return toast.error("رقم الهاتف مطلوب");
@@ -417,7 +416,6 @@ export function PersonDialog({ person, mode, onClose }: { person?: { id: string;
   const isNew = mode === "servant" && !person;
   
   const save = async () => {
-    // إجبار البيانات الإلزامية الأربعة للخدام أو التعديل
     if (!f.name.trim()) return toast.error("الاسم مطلوب");
     if (!f.birth) return toast.error("تاريخ الميلاد مطلوب");
     if (!f.phone.trim()) return toast.error("رقم الهاتف مطلوب");
@@ -445,7 +443,7 @@ export function PersonDialog({ person, mode, onClose }: { person?: { id: string;
           <label className="block text-sm font-bold">الاسم *<input className={inp} value={f.name} maxLength={80} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
           {mode === "edit" && f.year !== "" && <label className="block text-sm font-bold">المرحلة<select className={inp} value={f.year} onChange={(e) => setF({ ...f, year: e.target.value })}>{YEARS3.map((y) => <option key={y}>{y}</option>)}</select></label>}
           <label className="block text-sm font-bold">تاريخ الميلاد *<input type="date" className={inp} value={f.birth} onChange={(e) => setF({ ...f, birth: e.target.value })} /></label>
-          <label className="block text-sm font-bold">رقم الموبايل *<input className={inp} inputMode="tel" placeholder="01012345678" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label>
+          <label className="block text-sm font-bold">رقم Mوبايل *<input className={inp} inputMode="tel" placeholder="01012345678" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label>
           <label className="block text-sm font-bold">رقم إضافي / ولي الأمر (اختياري)<input className={inp} inputMode="tel" value={f.phone2} onChange={(e) => setF({ ...f, phone2: e.target.value })} /></label>
           <label className="block text-sm font-bold">العنوان *<input className={inp} maxLength={200} value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} /></label>
           <label className="block text-sm font-bold">ملاحظات (اختياري)<textarea className={inp} rows={3} maxLength={1000} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></label>
