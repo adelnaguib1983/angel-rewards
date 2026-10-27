@@ -41,7 +41,6 @@ function useMembers() {
 
 const TABS = [
   ["summary", "📊 الملخص الأسبوعي"], ["announcements", "📣 الإعلانات"], ["requests", "📝 طلبات التسجيل"], ["members", "👥 المخدومون"], ["servants", "📘 الخدام والافتقاد"],
-
   ["activities", "✅ الأنشطة"], ["redeem", "🎁 طلبات الهدايا"], ["log", "📒 سجل النقاط"],
   ["archive", "🗂️ الأرشيف والمقارنة"], ["gifts", "🛍️ الهدايا"], ["badges", "🏅 الأوسمة والنقاط"], ["notif", "🔔 مركز التنبيهات"], ["quiz", "🧠 المسابقات"], ["visitarch", "🗂️ أرشيف الافتقاد"], ["read", "📖 القراءات اليومية"],
   ["audit", "🕵️ سجل التدقيق"], ["staff", "🔑 الصلاحيات"],
@@ -1070,7 +1069,12 @@ function getFridayList() {
   return fridays;
 }
 
+} = await supabase.from("profiles").select("*");
+      if (profErr) throw profErr;
 
+      const { data: attendanceRecords } = await supabase
+        .from("daily_attendance")
+        .select("*")
         .eq("attendance_date", date);
 
       const { data: allAttendanceRecords } = await supabase
