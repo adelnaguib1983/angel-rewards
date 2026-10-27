@@ -40,7 +40,8 @@ function useMembers() {
 }
 
 const TABS = [
-  ["summary", "📊 الملخص الأسبوعي"], ["announcements", "📣 الإعلانات"], ["requests", "📝 طلبات التسجيل"], ["members", "👥 المخدومون"], ["servants", "📘 الخدام والافتقاد"], ["absence", "📋 الحضور والغياب الأسبوعي"],
+  ["summary", "📊 الملخص الأسبوعي"], ["announcements", "📣 الإعلانات"], ["requests", "📝 طلبات التسجيل"], ["members", "👥 المخدومون"], ["servants", "📘 الخدام والافتقاد"],
+
   ["activities", "✅ الأنشطة"], ["redeem", "🎁 طلبات الهدايا"], ["log", "📒 سجل النقاط"],
   ["archive", "🗂️ الأرشيف والمقارنة"], ["gifts", "🛍️ الهدايا"], ["badges", "🏅 الأوسمة والنقاط"], ["notif", "🔔 مركز التنبيهات"], ["quiz", "🧠 المسابقات"], ["visitarch", "🗂️ أرشيف الافتقاد"], ["read", "📖 القراءات اليومية"],
   ["audit", "🕵️ سجل التدقيق"], ["staff", "🔑 الصلاحيات"],
@@ -95,7 +96,7 @@ function Admin() {
         {tab === "requests" && <Requests />}
         {tab === "members" && <Members />}
         {tab === "servants" && <ServantsTab />}
-        {tab === "absence" && <AbsenceTab />}
+       
         {tab === "activities" && <Activities />}
         {tab === "redeem" && <Redemptions />}
         {tab === "log" && <AdjLog />}
@@ -1069,25 +1070,7 @@ function getFridayList() {
   return fridays;
 }
 
-function AbsenceTab() {
-  const qc = useQueryClient();
-  const fridaysList = useMemo(() => getFridayList(), []);
-  const [date, setDate] = useState(fridaysList[0] || new Date().toISOString().split("T")[0]);
-  const [accountType, setAccountType] = useState<"student" | "servant">("student");
-  const [selectedYear, setSelectedYear] = useState("all");
-  const [statsDialogType, setStatsDialogType] = useState<"present" | "absent" | "total" | null>(null);
 
-  const filterYear = selectedYear === "all" ? null : selectedYear;
-
-  const { data: profilesData, isLoading } = useQuery({
-    queryKey: ["admin-attendance-complete", accountType, date],
-    queryFn: async () => {
-      const { data: profiles, error: profErr } = await supabase.from("profiles").select("*");
-      if (profErr) throw profErr;
-
-      const { data: attendanceRecords } = await supabase
-        .from("daily_attendance")
-        .select("*")
         .eq("attendance_date", date);
 
       const { data: allAttendanceRecords } = await supabase
