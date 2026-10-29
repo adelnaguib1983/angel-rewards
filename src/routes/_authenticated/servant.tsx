@@ -336,21 +336,34 @@ function AiQuizGeneratorSection() {
   );
 }
 
-function getFridayList() {
-  const fridays = [];
-  let d = new Date();
-  const day = d.getDay();
-  const diff = (day >= 5 ? day - 5 : day + 2);
-  d.setDate(d.getDate() - diff);
+function getThisWeekFriday(): string {
+  const d = new Date();
+  const day = d.getDay(); // 0 = أحد, 5 = جمعة, 6 = سبت
+  const diff = day === 6 ? -1 : (5 - day);
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().split("T")[0];
+}
 
-  for (let i = -4; i < 12; i++) {
-    const tempDate = new Date(d);
-    tempDate.setDate(d.getDate() - (i * 7));
-    const dateStr = tempDate.toISOString().split("T")[0];
-    fridays.push(dateStr);
+function getFridayList() {
+  const currentFridayStr = getThisWeekFriday();
+  const baseDate = new Date(currentFridayStr);
+  const fridays: { date: string; label: string; isCurrent: boolean }[] = [];
+
+  // توليد 24 أسبوعاً للماضي (6 أشهر) و4 أسابيع للمستقبل
+  for (let i = -4; i <= 24; i++) {
+    const temp = new Date(baseDate);
+    temp.setDate(baseDate.getDate() - (i * 7));
+    const dateStr = temp.toISOString().split("T")[0];
+    const isCurrent = dateStr === currentFridayStr;
+    fridays.push({
+      date: dateStr,
+      label: isCurrent ? `جمعة هذا الأسبوع (${dateStr}) ★` : `جمعة ${dateStr}`,
+      isCurrent,
+    });
   }
-  fridays.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-  return fridays;
+
+  fridays.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  return { fridaysList: fridays, defaultFriday: currentFridayStr };
 }
 
 function DailyAttendanceSection() {
