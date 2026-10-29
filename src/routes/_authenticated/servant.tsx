@@ -602,6 +602,17 @@ function DailyAttendanceSection() {
           ) : !filteredPeople.length ? (
             <p className="text-center text-muted-foreground py-8">لا توجد بيانات مسجلة للأفراد في هذا القسم.</p>
           ) : (
+          ) : !filteredPeople.length ? (
+            <p className="text-center text-muted-foreground py-8">لا توجد بيانات مسجلة للأفراد في هذا القسم.</p>
+          ) : (
+            <>
+              {filteredPeople.length > 0 && filteredPeople.every((p: any) => !p.attendance_status) && (
+                <div className="rounded-2xl border-2 border-amber-500/30 bg-amber-500/10 p-3 text-xs font-bold text-amber-700 dark:text-amber-400">
+                  ℹ️ لم يتم رصد الحضور لخدمة هذه الجمعة ({date}) بعد — الأزرار جاهزة للرصد الآن.
+                </div>
+              )}
+              <div className="grid gap-2.5 md:grid-cols-2">
+
             <div className="grid gap-2.5 md:grid-cols-2">
               {filteredPeople.map((item: any) => {
                 const isExternal = item.auth_user_id || item.email || item.registered_externally;
@@ -622,15 +633,15 @@ function DailyAttendanceSection() {
                         <div className="text-xs text-muted-foreground">{item.academic_year || (accountType === "servant" ? "خادم" : "بدون مرحلة")}</div>
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
+                      {/* زر حاضر: يتعطل إذا كان الشخص مسجلاً حاضر بالفعل أو قيد الحفظ */}
                       <button 
-                        disabled={isUpdating}
-                        onClick={() => handleStatusChange(item.person_id, "present")} 
+                        disabled={loadingPersons[item.person_id] || item.attendance_status === "present"}
+                        onClick={() => handleStatusChange(item.person_id, "present", item.attendance_status)} 
                         className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
                           item.attendance_status === "present" 
-                            ? "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400" 
-                            : "bg-muted text-muted-foreground hover:bg-emerald-100 hover:text-emerald-800"
+                            ? "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400 cursor-not-allowed opacity-90" 
+                            : "bg-muted text-muted-foreground hover:bg-emerald-100 hover:text-emerald-800 disabled:opacity-50"
                         }`}
                       >
                         <span>✓ حاضر</span>
@@ -639,13 +650,14 @@ function DailyAttendanceSection() {
                         </span>
                       </button>
 
+                      {/* زر غائب: يتعطل إذا كان الشخص مسجلاً غائب بالفعل أو قيد الحفظ */}
                       <button 
-                        disabled={isUpdating}
-                        onClick={() => handleStatusChange(item.person_id, "absent")} 
+                        disabled={loadingPersons[item.person_id] || item.attendance_status === "absent"}
+                        onClick={() => handleStatusChange(item.person_id, "absent", item.attendance_status)} 
                         className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
                           item.attendance_status === "absent" 
-                            ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-red-400" 
-                            : "bg-muted text-muted-foreground hover:bg-red-100 hover:text-red-800"
+                            ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-red-400 cursor-not-allowed opacity-90" 
+                            : "bg-muted text-muted-foreground hover:bg-red-100 hover:text-red-800 disabled:opacity-50"
                         }`}
                       >
                         <span>✕ غائب</span>
@@ -653,7 +665,21 @@ function DailyAttendanceSection() {
                           {absentCountVal}
                         </span>
                       </button>
+
+                      {/* زر مسح الرصد: يظهر فقط إذا كان الشخص مسجلاً لتصحيح الخطأ */}
+                      {item.attendance_status && (
+                        <button
+                          type="button"
+                          title="مسح الرصد وإعادته كـ لم يُرصد"
+                          disabled={loadingPersons[item.person_id]}
+                          onClick={() => handleClearAttendance(item.person_id)}
+                          className="rounded-lg p-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition disabled:opacity-50"
+                        >
+                          ↺
+                        </button>
+                      )}
                     </div>
+
                   </div>
                 );
               })}
@@ -675,13 +701,14 @@ function DailyAttendanceSection() {
                       <div className="text-xs text-muted-foreground">{item.academic_year || (accountType === "servant" ? "خادم" : "بدون مرحلة")}</div>
                     </div>
                   </div>
-                  <button 
-                    disabled={isUpdating}
-                    onClick={() => handleStatusChange(item.person_id, "present")} 
-                    className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-emerald-700 transition"
+                                    <button 
+                    disabled={loadingPersons[item.person_id]}
+                    onClick={() => handleStatusChange(item.person_id, "present", item.attendance_status)} 
+                    className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-emerald-700 transition disabled:opacity-50"
                   >
                     تعديل إلى حاضر ✓
                   </button>
+
                 </div>
               ))}
             </div>
