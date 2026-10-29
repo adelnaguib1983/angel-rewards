@@ -595,97 +595,101 @@ function DailyAttendanceSection() {
         <button onClick={() => setSubTab("absent")} className={`flex-1 rounded-2xl border-2 py-2.5 font-extrabold transition ${subTab === "absent" ? "border-destructive bg-destructive text-destructive-foreground" : "border-border bg-card"}`}>⚠️ كشف الغياب ({absentPeople.length})</button>
       </div>
 
-      {subTab === "record" ? (
-        <div className="space-y-2">
+           {subTab === "record" ? (
+        <div className="space-y-3">
           {isLoading ? (
             <p className="text-center text-muted-foreground py-8">جاري التحميل...</p>
           ) : !filteredPeople.length ? (
             <p className="text-center text-muted-foreground py-8">لا توجد بيانات مسجلة للأفراد في هذا القسم.</p>
           ) : (
-          ) : !filteredPeople.length ? (
-            <p className="text-center text-muted-foreground py-8">لا توجد بيانات مسجلة للأفراد في هذا القسم.</p>
-          ) : (
             <>
-              {filteredPeople.length > 0 && filteredPeople.every((p: any) => !p.attendance_status) && (
+              {filteredPeople.every((p: any) => !p.attendance_status) && (
                 <div className="rounded-2xl border-2 border-amber-500/30 bg-amber-500/10 p-3 text-xs font-bold text-amber-700 dark:text-amber-400">
                   ℹ️ لم يتم رصد الحضور لخدمة هذه الجمعة ({date}) بعد — الأزرار جاهزة للرصد الآن.
                 </div>
               )}
               <div className="grid gap-2.5 md:grid-cols-2">
+                {filteredPeople.map((item: any) => {
+                  const isExternal = item.auth_user_id || item.email || item.registered_externally;
+                  const presentCountVal = item.present_count || 0; 
+                  const absentCountVal = item.absent_count || 0;
 
-            <div className="grid gap-2.5 md:grid-cols-2">
-              {filteredPeople.map((item: any) => {
-                const isExternal = item.auth_user_id || item.email || item.registered_externally;
-                const presentCountVal = item.present_count || 0; 
-                const absentCountVal = item.absent_count || 0;
-
-                return (
-                  <div key={item.person_id} className="flex items-center justify-between rounded-2xl border-2 border-border bg-card p-3.5">
-                    <div className="flex items-center gap-3">
-                      {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-sm">{item.full_name}</span>
-                          <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${isExternal ? "bg-sky/20 text-sky" : "bg-amber-500/20 text-amber-600"}`}>
-                            {isExternal ? "🌐 سجل من الخارج" : "➕ أُضيف داخلياً"}
-                          </span>
+                  return (
+                    <div key={item.person_id} className="flex items-center justify-between rounded-2xl border-2 border-border bg-card p-3.5">
+                      <div className="flex items-center gap-3">
+                        {item.photo_url ? (
+                          <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" />
+                        ) : (
+                          <span className="text-2xl">{item.avatar || "👤"}</span>
+                        )}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-sm">{item.full_name}</span>
+                            <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${isExternal ? "bg-sky/20 text-sky" : "bg-amber-500/20 text-amber-600"}`}>
+                              {isExternal ? "🌐 سجل من الخارج" : "➕ أُضيف داخلياً"}
+                            </span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {item.academic_year || (accountType === "servant" ? "خادم" : "بدون مرحلة")}
+                          </div>
                         </div>
-                        <div className="text-xs text-muted-foreground">{item.academic_year || (accountType === "servant" ? "خادم" : "بدون مرحلة")}</div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        {/* زر حاضر */}
+                        <button 
+                          disabled={loadingPersons[item.person_id] || item.attendance_status === "present"}
+                          onClick={() => handleStatusChange(item.person_id, "present", item.attendance_status)} 
+                          className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                            item.attendance_status === "present" 
+                              ? "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400 cursor-not-allowed opacity-90" 
+                              : "bg-muted text-muted-foreground hover:bg-emerald-100 hover:text-emerald-800 disabled:opacity-50"
+                          }`}
+                        >
+                          <span>✓ حاضر</span>
+                          <span className="rounded-full bg-black/25 px-2 py-0.5 text-[11px] font-mono text-white">
+                            {presentCountVal}
+                          </span>
+                        </button>
+
+                        {/* زر غائب */}
+                        <button 
+                          disabled={loadingPersons[item.person_id] || item.attendance_status === "absent"}
+                          onClick={() => handleStatusChange(item.person_id, "absent", item.attendance_status)} 
+                          className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                            item.attendance_status === "absent" 
+                              ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-red-400 cursor-not-allowed opacity-90" 
+                              : "bg-muted text-muted-foreground hover:bg-red-100 hover:text-red-800 disabled:opacity-50"
+                          }`}
+                        >
+                          <span>✕ غائب</span>
+                          <span className="rounded-full bg-black/25 px-2 py-0.5 text-[11px] font-mono text-white">
+                            {absentCountVal}
+                          </span>
+                        </button>
+
+                        {/* زر مسح الرصد */}
+                        {item.attendance_status && (
+                          <button
+                            type="button"
+                            title="مسح الرصد وإعادته كـ لم يُرصد"
+                            disabled={loadingPersons[item.person_id]}
+                            onClick={() => handleClearAttendance(item.person_id)}
+                            className="rounded-lg p-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition disabled:opacity-50"
+                          >
+                            ↺
+                          </button>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      {/* زر حاضر: يتعطل إذا كان الشخص مسجلاً حاضر بالفعل أو قيد الحفظ */}
-                      <button 
-                        disabled={loadingPersons[item.person_id] || item.attendance_status === "present"}
-                        onClick={() => handleStatusChange(item.person_id, "present", item.attendance_status)} 
-                        className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
-                          item.attendance_status === "present" 
-                            ? "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400 cursor-not-allowed opacity-90" 
-                            : "bg-muted text-muted-foreground hover:bg-emerald-100 hover:text-emerald-800 disabled:opacity-50"
-                        }`}
-                      >
-                        <span>✓ حاضر</span>
-                        <span className="rounded-full bg-black/25 px-2 py-0.5 text-[11px] font-mono text-white">
-                          {presentCountVal}
-                        </span>
-                      </button>
-
-                      {/* زر غائب: يتعطل إذا كان الشخص مسجلاً غائب بالفعل أو قيد الحفظ */}
-                      <button 
-                        disabled={loadingPersons[item.person_id] || item.attendance_status === "absent"}
-                        onClick={() => handleStatusChange(item.person_id, "absent", item.attendance_status)} 
-                        className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
-                          item.attendance_status === "absent" 
-                            ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-red-400 cursor-not-allowed opacity-90" 
-                            : "bg-muted text-muted-foreground hover:bg-red-100 hover:text-red-800 disabled:opacity-50"
-                        }`}
-                      >
-                        <span>✕ غائب</span>
-                        <span className="rounded-full bg-black/25 px-2 py-0.5 text-[11px] font-mono text-white">
-                          {absentCountVal}
-                        </span>
-                      </button>
-
-                      {/* زر مسح الرصد: يظهر فقط إذا كان الشخص مسجلاً لتصحيح الخطأ */}
-                      {item.attendance_status && (
-                        <button
-                          type="button"
-                          title="مسح الرصد وإعادته كـ لم يُرصد"
-                          disabled={loadingPersons[item.person_id]}
-                          onClick={() => handleClearAttendance(item.person_id)}
-                          className="rounded-lg p-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition disabled:opacity-50"
-                        >
-                          ↺
-                        </button>
-                      )}
-                    </div>
-
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
+      )
+
       ) : (
         <div className="space-y-2">
           {absentPeople.length === 0 ? (
