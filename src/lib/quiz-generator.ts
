@@ -1,0 +1,179 @@
+// ==========================================================
+// 1. تعريف أنواع البيانات (Types)
+// ==========================================================
+
+export type QuestionType = "true_false" | "multiple_choice";
+
+export interface GeneratedQuestion {
+  id?: string;
+  type: QuestionType;
+  questionText: string;
+  options: string[]; // ["صح", "خطأ"] أو 3 خيارات واضحة
+  correctAnswer: string;
+  points: number;
+}
+
+export interface QuizDraft {
+  title: string;
+  sourceType: "bible_reference" | "text" | "media";
+  bibleReference?: {
+    book: string;
+    chapter: number;
+    verses?: string; // مثلاً: "1-10"
+  };
+  content?: string;
+  questions: GeneratedQuestion[];
+  status: "draft_pending_review" | "approved" | "published";
+  createdBy: string; // معرف الخادم
+  createdAt: string;
+}
+
+// ==========================================================
+// 2. دالة توليد الأسئلة باستخدام الذكاء الاصطناعي (AI Prompt)
+// ==========================================================
+
+export async function generateBibleQuizWithAI(params: {
+  apiKey: string; // مفتاح OpenAI API أو أي نموذج متوافق
+  sourceType: "bible_reference" | "text";
+  bibleReference?: { book: string; chapter: number; verses?: string };
+  rawText?: string;
+  countTrueFalse?: number; // عدد أسئلة صح وخطأ
+  countMultipleChoice?: number; // عدد أسئلة الاختيار من متعدد
+}): Promise<GeneratedQuestion[]> {
+  const {
+    apiKey,
+    sourceType,
+    bibleReference,
+    rawText,
+    countTrueFalse = 3,
+    countMultipleChoice = 3,
+  } = params;
+
+  // تحديد مصدر المحتوى للشاهد أو النص
+  let contextDescription = "";
+  if (sourceType === "bible_reference" && bibleReference) {
+    contextDescription = `الشاهد الكتابي: سفر ${bibleReference.book}، أصحاح ${bibleReference.chapter}${
+      bibleReference.verses ? `، آيات ${bibleReference.verses}` : ""
+    }`;
+  } else {
+    contextDescription = `المحتوى النصي:\n${rawText ?? ""}`;
+  }
+
+  // التوجيه الصارم لنموذج الذكاء الاصطناعي
+  const systemPrompt = `
+أنت خبير في دراسات الكتاب المقدس ومسابقات مدارس الأحد.
+مهمتك: توليد أسئلة دقيقة مستوحاة حصراً من الشاهد أو النص المقدم.
+
+القواعد الصارمة:
+1. أسئلة "صح أو خطأ" (true_false): يجب أن تحتوي على خيارين فقط باللغة العربية: ["صح", "خطأ"].
+2. أسئلة الاختيار من متعدد / أكمل / ما الشاهد (multiple_choice): يجب أن تحتوي على 3 اختيارات فقط محددة وواضحة جداً.
+3. حدد الإجابة الصحيحة بالضبط كما هي مكتوبة في الخيارات.
+4. اجعل النقاط الافتراضية لكل سؤال 5 نقاط.
+5. أرجع النتيجة بتنسيق JSON حصراً مصفوفة من العناصر بدون أي نص إضافي:
+[
+  {
+    "type": "true_false",
+    "questionText": "نص السؤال هنا",
+    "options": ["صح", "خطأ"],
+    "correctAnswer": "صح",
+    "points": 5
+  },
+  {
+    "type": "multiple_choice",
+    "questionText": "نص السؤال هنا",
+    "options": ["الخيار الأول", "الخيار الثاني", "الخيار الثالث"],
+    "correctAnswer": "الخيار الأول",
+    "points": 5
+  }
+]
+`;
+
+  const userPrompt = `
+المطلوب توليد:
+- ${countTrueFalse} أسئلة صح وخطأ.
+- ${countMultipleChoice} أسئلة اختيار من متعدد (3 خيارات).
+
+${contextDescription}
+`;
+
+  // استدعاء واجهة الذكاء الاصطناعي (OpenAI Chat Completions API)
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.3,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`AI generation failed with status: ${response.status}`);
+  }
+
+  const result = await response.json();
+  const rawContent = result.choices[0]?.message?.content ?? "{}";
+  const parsed = JSON.parse(rawContent);
+
+  // إرجاع مصفوفة الأسئلة
+  const questions: GeneratedQuestion[] = Array.isArray(parsed)
+    ? parsed
+    : (parsed.questions ?? []);
+
+  return questions;
+}
+
+// ==========================================================
+// 3. دالة حفظ المسابقة كـ "مسودة قيد المراجعة" (Draft)
+// ==========================================================
+
+export function createQuizDraft(params: {
+  title: string;
+  sourceType: "bible_reference" | "text" | "media";
+  bibleReference?: { book: string; chapter: number; verses?: string };
+  questions: GeneratedQuestion[];
+  servantId: string;
+}): QuizDraft {
+  return {
+    title: params.title,
+    sourceType: params.sourceType,
+    bibleReference: params.bibleReference,
+    questions: params.questions,
+    status: "draft_pending_review", // تبقى مسودة لا تُنشر تلقائياً حتى يعتمدها المسؤول
+    createdBy: params.servantId,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+// ==========================================================
+// 4. دالة التصحيح التلقائي وحساب النقاط للمخدوم
+// ==========================================================
+
+export function evaluateStudentSubmission(params: {
+  questions: GeneratedQuestion[];
+  studentAnswers: Record<number, string>; // رقم السؤال مقابل إجابة المخدوم
+}): { totalEarned: number; maxPoints: number; detailedResults: boolean[] } {
+  let totalEarned = 0;
+  let maxPoints = 0;
+  const detailedResults: boolean[] = [];
+
+  params.questions.forEach((q, index) => {
+    maxPoints += q.points;
+    const studentAnswer = params.studentAnswers[index]?.trim();
+    const isCorrect = studentAnswer === q.correctAnswer.trim();
+
+    detailedResults.push(isCorrect);
+    if (isCorrect) {
+      totalEarned += q.points;
+    }
+  });
+
+  return { totalEarned, maxPoints, detailedResults };
+}
