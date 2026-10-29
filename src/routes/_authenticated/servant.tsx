@@ -89,12 +89,20 @@ function Prep({ userId }: { userId: string }) {
       return toast.error("يرجى كتابة التحضير أو إرفاق ملف أولاً");
     }
 
-    await supabase.from("prep_archive" as any).insert({
+        const images = selectedImage ? [selectedImage] : [];
+
+    const { error } = await supabase.from("servant_preparations").upsert({
       user_id: userId,
-      content: content,
-      media_url: selectedImage || null,
-      created_at: new Date().toISOString()
-    }).catch(() => {});
+      notes: content.trim(),
+      images: images,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id,week_start" });
+
+    if (error) {
+      toast.error("فشل حفظ التحضير: " + error.message);
+      return;
+    }
+
 
     toast.success("تم حفظ التحضير الأسبوعي والمرفقات بنجاح ✅");
     setContent("");
