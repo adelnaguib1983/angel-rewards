@@ -1052,27 +1052,41 @@ function ServantsTab() {
 }
 
 // دالة لتوليد التسلسل التاريخي لأيام الجمعة فقط
-function getFridayList() {
-  const fridays = [];
-  let d = new Date();
+function getThisWeekFriday(): string {
+  const d = new Date();
   const day = d.getDay();
-  const diff = (day >= 5 ? day - 5 : day + 2);
-  d.setDate(d.getDate() - diff);
+  const diff = day === 6 ? -1 : (5 - day);
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().split("T")[0];
+}
 
-  for (let i = -4; i < 12; i++) {
-    const tempDate = new Date(d);
-    tempDate.setDate(d.getDate() - (i * 7));
-    const dateStr = tempDate.toISOString().split("T")[0];
-    fridays.push(dateStr);
+function getFridayList() {
+  const currentFridayStr = getThisWeekFriday();
+  const baseDate = new Date(currentFridayStr);
+  const fridays: { date: string; label: string; isCurrent: boolean }[] = [];
+
+  for (let i = -4; i <= 24; i++) {
+    const temp = new Date(baseDate);
+    temp.setDate(baseDate.getDate() - (i * 7));
+    const dateStr = temp.toISOString().split("T")[0];
+    const isCurrent = dateStr === currentFridayStr;
+    fridays.push({
+      date: dateStr,
+      label: isCurrent ? `جمعة هذا الأسبوع (${dateStr}) ★` : `جمعة ${dateStr}`,
+      isCurrent,
+    });
   }
-  fridays.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-  return fridays;
+
+  fridays.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  return { fridaysList: fridays, defaultFriday: currentFridayStr };
 }
 
 function AbsenceTab() {
   const qc = useQueryClient();
-  const fridaysList = useMemo(() => getFridayList(), []);
-  const [date, setDate] = useState(fridaysList[0] || new Date().toISOString().split("T")[0]);
+    const { fridaysList, defaultFriday } = useMemo(() => getFridayList(), []);
+  const [date, setDate] = useState<string>(defaultFriday);
+  const [loadingPersons, setLoadingPersons] = useState<Record<string, boolean>>({});
+
   const [accountType, setAccountType] = useState<"student" | "servant">("student");
   const [selectedYear, setSelectedYear] = useState("all");
   const [statsDialogType, setStatsDialogType] = useState<"present" | "absent" | "total" | null>(null);
