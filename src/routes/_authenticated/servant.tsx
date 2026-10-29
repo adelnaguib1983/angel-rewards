@@ -449,9 +449,12 @@ function DailyAttendanceSection() {
   const people = profilesData || [];
   const filteredPeople = filterYear ? people.filter((p: any) => p.academic_year === filterYear) : people;
 
-  const handleStatusChange = async (personId: string, status: "present" | "absent") => {
-    if (isUpdating) return; // منع التكرار السريع
-    setIsUpdating(true);
+    const handleStatusChange = async (personId: string, status: "present" | "absent", currentStatus: string | null) => {
+    // منع الضغط إذا كان الشخص قيد التحميل حالياً أو مسجلاً بنفس الحالة بالفعل
+    if (loadingPersons[personId] || currentStatus === status) return;
+
+    // قفل أزرار هذا الشخص فقط
+    setLoadingPersons((prev) => ({ ...prev, [personId]: true }));
 
     try {
       const { error } = await supabase.from("daily_attendance").upsert({
@@ -467,8 +470,8 @@ function DailyAttendanceSection() {
 
       // في حالة تسجيل "غائب"، نتحقق من الغياب لأسبوعين متتاليين
       if (status === "absent") {
-        const currentIndex = fridaysList.indexOf(date);
-        const previousFriday = currentIndex !== -1 && currentIndex + 1 < fridaysList.length ? fridaysList[currentIndex + 1] : null;
+        const currentIndex = fridaysList.findIndex((f) => f.date === date);
+        const previousFriday = currentIndex !== -1 && currentIndex + 1 < fridaysList.length ? fridaysList[currentIndex + 1].date : null;
 
         if (previousFriday) {
           const { data: pastRecord } = await supabase
@@ -478,10 +481,8 @@ function DailyAttendanceSection() {
             .eq("attendance_date", previousFriday)
             .maybeSingle();
 
-          // إذا كان غائباً في الأسبوع الماضي وهذا الأسبوع (أسبوعين متتاليين)
           if (pastRecord && pastRecord.status === "absent") {
             const targetCategory = accountType === "servant" ? "الخادم" : "المخدوم";
-            
             toast.warning(`⚠️ تنبيه: ${targetCategory} غاب لمدة أسبوعين متتاليين وتم إخطار المشرف!`);
             
             await supabase.from("suggestions_and_notes").insert({
@@ -493,12 +494,46 @@ function DailyAttendanceSection() {
         }
       }
 
-      toast.success("تم تحديث حالة الحضور وزيادة العداد بنجاح ✅");
+      toast.success(status === "present" ? "تم تسجيل الحضور بنجاح ✅" : "تم تسجيل الغياب بنجاح ✕");
       qc.invalidateQueries({ queryKey: ["profiles-attendance-all-fixed"] });
     } finally {
-      setIsUpdating(false);
+      // فك القفل عن هذا الشخص فقط
+      setLoadingPersons((prev) => {
+        const next = { ...prev };
+        delete next[personId];
+        return next;
+      });
     }
   };
+
+  // دالة مسح/إلغاء الحالة في حال التسجيل بالخطأ
+  const handleClearAttendance = async (personId: string) => {
+    if (loadingPersons[personId]) return;
+    setLoadingPersons((prev) => ({ ...prev, [personId]: true }));
+
+    try {
+      const { error } = await supabase
+        .from("daily_attendance")
+        .delete()
+        .eq("person_id", personId)
+        .eq("attendance_date", date);
+
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
+      toast.info("تم مسح الحالة وإعادة الشخص إلى (لم يُرصد)");
+      qc.invalidateQueries({ queryKey: ["profiles-attendance-all-fixed"] });
+    } finally {
+      setLoadingPersons((prev) => {
+        const next = { ...prev };
+        delete next[personId];
+        return next;
+      });
+    }
+  };
+
 
   const presentCount = filteredPeople.filter((p: any) => p.attendance_status === "present").length;
   const absentCount = filteredPeople.filter((p: any) => p.attendance_status === "absent").length;
