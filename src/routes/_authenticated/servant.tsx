@@ -368,15 +368,16 @@ function getFridayList() {
 
 function DailyAttendanceSection() {
   const qc = useQueryClient();
-  const fridaysList = useMemo(() => getFridayList(), []);
-  const [date, setDate] = useState(fridaysList[0] || new Date().toISOString().split("T")[0]);
+    const { fridaysList, defaultFriday } = useMemo(() => getFridayList(), []);
+  const [date, setDate] = useState<string>(defaultFriday);
+
   const [subTab, setSubTab] = useState<"record" | "absent">("record");
   const [accountType, setAccountType] = useState<"student" | "servant">("student");
   const [selectedYear, setSelectedYear] = useState("all");
   const [statsDialogType, setStatsDialogType] = useState<"present" | "absent" | "total" | null>(null);
   
   // متغير حماية لمنع التنفيذ المتتالي السريع وتداخل الطلبات
-  const [isUpdating, setIsUpdating] = useState(false);
+    const [loadingPersons, setLoadingPersons] = useState<Record<string, boolean>>({});
 
   const filterYear = selectedYear === "all" ? null : selectedYear;
 
