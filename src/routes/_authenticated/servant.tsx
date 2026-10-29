@@ -565,17 +565,18 @@ function DailyAttendanceSection() {
       <div className={`${card} flex flex-wrap items-center justify-between gap-3`}>
         <div className="flex items-center gap-2">
           <label className="text-sm font-extrabold">📅 تاريخ خدمة الجمعة:</label>
-          <select 
+                    <select 
             value={date} 
             onChange={(e) => setDate(e.target.value)} 
             className="rounded-xl border-2 border-border bg-background px-3 py-1.5 font-bold text-sm"
           >
             {fridaysList.map((f) => (
-              <option key={f} value={f}>
-                جمعة {f}
+              <option key={f.date} value={f.date}>
+                {f.label}
               </option>
             ))}
           </select>
+
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={() => setAccountType("student")} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${accountType === "student" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>المخدومين (الأولاد)</button>
