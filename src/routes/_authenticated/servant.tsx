@@ -688,8 +688,6 @@ function DailyAttendanceSection() {
             </>
           )}
         </div>
-      )
-
       ) : (
         <div className="space-y-2">
           {absentPeople.length === 0 ? (
