@@ -1157,37 +1157,63 @@ function AbsenceTab() {
   const people = profilesData || [];
   const filteredPeople = filterYear ? people.filter((p: any) => p.academic_year === filterYear) : people;
 
-  const handleStatusChange = async (personId: string, status: "present" | "absent") => {
-    const { error } = await supabase.from("daily_attendance").upsert({
-      person_id: personId,
-      attendance_date: date,
-      status: status
-    }, { onConflict: "person_id,attendance_date" });
+    const handleStatusChange = async (personId: string, status: "present" | "absent", currentStatus?: string) => {
+    if (loadingPersons[personId] || currentStatus === status) return;
+    setLoadingPersons((prev) => ({ ...prev, [personId]: true }));
 
-    if (error) return toast.error(error.message);
-
-    if (status === "absent") {
-      const { data: pastRecords } = await supabase
+    try {
+      const { error } = await supabase
         .from("daily_attendance")
-        .select("status, attendance_date")
-        .eq("person_id", personId)
-        .neq("attendance_date", date)
-        .order("attendance_date", { ascending: false })
-        .limit(1);
+        .upsert(
+          { person_id: personId, attendance_date: date, status },
+          { onConflict: "person_id,attendance_date" }
+        );
 
-      if (pastRecords && pastRecords.length > 0 && pastRecords[0].status === "absent") {
-        toast.warning("⚠️ تنبيه: غاب مرتين متتاليتين وتم إخطار المشرف!");
-        await supabase.from("suggestions_and_notes").insert({
-          content: `⚠️ تنبيه غياب متكرر: المخدوم / الخادم غاب مرتين متتاليتين في خدمة الجمعة تاريخ ${date}`,
-          target_type: "all_servants",
-          status: "pending"
-        }).catch(() => {});
+      if (error) {
+        toast.error(error.message);
+        return;
       }
-    }
 
-    toast.success("تم تحديث حالة الحضور وزيادة العداد بنجاح ✅");
-    qc.invalidateQueries({ queryKey: ["admin-attendance-complete"] });
+      toast.success(status === "present" ? "تم تسجيل الحضور ✓" : "تم تسجيل الغياب ✕");
+      qc.invalidateQueries({ queryKey: ["profiles-attendance-all-fixed"] });
+    } catch (err: any) {
+      toast.error(err.message || "حدث خطأ أثناء الحفظ");
+    } finally {
+      setLoadingPersons((prev) => {
+        const next = { ...prev };
+        delete next[personId];
+        return next;
+      });
+    }
   };
+
+  const handleClearAttendance = async (personId: string) => {
+    if (loadingPersons[personId]) return;
+    setLoadingPersons((prev) => ({ ...prev, [personId]: true }));
+
+    try {
+      const { error } = await supabase
+        .from("daily_attendance")
+        .delete()
+        .eq("person_id", personId)
+        .eq("attendance_date", date);
+
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
+      toast.info("تم مسح الحالة وإعادة الشخص إلى (لم يُرصد)");
+      qc.invalidateQueries({ queryKey: ["profiles-attendance-all-fixed"] });
+    } finally {
+      setLoadingPersons((prev) => {
+        const next = { ...prev };
+        delete next[personId];
+        return next;
+      });
+    }
+  };
+
 
   const presentCount = filteredPeople.filter((p: any) => p.attendance_status === "present").length;
   const absentCount = filteredPeople.filter((p: any) => p.attendance_status === "absent").length;
@@ -1218,17 +1244,14 @@ function AbsenceTab() {
       <div className={`${card} flex flex-wrap items-center justify-between gap-3`}>
         <div className="flex items-center gap-2">
           <label className="text-sm font-extrabold">📅 تاريخ خدمة الجمعة:</label>
-          <select 
-            value={date} 
-            onChange={(e) => setDate(e.target.value)} 
-            className="rounded-xl border-2 border-border bg-background px-3 py-1.5 font-bold text-sm"
-          >
+                   <select value={date} onChange={(e) => setDate(e.target.value)} className="rounded-xl border-2 border-border bg-background px-3 py-1.5 font-bold text-sm">
             {fridaysList.map((f) => (
-              <option key={f} value={f}>
-                جمعة {f}
+              <option key={f.date} value={f.date}>
+                {f.label}
               </option>
             ))}
           </select>
+
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={() => setAccountType("student")} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${accountType === "student" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>📁 فولدر المخدومين</button>
