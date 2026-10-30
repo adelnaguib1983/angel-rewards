@@ -18,42 +18,94 @@ export function NotificationsBell({ onOpen, onQuiz }: { onOpen?: (id: string) =>
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState(null);
+
+  // جلب التنبيهات مع فحص دوري
   const { data } = useQuery({
     queryKey: ["myNotifs"],
     queryFn: async () => (await supabase.from("member_notifications").select("id,message,announcement_id,quiz_id,ref_id,kind,read,created_at").order("created_at", { ascending: false }).limit(30)).data ?? [],
-    refetchInterval: 60000,
+    refetchInterval: 30000,
   });
-  const unread = data?.filter((n) => !n.read).length ?? 0;
+
+  // حساب عدد التنبيهات غير المقروءة
+  const unreadCount = data?.filter((n) => !n.read).length ?? 0;
+
+  // الاستماع اللحظي (Realtime) للإشعارات الجديدة
+  useEffect(() => {
+    const channel = supabase
+      .channel("member_notifications_realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "member_notifications" },
+        () => {
+          qc.invalidateQueries({ queryKey: ["myNotifs"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [qc]);
+
   async function click(n) {
     setOpen(false);
-    if (!n.read) { await supabase.from("member_notifications").update({ read: true }).eq("id", n.id); qc.invalidateQueries({ queryKey: ["myNotifs"] }); }
+    if (!n.read) {
+      await supabase.from("member_notifications").update({ read: true }).eq("id", n.id);
+      qc.invalidateQueries({ queryKey: ["myNotifs"] });
+    }
     if ((n.quiz_id || n.kind === "quiz") && onQuiz) onQuiz();
     else if (n.announcement_id && onOpen) onOpen(n.announcement_id);
     else setDetail(n);
   }
+
   const icon = { quiz: "🧠", suggestion: "💡", absence: "🚫", announcement: "📣" };
+
   return (
     <>
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger aria-label="التنبيهات" className="relative rounded-xl border-2 border-border px-3 py-2 text-lg leading-none hover:bg-muted">
-        🔔{unread > 0 && <span className="absolute -left-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">{unread}</span>}
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 p-2">
-        <div className="mb-1 px-2 font-extrabold">التنبيهات</div>
-        {!data?.length && <p className="p-3 text-sm text-muted-foreground">لا توجد تنبيهات.</p>}
-        <div className="max-h-80 space-y-1 overflow-y-auto">
-          {data?.map((n) => (
-            <button key={n.id} onClick={() => click(n)} className={`w-full rounded-xl p-2 text-right text-sm hover:bg-muted ${n.read ? "text-muted-foreground" : "bg-muted/50 font-bold"}`}>
-              <span className="ml-1" aria-hidden="true">{icon[n.kind] ?? "🔔"}</span><span className="line-clamp-2">{n.message}</span><div className="text-[10px] font-normal text-muted-foreground">{new Date(n.created_at).toLocaleString("ar-EG")} · اضغط للتفاصيل</div>
-            </button>
-          ))}
-        </div>
-      </PopoverContent>
-    </Popover>
-    <NotificationDetail n={detail} onClose={() => setDetail(null)} />
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger aria-label="التنبيهات" className="relative rounded-xl border-2 border-border px-3 py-2 text-lg leading-none hover:bg-muted transition-colors">
+          🔔
+          {/* الشارة الرقمية (Badge) للعداد غير المقروء */}
+          {unreadCount > 0 && (
+            <span className="absolute -top-1.5 -left-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-black text-white shadow-md ring-2 ring-background animate-pulse">
+              {unreadCount > 99 ? "+99" : unreadCount}
+            </span>
+          )}
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-80 p-2">
+          <div className="flex items-center justify-between mb-1 px-2">
+            <span className="font-extrabold">التنبيهات</span>
+            {unreadCount > 0 && (
+              <span className="text-xs font-semibold text-destructive">
+                {unreadCount} جديدة
+              </span>
+            )}
+          </div>
+          {!data?.length && <p className="p-3 text-sm text-muted-foreground">لا توجد تنبيهات.</p>}
+          <div className="max-h-80 space-y-1 overflow-y-auto">
+            {data?.map((n) => (
+              <button
+                key={n.id}
+                onClick={() => click(n)}
+                className={`w-full rounded-xl p-2 text-right text-sm hover:bg-muted transition-colors ${
+                  n.read ? "text-muted-foreground" : "bg-muted/60 font-bold text-foreground border-r-4 border-primary"
+                }`}
+              >
+                <span className="ml-1" aria-hidden="true">{icon[n.kind] ?? "🔔"}</span>
+                <span className="line-clamp-2">{n.message}</span>
+                <div className="text-[10px] font-normal text-muted-foreground mt-0.5">
+                  {new Date(n.created_at).toLocaleString("ar-EG")} · اضغط للتفاصيل
+                </div>
+              </button>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+      <NotificationDetail n={detail} onClose={() => setDetail(null)} />
     </>
   );
 }
+
 
 export function AnnouncementsBoard({ userId }: { userId: string }) {
   const qc = useQueryClient();
