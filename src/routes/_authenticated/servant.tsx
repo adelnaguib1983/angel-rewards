@@ -366,6 +366,8 @@ function getFridayList() {
   fridays.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   return { fridaysList: fridays, defaultFriday: currentFridayStr };
 }
+{/* أزرار تنبيهات الغياب للمراحل الثلاث */}
+<ConsecutiveAbsenceAlertButtons absentPersons={absentPersonsList} />
 
 function DailyAttendanceSection() {
   const qc = useQueryClient();
