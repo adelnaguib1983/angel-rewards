@@ -10,8 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { BirthdaysButton, PrepArchive, ReadingPlanner, VisitArchive } from "@/components/StaffMemberExtras";
 import { NotificationsBell } from "@/components/MemberExtras";
 import { ConsecutiveAbsenceAlertButtons } from "@/components/AbsenceAlertButtons";
-import { ServantSuggestionsTab } from "../components/ServantSuggestionsTab";
-
+import { ServantSuggestionsTab } from "@/components/ServantSuggestionsTab";
 
 export const Route = createFileRoute("/_authenticated/servant")({
   head: () => ({
