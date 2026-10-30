@@ -367,7 +367,6 @@ function getFridayList() {
   return { fridaysList: fridays, defaultFriday: currentFridayStr };
 }
 {/* أزرار تنبيهات الغياب للمراحل الثلاث */}
-<ConsecutiveAbsenceAlertButtons absentPersons={absentPersonsList} />
 
 function DailyAttendanceSection() {
   const qc = useQueryClient();
