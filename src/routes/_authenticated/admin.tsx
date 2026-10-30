@@ -96,7 +96,7 @@ function Admin() {
         {tab === "requests" && <Requests />}
         {tab === "members" && <Members />}
         {tab === "servants" && <ServantsTab />}
-        {tab === "absence" && <AbsenceTab />}
+       
         {tab === "activities" && <Activities />}
         {tab === "redeem" && <Redemptions />}
         {tab === "log" && <AdjLog />}
