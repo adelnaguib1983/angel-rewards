@@ -58,6 +58,7 @@ function ServantPage() {
               {([
                 ["prep", "📘 تحضير الخادم"],
                 ["attendance", "📋 الحضور والغياب الأسبوعي"],
+                ["suggest", "💡 الاقتراحات"],
                 ["ai_quiz", "🤖 توليد المسابقات"],
                 ["preparch", "📚 أرشيف التحضيرات"],
                 ["visitarch", "🗂️ أرشيف الافتقاد"],
@@ -68,9 +69,11 @@ function ServantPage() {
               <BirthdaysButton />
               <div className="mr-auto"><NotificationsBell /></div>
             </nav>
-            {tab === "prep" && <Prep userId={me.user.id} />}
+                       {tab === "prep" && <Prep userId={me.user.id} />}
             {tab === "attendance" && <DailyAttendanceSection />}
+            {tab === "suggest" && <ServantSuggestionsTab userId={me.user.id} />}
             {tab === "ai_quiz" && <AiQuizGeneratorSection />}
+
             {tab === "preparch" && <PrepArchive userId={me.user.id} />}
             {tab === "visitarch" && <VisitArchive />}
             {tab === "read" && <ReadingPlanner />}
