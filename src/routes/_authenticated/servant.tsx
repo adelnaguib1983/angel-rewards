@@ -9,6 +9,7 @@ import { ACADEMIC_YEARS, fileToDataUrl, useMe } from "@/lib/app";
 import { Textarea } from "@/components/ui/textarea";
 import { BirthdaysButton, PrepArchive, ReadingPlanner, VisitArchive } from "@/components/StaffMemberExtras";
 import { NotificationsBell } from "@/components/MemberExtras";
+import { ConsecutiveAbsenceAlertButtons } from "@/components/AbsenceAlertButtons";
 
 export const Route = createFileRoute("/_authenticated/servant")({
   head: () => ({
