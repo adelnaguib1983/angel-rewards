@@ -8,6 +8,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { PROFILE_COLS, ACADEMIC_YEARS, MONTHS, REDEEM_STATUS, cairoDate, cairoWeek, useMe, useSettings, fileToDataUrl } from "@/lib/app";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ServantsAbsenceAlertButton } from "@/components/AbsenceAlertButtons";
 import { AddMemberButton, BirthdaysButton, PersonDialog, PrepArchive, PrepDetail, QuizLeague, ReadingPlanner, ServantsManager, SuggestionDetail, VisitArchive, VisitHistoryDialog, removeMember } from "@/components/StaffMemberExtras";
 import AdminWeeklySummary from "@/components/AdminWeeklySummary";
 import { ImageLightbox } from "@/components/ImageLightbox";
