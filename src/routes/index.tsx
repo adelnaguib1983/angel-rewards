@@ -1,5 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMe } from "@/lib/app";
+import { SplashScreen } from "@/components/SplashScreen";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -15,36 +17,35 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const items = [
-  ["⛪", "القداس"], ["📖", "مدارس الأحد"], ["🍞", "التناول"],
-  ["🕊️", "الاعتراف"], ["📜", "الكتاب المقدس"], ["🎁", "العطاء"],
-];
-
 function Index() {
-  const { data } = useMe();
+  const { data: me, isLoading } = useMe();
+  const navigate = useNavigate();
+  const [splashFinished, setSplashFinished] = useState(false);
+
+  useEffect(() => {
+    // التوجيه التلقائي بمجرد انتهاء مدة الشاشة الافتتاحية وجلب بيانات الحساب
+    if (!splashFinished || isLoading) return;
+
+    if (!me) {
+      // مستخدم غير مسجل -> صفحة تسجيل الدخول
+      navigate({ to: "/auth", replace: true });
+    } else if (me.isAdmin || me.role === "servant") {
+      // خادم أو مسؤول -> صفحة الخادم
+      navigate({ to: "/servant", replace: true });
+    } else {
+      // فتى / مشترك -> صفحة المشترك الرئيسية
+      navigate({ to: "/home", replace: true });
+    }
+  }, [splashFinished, isLoading, me, navigate]);
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center px-5 py-16 text-center">
-      <div className="mb-4 rounded-full bg-secondary px-4 py-1 text-sm font-bold text-secondary-foreground">للفتيان ١١–١٤ سنة</div>
-      <h1 className="text-5xl font-extrabold leading-tight md:text-7xl">
-        أبطال <span className="text-primary">الإيمان</span> ⚡
-      </h1>
-      <p className="mt-5 max-w-xl text-lg text-muted-foreground">
-        كل أسبوع مغامرة جديدة! سجّل إنجازاتك الروحية، اجمع النقاط، افتح الأوسمة، واستبدلها بهدايا حقيقية.
-      </p>
-      <div className="mt-10 grid w-full max-w-2xl grid-cols-3 gap-3 md:grid-cols-6">
-        {items.map(([e, l], i) => (
-          <div key={l} className="pop rounded-2xl border-2 border-border bg-card p-3 transition-transform hover:-translate-y-1" style={{ rotate: `${(i % 2 ? 1 : -1) * 3}deg` }}>
-            <div className="text-4xl">{e}</div>
-            <div className="mt-1 text-xs font-bold">{l}</div>
-          </div>
-        ))}
-      </div>
-      <Link
-        to={data ? "/home" : "/auth"}
-        className="pop mt-12 rounded-2xl bg-primary px-10 py-4 text-xl font-extrabold text-primary-foreground transition-transform hover:-translate-y-1 active:translate-y-1"
-      >
-        {data ? "ادخل إلى لوحتك 🚀" : "ابدأ المغامرة 🚀"}
-      </Link>
-    </main>
+    <div className="relative min-h-screen w-full bg-[#0f1a2e]">
+      {/* الشاشة الافتتاحية تغطي الشاشة بالكامل أثناء التحميل والتوجيه */}
+      <SplashScreen
+        duration={1800}
+        imageUrl="/icon-512.png.jpeg"
+        onFinish={() => setSplashFinished(true)}
+      />
+    </div>
   );
 }
