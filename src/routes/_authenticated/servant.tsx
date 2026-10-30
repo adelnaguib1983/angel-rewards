@@ -449,7 +449,20 @@ function DailyAttendanceSection() {
   });
 
   const people = profilesData || [];
-  const filteredPeople = filterYear ? people.filter((p: any) => p.academic_year === filterYear) : people;
+  const filteredPeople = filterYear ?
+  // تجهيز قائمة المخدومين الغائبين مرتين أو أكثر
+  const absentPersonsList = useMemo(() => {
+    return (people || [])
+      .filter((p: any) => (p.absent_count || 0) >= 2)
+      .map((p: any) => ({
+        id: p.person_id,
+        name: p.full_name,
+        stage: p.academic_year,
+        absent_count: p.absent_count,
+      }));
+  }, [people]);
+
+ people.filter((p: any) => p.academic_year === filterYear) : people;
 
     const handleStatusChange = async (personId: string, status: "present" | "absent", currentStatus: string | null) => {
     // منع الضغط إذا كان الشخص قيد التحميل حالياً أو مسجلاً بنفس الحالة بالفعل
@@ -545,6 +558,8 @@ function DailyAttendanceSection() {
 
   return (
     <div className="space-y-4">
+<ConsecutiveAbsenceAlertButtons absentPersons={absentPersonsList} />
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div onClick={() => setStatsDialogType("total")} className="rounded-2xl border-2 border-border bg-card p-3 text-center cursor-pointer hover:bg-muted/50 transition">
           <div className="text-xs text-muted-foreground">إجمالي الأفراد</div>
