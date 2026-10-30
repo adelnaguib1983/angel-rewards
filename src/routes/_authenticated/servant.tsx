@@ -452,7 +452,7 @@ function DailyAttendanceSection() {
     },
   });
 
-    const people = profilesData || [];
+      const people = profilesData || [];
 
   // تجهيز قائمة المخدومين الغائبين مرتين أو أكثر بشكل صحيح خارج أي شرط
   const absentPersonsList = useMemo(() => {
@@ -469,9 +469,6 @@ function DailyAttendanceSection() {
   const filteredPeople = filterYear 
     ? people.filter((p: any) => p.academic_year === filterYear) 
     : people;
-
-
- people.filter((p: any) => p.academic_year === filterYear) : people;
 
     const handleStatusChange = async (personId: string, status: "present" | "absent", currentStatus: string | null) => {
     // منع الضغط إذا كان الشخص قيد التحميل حالياً أو مسجلاً بنفس الحالة بالفعل
