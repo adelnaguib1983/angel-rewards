@@ -452,9 +452,9 @@ function DailyAttendanceSection() {
     },
   });
 
-  const people = profilesData || [];
-  const filteredPeople = filterYear ?
-  // تجهيز قائمة المخدومين الغائبين مرتين أو أكثر
+    const people = profilesData || [];
+
+  // تجهيز قائمة المخدومين الغائبين مرتين أو أكثر بشكل صحيح خارج أي شرط
   const absentPersonsList = useMemo(() => {
     return (people || [])
       .filter((p: any) => (p.absent_count || 0) >= 2)
@@ -465,6 +465,11 @@ function DailyAttendanceSection() {
         absent_count: p.absent_count,
       }));
   }, [people]);
+
+  const filteredPeople = filterYear 
+    ? people.filter((p: any) => p.academic_year === filterYear) 
+    : people;
+
 
  people.filter((p: any) => p.academic_year === filterYear) : people;
 
