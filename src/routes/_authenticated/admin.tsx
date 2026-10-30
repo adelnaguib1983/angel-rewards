@@ -1288,35 +1288,53 @@ function AbsenceTab() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => handleStatusChange(item.person_id, "present")} 
-                      className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
-                        item.attendance_status === "present" 
-                          ? "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400" 
-                          : "bg-muted text-muted-foreground hover:bg-emerald-100 hover:text-emerald-800"
-                      }`}
-                    >
-                      <span>✓ حاضر</span>
-                      <span className="rounded-full bg-black/25 px-2 py-0.5 text-[11px] font-mono text-white">
-                        {presentCountVal}
-                      </span>
-                    </button>
+                                     <div className="flex items-center gap-1.5">
+                      {/* زر حاضر: يتعطل إذا كان الشخص مسجلاً حاضر بالفعل أو قيد الحفظ */}
+                      <button 
+                        disabled={loadingPersons[item.person_id] || item.attendance_status === "present"}
+                        onClick={() => handleStatusChange(item.person_id, "present", item.attendance_status)} 
+                        className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                          item.attendance_status === "present" 
+                            ? "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400 cursor-not-allowed opacity-90" 
+                            : "bg-muted text-muted-foreground hover:bg-emerald-100 hover:text-emerald-800 disabled:opacity-50"
+                        }`}
+                      >
+                        <span>✓ حاضر</span>
+                        <span className="rounded-full bg-black/25 px-2 py-0.5 text-[11px] font-mono text-white">
+                          {presentCountVal}
+                        </span>
+                      </button>
 
-                    <button 
-                      onClick={() => handleStatusChange(item.person_id, "absent")} 
-                      className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
-                        item.attendance_status === "absent" 
-                          ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-red-400" 
-                          : "bg-muted text-muted-foreground hover:bg-red-100 hover:text-red-800"
-                      }`}
-                    >
-                      <span>✕ غائب</span>
-                      <span className="rounded-full bg-black/25 px-2 py-0.5 text-[11px] font-mono text-white">
-                        {absentCountVal}
-                      </span>
-                    </button>
-                  </div>
+                      {/* زر غائب: يتعطل إذا كان الشخص مسجلاً غائب بالفعل أو قيد الحفظ */}
+                      <button 
+                        disabled={loadingPersons[item.person_id] || item.attendance_status === "absent"}
+                        onClick={() => handleStatusChange(item.person_id, "absent", item.attendance_status)} 
+                        className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                          item.attendance_status === "absent" 
+                            ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-red-400 cursor-not-allowed opacity-90" 
+                            : "bg-muted text-muted-foreground hover:bg-red-100 hover:text-red-800 disabled:opacity-50"
+                        }`}
+                      >
+                        <span>✕ غائب</span>
+                        <span className="rounded-full bg-black/25 px-2 py-0.5 text-[11px] font-mono text-white">
+                          {absentCountVal}
+                        </span>
+                      </button>
+
+                      {/* زر مسح الرصد */}
+                      {item.attendance_status && (
+                        <button
+                          type="button"
+                          title="مسح الرصد وإعادته كـ لم يُرصد"
+                          disabled={loadingPersons[item.person_id]}
+                          onClick={() => handleClearAttendance(item.person_id)}
+                          className="rounded-lg p-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition disabled:opacity-50"
+                        >
+                          ↺
+                        </button>
+                      )}
+                    </div>
+
                 </div>
               );
             })}
