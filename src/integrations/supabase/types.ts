@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -221,6 +221,47 @@ export type Database = {
           member_id?: string
         }
         Relationships: []
+      }
+      daily_attendance: {
+        Row: {
+          attendance_date: string
+          created_at: string
+          id: string
+          notes: string | null
+          person_id: string
+          recorded_by: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attendance_date?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          person_id: string
+          recorded_by?: string
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          attendance_date?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          person_id?: string
+          recorded_by?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_attendance_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       daily_readings: {
         Row: {
@@ -712,27 +753,66 @@ export type Database = {
       }
       suggestions: {
         Row: {
+          audio_url: string | null
           body: string
           created_at: string
           id: string
           images: string[]
+          replied_at: string | null
+          reply: string | null
+          reply_by: string | null
+          status: string
+          target_type: string
+          target_user_id: string | null
           user_id: string
+          video_url: string | null
         }
         Insert: {
+          audio_url?: string | null
           body: string
           created_at?: string
           id?: string
           images?: string[]
+          replied_at?: string | null
+          reply?: string | null
+          reply_by?: string | null
+          status?: string
+          target_type?: string
+          target_user_id?: string | null
           user_id?: string
+          video_url?: string | null
         }
         Update: {
+          audio_url?: string | null
           body?: string
           created_at?: string
           id?: string
           images?: string[]
+          replied_at?: string | null
+          reply?: string | null
+          reply_by?: string | null
+          status?: string
+          target_type?: string
+          target_user_id?: string | null
           user_id?: string
+          video_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "suggestions_reply_by_fkey"
+            columns: ["reply_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "suggestions_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -824,6 +904,7 @@ export type Database = {
           created_at: string
           full_name: string
           id: string
+          is_registered: boolean
           points: number
           status: string
         }[]
@@ -877,6 +958,7 @@ export type Database = {
           created_at: string
           full_name: string
           id: string
+          is_registered: boolean
           status: string
         }[]
       }
@@ -926,6 +1008,33 @@ export type Database = {
       }
       can_view_contacts: { Args: { _uid: string }; Returns: boolean }
       complete_reading: { Args: { _reading: string }; Returns: number }
+      get_attendance_stats: {
+        Args: { _academic_year?: string; _date: string }
+        Returns: Json
+      }
+      get_daily_absent_list: {
+        Args: { _academic_year?: string; _account_type?: string; _date: string }
+        Returns: {
+          academic_year: string
+          account_type: string
+          avatar: string
+          full_name: string
+          notes: string
+          person_id: string
+          phone: string
+          photo_url: string
+        }[]
+      }
+      get_daily_attendance: {
+        Args: { _academic_year?: string; _account_type: string; _date: string }
+        Returns: {
+          academic_year: string
+          attendance_status: string
+          full_name: string
+          person_id: string
+        }[]
+      }
+      get_my_unread_count: { Args: never; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1044,6 +1153,15 @@ export type Database = {
           points: number
           question: string
         }[]
+      }
+      record_daily_attendance: {
+        Args: {
+          _date: string
+          _notes?: string
+          _person_id: string
+          _status: string
+        }
+        Returns: undefined
       }
       redeem_gift: { Args: { _gift_id: string }; Returns: undefined }
       servant_members: {
