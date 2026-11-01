@@ -606,6 +606,7 @@ export type Database = {
           image_url: string | null
           opens_at: string | null
           published: boolean
+          status: string
           title: string
         }
         Insert: {
@@ -616,6 +617,7 @@ export type Database = {
           image_url?: string | null
           opens_at?: string | null
           published?: boolean
+          status?: string
           title: string
         }
         Update: {
@@ -626,6 +628,7 @@ export type Database = {
           image_url?: string | null
           opens_at?: string | null
           published?: boolean
+          status?: string
           title?: string
         }
         Relationships: []
@@ -723,31 +726,64 @@ export type Database = {
       }
       servant_preparations: {
         Row: {
+          audio_url: string | null
           created_at: string
           id: string
           images: string[]
           notes: string
           updated_at: string
           user_id: string
+          video_url: string | null
           week_start: string
         }
         Insert: {
+          audio_url?: string | null
           created_at?: string
           id?: string
           images?: string[]
           notes?: string
           updated_at?: string
           user_id?: string
+          video_url?: string | null
           week_start?: string
         }
         Update: {
+          audio_url?: string | null
           created_at?: string
           id?: string
           images?: string[]
           notes?: string
           updated_at?: string
           user_id?: string
+          video_url?: string | null
           week_start?: string
+        }
+        Relationships: []
+      }
+      service_years: {
+        Row: {
+          created_at: string
+          end_date: string
+          id: string
+          is_current: boolean
+          label: string | null
+          start_date: string
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          id?: string
+          is_current?: boolean
+          label?: string | null
+          start_date: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          id?: string
+          is_current?: boolean
+          label?: string | null
+          start_date?: string
         }
         Relationships: []
       }
@@ -922,6 +958,7 @@ export type Database = {
           visits: number
         }[]
       }
+      admin_promote_academic_years: { Args: never; Returns: undefined }
       admin_quiz_results: {
         Args: { _quiz: string }
         Returns: {
@@ -940,6 +977,10 @@ export type Database = {
           _reason: string
           _status: string
         }
+        Returns: undefined
+      }
+      admin_review_quiz: {
+        Args: { _approve: boolean; _note?: string; _quiz: string }
         Returns: undefined
       }
       admin_servant_attendance: {
@@ -1174,6 +1215,33 @@ export type Database = {
           id: string
           photo_url: string
           visited: boolean
+        }[]
+      }
+      servant_report_absence_alert: {
+        Args: { _message: string }
+        Returns: undefined
+      }
+      servant_submit_quiz: {
+        Args: {
+          _closes_at: string
+          _opens_at: string
+          _questions: Json
+          _source?: string
+          _title: string
+        }
+        Returns: string
+      }
+      servant_week_preps: {
+        Args: { _week?: string }
+        Returns: {
+          audio_url: string
+          avatar: string
+          full_name: string
+          images: string[]
+          notes: string
+          updated_at: string
+          user_id: string
+          video_url: string
         }[]
       }
       signup_counts: {
