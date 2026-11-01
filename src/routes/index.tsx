@@ -29,7 +29,7 @@ function Index() {
     if (!me) {
       // مستخدم غير مسجل -> صفحة تسجيل الدخول
       navigate({ to: "/auth", replace: true });
-    } else if (me.isAdmin || me.role === "servant") {
+    } else if (me.isAdmin || me.profile?.account_type === "servant") {
       // خادم أو مسؤول -> صفحة الخادم
       navigate({ to: "/servant", replace: true });
     } else {

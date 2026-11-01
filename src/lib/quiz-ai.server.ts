@@ -47,13 +47,13 @@ type QuizDraft = {
 
 type QuizInput = {
   sourceType: "text" | "image" | "audio" | "video" | "bible";
-  text?: string;
-  imageDataUrl?: string;
-  audioBase64?: string;
-  audioMime?: string;
-  videoBase64?: string;
-  videoMime?: string;
-  bible?: { book: string; chapter: number; from?: number; to?: number };
+  text?: string | undefined;
+  imageDataUrl?: string | undefined;
+  audioBase64?: string | undefined;
+  audioMime?: string | undefined;
+  videoBase64?: string | undefined;
+  videoMime?: string | undefined;
+  bible?: { book: string; chapter: number; from?: number; to?: number } | undefined;
   count: 15 | 20;
 };
 
