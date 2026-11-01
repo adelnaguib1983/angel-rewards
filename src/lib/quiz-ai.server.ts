@@ -1,5 +1,3 @@
-import "server-only";
-
 const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 const QUIZ_MODEL = "openai/gpt-6-astra";
 const MEDIA_MODEL = "google/gemini-3.8-flash";
@@ -124,7 +122,7 @@ async function generateQuizJson(input: QuizInput): Promise<QuizDraft> {
     stream: true,
     store: false,
     instructions: SYSTEM,
-    input: [{ role: "user", content: parts.length === 1 ? [{ type: "input_text", text: userText }] : parts }],
+    input: [{ role: "user", content: parts }],
     max_output_tokens: 12000,
     reasoning: { effort: "medium", summary: "auto" },
     text: { format: { type: "json_schema", ...QUIZ_SCHEMA } },
