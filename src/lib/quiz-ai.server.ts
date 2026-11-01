@@ -111,15 +111,13 @@ async function generateQuizJson(input: QuizInput): Promise<QuizDraft> {
     const range = b.from && b.to && b.to > b.from ? `الآيات ${b.from}-${b.to}` : b.from ? `الآية ${b.from}` : `الأصحاح كاملًا`;
     userText = `المصدر (شاهد كتابي): سفر ${b.book}، أصحاح ${b.chapter}، ${range}. استخدم معرفتك بالنص الكتابي نفسه لتوليد الأسئلة، والتزم بدقة بما ورد فيه.`;
   } else if (input.sourceType === "image") {
-    parts.push({ type: "input_text", text: "المصدر: صورة مرفوعة. اقرأ كل ما فيها بدقة (نصوص ومعلومات) وولّد الأسئلة منها." });
-    parts.push({ type: "input_image", image_url: input.imageDataUrl!, detail: "high" });
-    userText = "ولّد الأسئلة من الصورة المرفقة.";
+    userText = "المصدر: صورة مرفوعة. اقرأ كل ما فيها بدقة (نصوص ومعلومات) وولّد الأسئلة منها.";
   } else {
     const transcript = await describeMedia(input.sourceType === "audio" ? "audio" : "video", (input.sourceType === "audio" ? input.audioBase64 : input.videoBase64)!, (input.sourceType === "audio" ? input.audioMime : input.videoMime) || "");
     userText = `المصدر (${input.sourceType === "audio" ? "تسجيل صوتي" : "فيديو"}) بعد تفريغه:\n${transcript}`;
   }
-  if (parts.length === 0) parts.push({ type: "input_text", text: userText });
-  else parts[0] = { type: "input_text", text: (parts[0] as { text: string }).text };
+  parts.push({ type: "input_text", text: userText });
+  if (input.sourceType === "image") parts.push({ type: "input_image", image_url: input.imageDataUrl!, detail: "high" });
 
   const body = {
     model: QUIZ_MODEL,
