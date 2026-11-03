@@ -1,5 +1,6 @@
 // @ts-nocheck
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useServerFn } from "@tanstack/react-router";
+import { generateQuizDraft } from "@/lib/quiz-ai.functions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -10,7 +11,7 @@ import { uploadServantMedia, isStoredPath, MEDIA_BUCKET } from "@/lib/media";
 import { MediaView } from "@/components/MediaPlayers";
 import { ImageLightbox } from "@/components/ImageLightbox";
 import { Textarea } from "@/components/ui/textarea";
-import { BirthdaysButton, PrepArchive, ReadingPlanner, VisitArchive } from "@/components/StaffMemberExtras";
+import { BirthdaysButton, PrepArchive, ReadingPlanner, VisitArchive, OT_BOOKS, NT_BOOKS } from "@/components/StaffMemberExtras";
 import { NotificationsBell } from "@/components/MemberExtras";
 import { ConsecutiveAbsenceAlertButtons } from "@/components/AbsenceAlertButtons";
 import { ServantSuggestionsTab } from "@/components/ServantSuggestionsTab";
