@@ -27,8 +27,46 @@ export function levelOf(points: number) {
   return { ...LEVELS[i], index: i + 1, next, progress };
 }
 
-export function currentWeek(d = new Date()) {
-  return Math.min(4, Math.ceil(d.getDate() / 7));
+const pad = (n: number) => String(n).padStart(2, "0");
+const utcYmd = (d: Date) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+
+/** تاريخ الجمعة التي تبدأ فترة الأسبوع (الجمعة → الخميس) المحتوية على التاريخ */
+export function fridayOf(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const base = new Date(Date.UTC(y, m - 1, d));
+  return utcYmd(new Date(base.getTime() - ((base.getUTCDay() + 2) % 7) * 86400000));
+}
+
+/** ترتيب الجمعة بين جمعات شهرها (1..5) */
+function fridayIndexInMonth(y: number, m: number, friday: string): number {
+  const first = new Date(Date.UTC(y, m - 1, 1));
+  const fr = new Date(friday + "T00:00:00Z");
+  let c = 0;
+  for (let d = new Date(first); d <= fr; d = new Date(d.getTime() + 86400000)) if (d.getUTCDay() === 5) c++;
+  return c;
+}
+
+/** فترة الأسبوع الحالية (الجمعة → الخميس): تبدأ في شهر الجمعة وقد تعود للشهر السابق */
+export function currentPeriod(d = new Date()) {
+  const from = fridayOf(cairoDate(d));
+  const [y, m] = from.split("-").map(Number);
+  const w = fridayIndexInMonth(y, m, from);
+  const to = utcYmd(new Date(new Date(from + "T00:00:00Z").getTime() + 6 * 86400000));
+  return { y, m, w, from, to };
+}
+
+/** فترات الأسابيع (الجمعة → الخميس) داخل شهر معين */
+export function monthPeriods(y: number, m: number) {
+  const first = new Date(Date.UTC(y, m - 1, 1));
+  const last = new Date(Date.UTC(y, m, 0));
+  const out: { w: number; from: string; to: string }[] = [];
+  for (let d = new Date(first); d <= last; d = new Date(d.getTime() + 86400000)) {
+    if (d.getUTCDay() === 5) {
+      const from = utcYmd(d);
+      out.push({ w: out.length + 1, from, to: utcYmd(new Date(d.getTime() + 6 * 86400000)) });
+    }
+  }
+  return out;
 }
 
 export function useMe() {
@@ -61,14 +99,12 @@ export function useSettings() {
 export function cairoDate(d: Date | string) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(d));
 }
-/** Sunday..Saturday Cairo dates for week offset (0 = this week) */
+/** Friday..Thursday Cairo dates for week offset (0 = the Friday period containing today) */
 export function cairoWeek(offset = 0) {
-  const today = cairoDate(new Date());
-  const [y, m, d] = today.split("-").map(Number);
-  const base = new Date(Date.UTC(y, m - 1, d));
-  const dow = base.getUTCDay();
-  const start = new Date(base.getTime() - (dow + offset * 7) * 86400000);
-  return Array.from({ length: 7 }, (_, i) => new Date(start.getTime() + i * 86400000).toISOString().slice(0, 10));
+  const from = fridayOf(cairoDate(new Date()));
+  const start = new Date(from + "T00:00:00Z");
+  const base = new Date(start.getTime() - offset * 7 * 86400000);
+  return Array.from({ length: 7 }, (_, i) => new Date(base.getTime() + i * 86400000).toISOString().slice(0, 10));
 }
 
 export async function signOut(queryClient: { cancelQueries: () => Promise<void>; clear: () => void }) {

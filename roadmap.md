@@ -6,36 +6,24 @@
 - [x] Weekly summary, ranking, archive, CSV, contact access + audit
 - [x] Streaks, calendar, AI coach, forgot password, admin login entry
 - [x] Announcements board + six-item mobile bottom navigation
-
 - [x] Sign up for trips/activities from announcements + registrant list for admin
 - [x] Member alert on new announcement, opens it directly
 - [x] Admin adds new activities with points
 - [x] Photos: member profile photo + announcement image
-- [x] Signup requires all basic data (name, birth date, mobile, address, academic year) + admin approval
-- [x] Weekly summary: clickable cards (completed activities by member, points per member, approved members list)
-- [x] Show "أهلا يا بطل" instead of "المستوى 1" above member name
-- [x] Remove "لوحتي"/"لوحة المشرف" header links; keep خروج; role chosen from login page
-- [x] Admin can remove members
-- [x] Keep app installable with same icon/look
-- [x] Weekly competitions graded with points
-- [x] Members cannot edit past activities or log outside the current week
-- [x] Separate admin notification icons and category drawers
-- [x] Split weekly absence into members and servants
-- [x] Reorder member home: profile, quizzes, announcements
-- [x] Add unresolved quiz badge to bottom navigation
-- [x] Five-person formal charts for stage and overall leaderboards
-- [x] Add continuous member and leader name effects
-- [x] توحيد مسميات المخدومين في كامل التطبيق
-- [x] إعادة بناء الملخص الأسبوعي ببطاقات تفصيلية وأرشيف
-- [x] جعل صفحة الخدام والتحضير ومركز التنبيهات تفاعليين
-- [x] إضافة مستعرض صور كامل مع التكبير والتحقق المرئي
+- [x] Signup requires all basic data + admin approval
+- [x] Weekly summary clickable cards, أهلا يا بطل, remove header links, CSV, contact audit
+- [x] Weekly competitions graded with points, no past-week edits
+- [x] Separate admin notification icons, split weekly absence, member home reorder
+- [x] Quiz badge, five-person leaderboards, name effects
+- [x] توحيد مسميات المخدومين + إعادة بناء الملخص الأسبوعي + مستعرض صور
 
-## قيد التنفيذ — حزمة السنة الخدمية والمسابقات الذكية
-- [x] قاعدة البيانات: جدول service_years + حالة اعتماد المسابقات (status) + أعمدة صوت/فيديو للتحضير + RPCs (servant_submit_quiz, admin_review_quiz, servant_report_absence_alert, servant_week_preps, admin_promote_academic_years)
-- [x] حاوية تخزين خاصة servant-media (50MB) مع سياسات RLS
-- [x] وحدة توليد المسابقات بالذكاء الاصطناعي (quiz-ai.server + quiz-ai.functions): نص/صورة/صوت/فيديو/شاهد كتابي، صح-خطأ واختيار من ٣، مخطط JSON صارم
-- [x] مساعدو الوسائط (media.ts + MediaPlayers) بروابط موقعة
-- [ ] ربط واجهة الخادم: Prep متعدد الصور + حفظ الصوت/الفيديو + استعراض تحضيرات الآخرين، إعادة بناء AiQuizGeneratorSection على الوحدة الحقيقية، عدادات الحضور بنطاق السنة الخدمية + زر اعتماد الجمعة (الباقي غائب) + إصلاح تنبيه الغياب المتتالي إلى servant_report_absence_alert
-- [ ] لوحة المشرف: حذف AbsenceTab غير المستخدم، عرض ServantsAbsenceAlertButton (غياب خدام جمعتين متتاليتين)، تبويب إعدادات السنة الخدمية + زر ترقية المراحل، قسم اعتماد المسابقات في تبويب المسابقات
-- [ ] تبويب الاقتراحات: صور متعددة + صوت + فيديو + إصلاح target_type
-- [ ] اختبار التوليد الفعلي عبر invoke-server-function + مراجعة بصرية
+## حزمة التحضيرات والمسابقات والحضور — مكتملة
+- [x] قاعدة البيانات: service_years + حالة اعتماد المسابقات + RPCs + حاوية servant-media + دورة الأسبوع الجمعة→الخميس (week_start / is_current_week / weekly_leaderboard) + سياسة قراءة الاقتراحات العامة
+- [x] تبويب تحضير الخادم: صور متعددة + رفع/تسجيل فويس + فيديو + استعراض تحضيرات باقي الخدام + حفظ دائم في الأرشيف
+- [x] تبويب الاقتراحات: صور متعددة + فويس (رفع/تسجيل) + فيديو + تحديد النشر (خاص بالخدام / للجميع)
+- [x] توليد المسابقات بالذكاء الاصطناعي الحقيقي (نص/صورة/صوت/فيديو/شاهد كتابي) + مراجعة كل الأسئلة + إرسال لاعتماد المشرف + قائمة مسابقاتي
+- [x] لوحة المشرف: قسم اعتماد المسابقات (اعتماد/رفض) + زر إعادة نشر كدفعة جديدة دون حذف السجل + استبدال كارت الملخص التجريبي بالملخص الفعلي
+- [x] الحضور: عدادات داخل الأزرار بنطاق السنة الخدمية + تأمين الأزرار + زر اعتماد الجمعة (من لم يُرصد غائب) + تنبيه الغياب المتتالي عبر RPC الحقيقي
+- [x] لوحة المشرف: بطاقة السنة الخدمية + زر ترقية المراحل بتأكيد مزدوج + زر تنبيه غياب الخدام (جمعتين متتاليتين) + حذف AbsenceTab الميت
+- [x] أسبوع الأنشطة من الجمعة إلى الخميس في صفحة المشترك مع تمييز الأسبوع الحالي + الشاشة الافتتاحية ثانيتين
+- [ ] اختبار حقيقي للتوليد بالذكاء الاصطناعي داخل التطبيق ومراجعة بصرية للتدفقات الجديدة

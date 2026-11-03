@@ -53,7 +53,7 @@ type QuizInput = {
   audioMime?: string | undefined;
   videoBase64?: string | undefined;
   videoMime?: string | undefined;
-  bible?: { book: string; chapter: number; from?: number; to?: number } | undefined;
+  bible?: { book: string; chapter: number; from?: number | undefined; to?: number | undefined } | undefined;
   count: 15 | 20;
 };
 

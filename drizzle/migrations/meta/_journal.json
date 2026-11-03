@@ -120,6 +120,13 @@
       "when": 1793524568399,
       "tag": "0016_servant_media_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793692318088,
+      "tag": "0017_friday_week_cycle_and_public_suggestions",
+      "breakpoints": true
     }
   ]
 }

@@ -42,7 +42,7 @@ function Index() {
     <div className="relative min-h-screen w-full bg-[#0f1a2e]">
       {/* الشاشة الافتتاحية تغطي الشاشة بالكامل أثناء التحميل والتوجيه */}
       <SplashScreen
-        duration={1800}
+        duration={2000}
         imageUrl="/icon-512.png.jpeg"
         onFinish={() => setSplashFinished(true)}
       />

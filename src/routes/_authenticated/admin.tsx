@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ServantsAbsenceAlertButton } from "@/components/AbsenceAlertButtons";
 import { AddMemberButton, BirthdaysButton, PersonDialog, PrepArchive, PrepDetail, QuizLeague, ReadingPlanner, ServantsManager, SuggestionDetail, VisitArchive, VisitHistoryDialog, removeMember } from "@/components/StaffMemberExtras";
-import AdminWeeklySummary from "@/components/AdminWeeklySummary";
 import { ImageLightbox } from "@/components/ImageLightbox";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -91,7 +90,7 @@ function Admin() {
             </button>
           ))}
         </nav>
-        {tab === "summary" && <AdminWeeklySummary />}
+        {tab === "summary" && <Summary />}
         {tab === "announcements" && <Announcements />}
         {tab === "requests" && <Requests />}
         {tab === "members" && <Members />}
@@ -920,6 +919,104 @@ function Staff() {
   );
 }
 
+function PendingQuizApprovals() {
+  const qc = useQueryClient();
+  const { data: pending } = useQuery({ queryKey: ["pending-quizzes"], queryFn: async () => (await supabase.from("quizzes").select("*, quiz_questions(*)").eq("status", "pending").order("created_at", { ascending: false })).data ?? [] });
+  const review = async (id: string, approve: boolean) => {
+    let note: string | null = null;
+    if (!approve) { note = prompt("سبب الرفض (اختياري)"); if (note === null) return; }
+    const { error } = await supabase.rpc("admin_review_quiz", { _quiz: id, _approve: approve, _note: note });
+    if (error) return toast.error(error.message);
+    toast.success(approve ? "تم اعتماد المسابقة ونشرها للمخدومين 🎉" : "تم رفض المسابقة");
+    qc.invalidateQueries({ queryKey: ["pending-quizzes"] }); qc.invalidateQueries({ queryKey: ["admin-quizzes"] });
+  };
+  if (!pending?.length) return null;
+  return (
+    <section className={card}>
+      <h2 className="mb-3 text-xl font-extrabold">📨 مسابقات بانتظار الاعتماد ({pending.length})</h2>
+      <div className="space-y-3">{pending.map((z: any) => (
+        <div key={z.id} className="rounded-2xl border-2 border-amber-500/40 bg-amber-500/5 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="font-extrabold">🧠 {z.title} <span className="text-xs text-muted-foreground">({z.quiz_questions?.length ?? 0} سؤال)</span></span>
+            <div className="flex gap-2">
+              <button onClick={() => review(z.id, true)} className="rounded-xl bg-emerald-600 px-3 py-1.5 text-sm font-bold text-white">اعتماد ونشر</button>
+              <button onClick={() => review(z.id, false)} className="rounded-xl bg-destructive px-3 py-1.5 text-sm font-bold text-destructive-foreground">رفض</button>
+            </div>
+          </div>
+          <div className="mt-2 max-h-64 space-y-1.5 overflow-y-auto">
+            {(z.quiz_questions ?? []).map((q: any, i: number) => (
+              <div key={q.id} className="rounded-xl bg-background p-2 text-xs">
+                <span className="font-bold">{i + 1}. {q.question}</span>
+                <span className="text-muted-foreground"> — {q.options.map((o: string, k: number) => `${k === q.correct ? "✓ " : ""}${o}`).join(" / ")}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}</div>
+    </section>
+  );
+}
+
+function ServiceYearCard() {
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const { data: years } = useQuery({ queryKey: ["service-years"], queryFn: async () => (await supabase.from("service_years").select("*").order("start_date", { ascending: false })).data ?? [] });
+  const cur = years?.find((y: any) => y.is_current) ?? years?.[0];
+  const promote = async () => {
+    if (!confirm("ترقية المراحل لبداية السنة الخدمية؟ أولى ← ثانية، ثانية ← ثالثة، وثالثة ← خريجين (خارج كشف الأسماء الفعالة).")) return;
+    if (!confirm("تأكيد أخير: لن تتأثر النقاط أو الأنشطة أو السجلات نهائيًا. هل تريد المتابعة؟")) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase.rpc("admin_promote_academic_years");
+      if (error) throw error;
+      toast.success("تمت ترقية المراحل بنجاح 🎓");
+      qc.invalidateQueries();
+    } catch (e: any) { toast.error(e.message || "تعذر تنفيذ الترقية"); } finally { setBusy(false); }
+  };
+  return (
+    <section className={card}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-extrabold">🗓️ السنة الخدمية</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {cur ? `${cur.label ? cur.label + " · " : ""}من ${cur.start_date} إلى ${cur.end_date}${cur.is_current ? " (الحالية)" : ""} — عدادات الحضور والغياب تُحتسب من بدايتها` : "لم تُحدد سنة خدمية بعد"}
+          </p>
+        </div>
+        <button onClick={promote} disabled={busy} className="rounded-xl bg-secondary px-4 py-2 text-sm font-extrabold text-secondary-foreground disabled:opacity-60">🎓 ترقية المراحل للسنة الجديدة</button>
+      </div>
+    </section>
+  );
+}
+
+function ServantConsecutiveAbsence() {
+  const { data: att } = useQuery({
+    queryKey: ["servant-attendance-4w"],
+    queryFn: async () => {
+      const res = await Promise.all([0, 1, 2, 3].map((o) => supabase.rpc("admin_servant_attendance", { _offset: o })));
+      return res.map((r) => r.data ?? []);
+    },
+  });
+  const absent = useMemo(() => {
+    if (!att?.length) return [] as { id: string; name: string; absent_count: number }[];
+    const names = new Map<string, string>();
+    const attended = new Map<string, boolean[]>();
+    att.forEach((week: any[]) => (week ?? []).forEach((s: any) => {
+      names.set(s.user_id, s.full_name);
+      const arr = attended.get(s.user_id) ?? [];
+      arr.push(!!s.attended);
+      attended.set(s.user_id, arr);
+    }));
+    const out: { id: string; name: string; absent_count: number }[] = [];
+    attended.forEach((arr, id) => {
+      let n = 0;
+      for (const a of arr) { if (!a) n++; else break; }
+      if (n >= 2) out.push({ id, name: names.get(id) ?? "", absent_count: n });
+    });
+    return out;
+  }, [att]);
+  return <ServantsAbsenceAlertButton absentServants={absent} />;
+}
+
 /* ---------- Quizzes ---------- */
 function AdminQuizzes() {
   const qc = useQueryClient();
@@ -934,6 +1031,18 @@ function AdminQuizzes() {
   const { data: quizzes } = useQuery({ queryKey: ["admin-quizzes"], queryFn: async () => (await supabase.from("quizzes").select("*").order("created_at", { ascending: false })).data ?? [] });
   const { data: res } = useQuery({ queryKey: ["quiz-res", results?.id], enabled: !!results, queryFn: async () => (await supabase.rpc("admin_quiz_results", { _quiz: results.id })).data ?? [] });
   const upd = (i, patch) => setQs(qs.map((q, j) => (j === i ? { ...q, ...patch } : q)));
+  const republish = async (z: any) => {
+    if (!confirm(`إعادة طرح «${z.title}» كمسابقة جديدة للدفعة الحالية؟ تُنسخ الأسئلة كما هي ويبدأ المتسابقون من جديد دون حذف سجل الدفعات السابقة.`)) return;
+    const { data: auth } = await supabase.auth.getUser();
+    const { data: nz, error } = await supabase.from("quizzes").insert({ title: z.title, created_by: auth.user.id, published: true, status: "published", image_url: z.image_url, opens_at: new Date().toISOString(), closes_at: null }).select("id").single();
+    if (error) return toast.error(error.message);
+    const { data: qs } = await supabase.from("quiz_questions").select("*").eq("quiz_id", z.id).order("sort");
+    const { error: e2 } = await supabase.from("quiz_questions").insert((qs ?? []).map((q: any) => ({ quiz_id: nz.id, question: q.question, options: q.options, correct: q.correct, points: q.points, sort: q.sort, image_url: q.image_url })));
+    if (e2) { await supabase.from("quizzes").delete().eq("id", nz.id); return toast.error(e2.message); }
+    await supabase.from("quizzes").update({ published: false }).eq("id", z.id);
+    toast.success("تمت إعادة النشر كدفعة جديدة 🎉");
+    qc.invalidateQueries({ queryKey: ["admin-quizzes"] });
+  };
   const create = async () => {
     if (!title.trim()) return toast.error("اكتب عنوان المسابقة");
     const missing = qs.findIndex((q) => q.correct === null || q.correct === undefined || !q.options[q.correct]?.trim());
@@ -978,11 +1087,13 @@ function AdminQuizzes() {
         <div className="mt-3 flex gap-2"><button onClick={() => setQs([...qs, blank()])} className="rounded-xl bg-muted px-4 py-2 font-bold">+ سؤال</button>
           <button onClick={create} disabled={qs.some((q) => q.correct === null)} className="rounded-xl bg-primary px-5 py-2 font-extrabold text-primary-foreground disabled:opacity-50">نشر المسابقة</button></div>
       </section>
+      <PendingQuizApprovals />
       <QuizLeague />
       <section className="space-y-2">{quizzes?.map((z) => (
         <div key={z.id} className={`${card} flex flex-wrap items-center justify-between gap-2`}>
           <span className="font-extrabold">🧠 {z.title} <span className="text-xs text-muted-foreground">{new Date(z.created_at).toLocaleDateString("ar-EG")}{z.opens_at && ` · يفتح ${new Date(z.opens_at).toLocaleString("ar-EG")}`}{z.closes_at && ` · يقفل ${new Date(z.closes_at).toLocaleString("ar-EG")}`}</span></span>
           <div className="flex gap-2"><button onClick={() => setResults({ id: z.id, title: z.title })} className="rounded-xl bg-secondary px-3 py-1.5 text-sm font-bold text-secondary-foreground">النتائج</button>
+            <button onClick={() => republish(z)} className="rounded-xl bg-sky px-3 py-1.5 text-sm font-bold text-primary-foreground">🔁 إعادة نشر</button>
             <button onClick={async () => { const { error } = await supabase.from("quizzes").update({ published: !z.published }).eq("id", z.id); if (error) return toast.error(error.message); qc.invalidateQueries({ queryKey: ["admin-quizzes"] }); }} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold">{z.published ? "إخفاء" : "إظهار"}</button>
             <button onClick={async () => { if (!confirm(`حذف مسابقة «${z.title}» نهائيًا؟`)) return; const { error } = await supabase.from("quizzes").delete().eq("id", z.id); if (error) return toast.error("لا يمكن حذف مسابقة شارك فيها مخدومون — استخدم إخفاء"); qc.invalidateQueries({ queryKey: ["admin-quizzes"] }); }} className="rounded-xl bg-destructive px-3 py-1.5 text-sm font-bold text-destructive-foreground">🗑️</button></div>
         </div>
@@ -1021,6 +1132,8 @@ function ServantsTab() {
   return (
     <div className="space-y-5">
       <ServantsManager />
+      <ServiceYearCard />
+      <ServantConsecutiveAbsence />
       <WeekPicker off={off} setOff={setOff} />
       <div className="grid gap-3 sm:grid-cols-3">
         <button onClick={() => document.getElementById("servant-preps")?.scrollIntoView({ behavior: "smooth" })} className="pop rounded-3xl bg-accent p-4 text-right text-accent-foreground"><div className="text-sm font-bold">أرسلوا التحضير</div><div className="font-display text-4xl font-extrabold">{(preps?.length ?? 0) - missing.length}</div></button>
@@ -1048,342 +1161,6 @@ function ServantsTab() {
       <Dialog open={!!prep} onOpenChange={(o) => !o && setPrep(null)}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>📘 تحضير {prep?.full_name}</DialogTitle></DialogHeader><div className="max-h-[65vh] overflow-y-auto"><p className="whitespace-pre-wrap leading-7">{prep?.notes || "بدون نص"}</p>{!!prep?.images?.length && <button onClick={() => setView(prep.images)} className="mt-3 rounded-xl bg-primary px-4 py-2 font-bold text-primary-foreground">فتح الصور ({prep.images.length})</button>}</div></DialogContent></Dialog>
       <p className="text-xs text-muted-foreground">اضغط اسم الخادم لعرض أرشيف تحضيراته كاملًا.</p>
       <ImageLightbox images={view} title="صور التحضير" onClose={() => setView(null)} />
-    </div>
-  );
-}
-
-// دالة لتوليد التسلسل التاريخي لأيام الجمعة فقط
-function getThisWeekFriday(): string {
-  const d = new Date();
-  const day = d.getDay();
-  const diff = day === 6 ? -1 : (5 - day);
-  d.setDate(d.getDate() + diff);
-  return d.toISOString().split("T")[0];
-}
-
-function getFridayList() {
-  const currentFridayStr = getThisWeekFriday();
-  const baseDate = new Date(currentFridayStr);
-  const fridays: { date: string; label: string; isCurrent: boolean }[] = [];
-
-  for (let i = -4; i <= 24; i++) {
-    const temp = new Date(baseDate);
-    temp.setDate(baseDate.getDate() - (i * 7));
-    const dateStr = temp.toISOString().split("T")[0];
-    const isCurrent = dateStr === currentFridayStr;
-    fridays.push({
-      date: dateStr,
-      label: isCurrent ? `جمعة هذا الأسبوع (${dateStr}) ★` : `جمعة ${dateStr}`,
-      isCurrent,
-    });
-  }
-
-  fridays.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  return { fridaysList: fridays, defaultFriday: currentFridayStr };
-}
-
-function AbsenceTab() {
-  const qc = useQueryClient();
-    const { fridaysList, defaultFriday } = useMemo(() => getFridayList(), []);
-  const [date, setDate] = useState<string>(defaultFriday);
-  const [loadingPersons, setLoadingPersons] = useState<Record<string, boolean>>({});
-
-  const [accountType, setAccountType] = useState<"student" | "servant">("student");
-  const [selectedYear, setSelectedYear] = useState("all");
-  const [statsDialogType, setStatsDialogType] = useState<"present" | "absent" | "total" | null>(null);
-
-  const filterYear = selectedYear === "all" ? null : selectedYear;
-
-  const { data: profilesData, isLoading } = useQuery({
-    queryKey: ["admin-attendance-complete", accountType, date],
-    queryFn: async () => {
-      const { data: profiles, error: profErr } = await supabase.from("profiles").select("*");
-      if (profErr) throw profErr;
-
-      const { data: attendanceRecords } = await supabase
-        .from("daily_attendance")
-        .select("*")
-        .eq("attendance_date", date);
-
-      const { data: allAttendanceRecords } = await supabase
-        .from("daily_attendance")
-        .select("person_id, status");
-
-      const countsMap: Record<string, { present: number, absent: number }> = {};
-      (allAttendanceRecords || []).forEach((rec: any) => {
-        if (!countsMap[rec.person_id]) {
-          countsMap[rec.person_id] = { present: 0, absent: 0 };
-        }
-        if (rec.status === 'present') countsMap[rec.person_id].present++;
-        if (rec.status === 'absent') countsMap[rec.person_id].absent++;
-      });
-
-      const allProfiles = profiles || [];
-      
-      const filtered = allProfiles.filter((m: any) => {
-        const type = (m.account_type || "").toLowerCase();
-        const hasYear = Boolean(m.academic_year && m.academic_year.trim() !== "");
-
-        if (accountType === "servant") {
-          return type.includes("servant") || type.includes("admin") || !hasYear;
-        } else {
-          return hasYear || type.includes("student") || type.includes("member") || type === "";
-        }
-      });
-
-      const listToUse = filtered.length > 0 ? filtered : allProfiles;
-
-      return listToUse.map((m: any) => {
-        const personId = m.id || m.user_id;
-        const att = (attendanceRecords || []).find((a: any) => a.person_id === personId);
-        const personCounts = countsMap[personId] || { present: 0, absent: 0 };
-
-        return {
-          person_id: personId,
-          full_name: m.full_name || m.name || m.username || "بدون اسم",
-          avatar: m.avatar || "👤",
-          photo_url: m.photo_url,
-          academic_year: m.academic_year || m.grade || "مرحلة عامة",
-          attendance_status: att ? att.status : null,
-          present_count: personCounts.present,
-          absent_count: personCounts.absent,
-          auth_user_id: m.auth_user_id,
-          email: m.email,
-          registered_externally: m.registered_externally
-        };
-      });
-    },
-  });
-
-  const people = profilesData || [];
-  const filteredPeople = filterYear ? people.filter((p: any) => p.academic_year === filterYear) : people;
-
-    const handleStatusChange = async (personId: string, status: "present" | "absent", currentStatus?: string) => {
-    if (loadingPersons[personId] || currentStatus === status) return;
-    setLoadingPersons((prev) => ({ ...prev, [personId]: true }));
-
-    try {
-      const { error } = await supabase
-        .from("daily_attendance")
-        .upsert(
-          { person_id: personId, attendance_date: date, status },
-          { onConflict: "person_id,attendance_date" }
-        );
-
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
-
-      toast.success(status === "present" ? "تم تسجيل الحضور ✓" : "تم تسجيل الغياب ✕");
-      qc.invalidateQueries({ queryKey: ["profiles-attendance-all-fixed"] });
-    } catch (err: any) {
-      toast.error(err.message || "حدث خطأ أثناء الحفظ");
-    } finally {
-      setLoadingPersons((prev) => {
-        const next = { ...prev };
-        delete next[personId];
-        return next;
-      });
-    }
-  };
-
-  const handleClearAttendance = async (personId: string) => {
-    if (loadingPersons[personId]) return;
-    setLoadingPersons((prev) => ({ ...prev, [personId]: true }));
-
-    try {
-      const { error } = await supabase
-        .from("daily_attendance")
-        .delete()
-        .eq("person_id", personId)
-        .eq("attendance_date", date);
-
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
-
-      toast.info("تم مسح الحالة وإعادة الشخص إلى (لم يُرصد)");
-      qc.invalidateQueries({ queryKey: ["profiles-attendance-all-fixed"] });
-    } finally {
-      setLoadingPersons((prev) => {
-        const next = { ...prev };
-        delete next[personId];
-        return next;
-      });
-    }
-  };
-
-
-  const presentCount = filteredPeople.filter((p: any) => p.attendance_status === "present").length;
-  const absentCount = filteredPeople.filter((p: any) => p.attendance_status === "absent").length;
-  const totalCount = filteredPeople.length;
-  const percentage = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div onClick={() => setStatsDialogType("total")} className="rounded-2xl border-2 border-border bg-card p-3 text-center cursor-pointer hover:bg-muted/50 transition">
-          <div className="text-xs text-muted-foreground">إجمالي الأفراد</div>
-          <div className="mt-1 text-2xl font-black">{totalCount}</div>
-        </div>
-        <div onClick={() => setStatsDialogType("present")} className="rounded-2xl border-2 border-border bg-card p-3 text-center cursor-pointer hover:bg-emerald-500/10 transition">
-          <div className="text-xs text-muted-foreground">الحاضرون في الجمعة</div>
-          <div className="mt-1 text-2xl font-black text-emerald-500">{presentCount}</div>
-        </div>
-        <div onClick={() => setStatsDialogType("absent")} className="rounded-2xl border-2 border-border bg-card p-3 text-center cursor-pointer hover:bg-destructive/10 transition">
-          <div className="text-xs text-muted-foreground">الغائبون في الجمعة</div>
-          <div className="mt-1 text-2xl font-black text-destructive">{absentCount}</div>
-        </div>
-        <div className="rounded-2xl border-2 border-border bg-card p-3 text-center">
-          <div className="text-xs text-muted-foreground">نسبة الحضور</div>
-          <div className="mt-1 text-2xl font-black text-sky">{percentage}%</div>
-        </div>
-      </div>
-
-      <div className={`${card} flex flex-wrap items-center justify-between gap-3`}>
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-extrabold">📅 تاريخ خدمة الجمعة:</label>
-                   <select value={date} onChange={(e) => setDate(e.target.value)} className="rounded-xl border-2 border-border bg-background px-3 py-1.5 font-bold text-sm">
-            {fridaysList.map((f) => (
-              <option key={f.date} value={f.date}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => setAccountType("student")} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${accountType === "student" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>📁 فولدر المخدومين</button>
-          <button onClick={() => setAccountType("servant")} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${accountType === "servant" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>📁 فولدر الخدام</button>
-        </div>
-        <div className="flex items-center gap-2">
-          <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="rounded-xl border-2 border-border bg-background px-3 py-1.5 text-xs font-bold">
-            <option value="all">كل المراحل</option>
-            {ACADEMIC_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        {isLoading ? (
-          <p className="text-center text-muted-foreground py-8">جاري التحميل...</p>
-        ) : !filteredPeople.length ? (
-          <p className="text-center text-muted-foreground py-8">لا توجد بيانات مسجلة للأفراد في هذا القسم.</p>
-        ) : (
-          <div className="grid gap-2.5 md:grid-cols-2">
-            {filteredPeople.map((item: any) => {
-              const presentCountVal = item.present_count || 0; 
-              const absentCountVal = item.absent_count || 0;
-
-              return (
-                <div key={item.person_id} className="flex items-center justify-between rounded-2xl border-2 border-border bg-card p-3.5">
-                  <div className="flex items-center gap-3">
-                    {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-sm">{item.full_name}</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground">{item.academic_year || (accountType === "servant" ? "خادم" : "بدون مرحلة")}</div>
-                    </div>
-                  </div>
-
-                                     <div className="flex items-center gap-1.5">
-                      {/* زر حاضر: يتعطل إذا كان الشخص مسجلاً حاضر بالفعل أو قيد الحفظ */}
-                      <button 
-                        disabled={loadingPersons[item.person_id] || item.attendance_status === "present"}
-                        onClick={() => handleStatusChange(item.person_id, "present", item.attendance_status)} 
-                        className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
-                          item.attendance_status === "present" 
-                            ? "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400 cursor-not-allowed opacity-90" 
-                            : "bg-muted text-muted-foreground hover:bg-emerald-100 hover:text-emerald-800 disabled:opacity-50"
-                        }`}
-                      >
-                        <span>✓ حاضر</span>
-                        <span className="rounded-full bg-black/25 px-2 py-0.5 text-[11px] font-mono text-white">
-                          {presentCountVal}
-                        </span>
-                      </button>
-
-                      {/* زر غائب: يتعطل إذا كان الشخص مسجلاً غائب بالفعل أو قيد الحفظ */}
-                      <button 
-                        disabled={loadingPersons[item.person_id] || item.attendance_status === "absent"}
-                        onClick={() => handleStatusChange(item.person_id, "absent", item.attendance_status)} 
-                        className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
-                          item.attendance_status === "absent" 
-                            ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-red-400 cursor-not-allowed opacity-90" 
-                            : "bg-muted text-muted-foreground hover:bg-red-100 hover:text-red-800 disabled:opacity-50"
-                        }`}
-                      >
-                        <span>✕ غائب</span>
-                        <span className="rounded-full bg-black/25 px-2 py-0.5 text-[11px] font-mono text-white">
-                          {absentCountVal}
-                        </span>
-                      </button>
-
-                      {/* زر مسح الرصد */}
-                      {item.attendance_status && (
-                        <button
-                          type="button"
-                          title="مسح الرصد وإعادته كـ لم يُرصد"
-                          disabled={loadingPersons[item.person_id]}
-                          onClick={() => handleClearAttendance(item.person_id)}
-                          className="rounded-lg p-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition disabled:opacity-50"
-                        >
-                          ↺
-                        </button>
-                      )}
-                    </div>
-
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {statsDialogType && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-3xl border-2 border-border bg-card p-6 shadow-2xl max-h-[85vh] flex flex-col pop">
-            <div className="flex items-center justify-between pb-4 border-b border-border">
-              <h3 className="text-lg font-extrabold">
-                {statsDialogType === "present" && `✅ قائمة الحاضرين (${presentCount})`}
-                {statsDialogType === "absent" && `⚠️ قائمة الغائبين (${absentCount})`}
-                {statsDialogType === "total" && `👥 إجمالي الأفراد (${totalCount})`}
-                <span className="block text-xs font-normal text-muted-foreground mt-0.5">
-                  ({accountType === "student" ? "المخدومين - الأولاد" : "الخدام"})
-                </span>
-              </h3>
-              <button onClick={() => setStatsDialogType(null)} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold hover:bg-destructive hover:text-white transition">✕ إغلاق</button>
-            </div>
-            <div className="mt-4 flex-1 overflow-y-auto space-y-2.5 pr-1">
-              {(() => {
-                const list = 
-                  statsDialogType === "present" ? filteredPeople.filter((p: any) => p.attendance_status === "present") :
-                  statsDialogType === "absent" ? filteredPeople.filter((p: any) => p.attendance_status === "absent") :
-                  filteredPeople;
-                if (list.length === 0) return <p className="text-center text-muted-foreground py-12">لا توجد بيانات مطابقة.</p>;
-                return list.map((item: any) => (
-                  <div key={item.person_id} className="flex items-center justify-between rounded-2xl border border-border bg-background p-3.5 shadow-sm">
-                    <div className="flex items-center gap-3">
-                      {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
-                      <div>
-                        <div className="font-extrabold text-sm">{item.full_name}</div>
-                        <div className="text-xs text-muted-foreground">{item.academic_year || (accountType === "servant" ? "خادم" : "بدون مرحلة")}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs font-bold">
-                      <span className="rounded-xl bg-emerald-500/10 px-2.5 py-1 text-emerald-600 border border-emerald-500/20">حضر: {item.present_count || 0}</span>
-                      <span className="rounded-xl bg-destructive/10 px-2.5 py-1 text-destructive border border-destructive/20">غاب: {item.absent_count || 0}</span>
-                    </div>
-                  </div>
-                ));
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

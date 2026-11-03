@@ -1,13 +1,17 @@
 // @ts-nocheck
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useServerFn } from "@tanstack/react-router";
+import { generateQuizDraft } from "@/lib/quiz-ai.functions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
-import { ACADEMIC_YEARS, fileToDataUrl, useMe } from "@/lib/app";
+import { ACADEMIC_YEARS, cairoDate, fileToDataUrl, fridayOf, useMe } from "@/lib/app";
+import { uploadServantMedia, isStoredPath, MEDIA_BUCKET } from "@/lib/media";
+import { MediaView } from "@/components/MediaPlayers";
+import { ImageLightbox } from "@/components/ImageLightbox";
 import { Textarea } from "@/components/ui/textarea";
-import { BirthdaysButton, PrepArchive, ReadingPlanner, VisitArchive } from "@/components/StaffMemberExtras";
+import { BirthdaysButton, PrepArchive, ReadingPlanner, VisitArchive, OT_BOOKS, NT_BOOKS } from "@/components/StaffMemberExtras";
 import { NotificationsBell } from "@/components/MemberExtras";
 import { ConsecutiveAbsenceAlertButtons } from "@/components/AbsenceAlertButtons";
 import { ServantSuggestionsTab } from "@/components/ServantSuggestionsTab";
@@ -84,257 +88,428 @@ function ServantPage() {
 }
 
 function Prep({ userId }: { userId: string }) {
+  const qc = useQueryClient();
   const [content, setContent] = useState("");
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>([]);
   const [voiceFile, setVoiceFile] = useState<File | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [recording, setRecording] = useState(false);
+  const [mr, setMr] = useState<MediaRecorder | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [gallery, setGallery] = useState<string[] | null>(null);
+  const [showOthers, setShowOthers] = useState(false);
+  const loadedRef = useRef(false);
+  const weekStart = fridayOf(cairoDate(new Date()));
+
+  // تحميل تحضير هذا الأسبوع إن وجد لاستكماله (يبقى محفوظًا دائمًا في الأرشيف)
+  const { data: mine } = useQuery({
+    queryKey: ["my-prep", weekStart],
+    queryFn: async () => (await supabase.from("servant_preparations").select("*").eq("user_id", userId).eq("week_start", weekStart).maybeSingle()).data,
+  });
+  useEffect(() => {
+    if (mine && !loadedRef.current) {
+      loadedRef.current = true;
+      setContent(mine.notes || "");
+      setImages(mine.images || []);
+      setAudioUrl(mine.audio_url || null);
+      setVideoUrl(mine.video_url || null);
+    }
+  }, [mine]);
+
+  const startRec = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+      rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+        setVoiceFile(new File([blob], `voice-${Date.now()}.webm`, { type: blob.type }));
+      };
+      rec.start(); setMr(rec); setRecording(true);
+    } catch { toast.error("تعذر الوصول إلى الميكروفون"); }
+  };
+  const stopRec = () => { mr?.stop(); setRecording(false); setMr(null); };
 
   const handleSave = async () => {
-    if (!content.trim() && !selectedImage && !voiceFile && !videoFile) {
+    if (!content.trim() && !images.length && !voiceFile && !audioUrl && !videoFile && !videoUrl) {
       return toast.error("يرجى كتابة التحضير أو إرفاق ملف أولاً");
     }
+    setSaving(true);
+    try {
+      let audio = audioUrl;
+      let video = videoUrl;
+      if (voiceFile) audio = await uploadServantMedia(voiceFile, userId);
+      if (videoFile) video = await uploadServantMedia(videoFile, userId);
 
-        const images = selectedImage ? [selectedImage] : [];
+      const { error } = await supabase.from("servant_preparations").upsert({
+        user_id: userId,
+        week_start: weekStart,
+        notes: content.trim(),
+        images,
+        audio_url: audio,
+        video_url: video,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id,week_start" });
 
-    const { error } = await supabase.from("servant_preparations").upsert({
-      user_id: userId,
-      notes: content.trim(),
-      images: images,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "user_id,week_start" });
+      if (error) { toast.error("فشل حفظ التحضير: " + error.message); return; }
 
-    if (error) {
-      toast.error("فشل حفظ التحضير: " + error.message);
-      return;
+      toast.success("تم حفظ التحضير الأسبوعي والمرفقات بنجاح ✅");
+      setVoiceFile(null); setVideoFile(null);
+      qc.invalidateQueries({ queryKey: ["my-prep"] });
+      qc.invalidateQueries({ queryKey: ["prep-archive"] });
+      qc.invalidateQueries({ queryKey: ["week-preps"] });
+    } catch (err: any) {
+      toast.error(err.message || "تعذر رفع المرفقات");
+    } finally {
+      setSaving(false);
     }
-
-
-    toast.success("تم حفظ التحضير الأسبوعي والمرفقات بنجاح ✅");
-    setContent("");
-    setSelectedImage(null);
-    setVoiceFile(null);
-    setVideoFile(null);
   };
 
   return (
     <section className={card}>
       <h2 className="text-xl font-extrabold">📘 تحضير الخادم الأسبوعي</h2>
-      <p className="text-xs text-muted-foreground mt-1">سجل تحضير الدرس، الآيات، وارفع الصور، الفويس، أو الفيديوهات الخاصة بخدمة هذا الأسبوع.</p>
-      
-      <Textarea 
-        value={content} 
-        onChange={(e) => setContent(e.target.value)} 
-        placeholder="اكتب عناصر الدرس، الآيات، والنشاط هنا..." 
-        className="mt-3 min-h-32" 
+      <p className="text-xs text-muted-foreground mt-1">سجل تحضير الدرس، الآيات، وارفع عدة صور معًا أو منفصلة، الفويس (رفع أو تسجيل)، أو الفيديو — والتحضير يبقى محفوظًا في الأرشيف دائمًا.</p>
+
+      <Textarea
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        placeholder="اكتب عناصر الدرس، الآيات، والنشاط هنا..."
+        className="mt-3 min-h-32"
       />
 
-      <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <div>
-          {selectedImage && <img src={selectedImage} alt="Prep preview" className="mb-2 max-h-24 rounded-xl object-cover mx-auto" />}
-          <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-3 cursor-pointer hover:bg-muted text-xs font-bold text-center">
-            <span>📷 إرفاق صورة</span>
-            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                try { const url = await fileToDataUrl(file, 900, 0.75); setSelectedImage(url); } catch (err) { toast.error((err as Error).message); }
-              }
+      {/* صور متعددة */}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {images.map((s, i) => (
+          <div key={i} className="relative">
+            <img src={s} alt="" className="h-20 w-20 rounded-xl object-cover" />
+            <button type="button" onClick={() => setImages(images.filter((_, j) => j !== i))} className="absolute -left-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-destructive text-xs text-destructive-foreground">✕</button>
+          </div>
+        ))}
+        {images.length < 6 && (
+          <label className="grid h-20 w-20 cursor-pointer place-items-center rounded-xl border-2 border-dashed border-border text-center text-xs font-bold hover:bg-muted">
+            📷<br />صور
+            <input type="file" accept="image/*" multiple className="hidden" onChange={async (e) => {
+              const files = Array.from(e.target.files ?? []).slice(0, 6 - images.length);
+              try {
+                const urls = await Promise.all(files.map((f) => fileToDataUrl(f, 900, 0.75)));
+                setImages([...images, ...urls]);
+              } catch (err) { toast.error((err as Error).message); }
+              e.target.value = "";
             }} />
           </label>
-        </div>
-
-        <div>
-          <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-3 cursor-pointer hover:bg-muted text-xs font-bold text-center h-full">
-            <span>🎤 إرفاق فويس (صوت)</span>
-            <input type="file" accept="audio/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) setVoiceFile(file); }} />
-          </label>
-          {voiceFile && <p className="text-[10px] text-emerald-600 text-center mt-1 font-bold">{voiceFile.name}</p>}
-        </div>
-
-        <div>
-          <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-3 cursor-pointer hover:bg-muted text-xs font-bold text-center h-full">
-            <span>🎬 إرفاق فيديو</span>
-            <input type="file" accept="video/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) setVideoFile(file); }} />
-          </label>
-          {videoFile && <p className="text-[10px] text-emerald-600 text-center mt-1 font-bold">{videoFile.name}</p>}
-        </div>
+        )}
       </div>
 
-      <button onClick={handleSave} className="pop mt-4 w-full rounded-2xl bg-sky py-3 font-extrabold text-primary-foreground">
-        حفظ التحضير والمرفقات
+      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border p-3 text-center text-xs font-bold hover:bg-muted">
+          🎤 {voiceFile ? voiceFile.name.slice(0, 18) : audioUrl ? "صوت محفوظ ✓ (استبدل بالرفع)" : "رفع فويس (صوت)"}
+          <input type="file" accept="audio/*" className="hidden" onChange={(e) => { setVoiceFile(e.target.files?.[0] ?? null); e.target.value = ""; }} />
+        </label>
+        <button type="button" onClick={() => (recording ? stopRec() : startRec())}
+          className={`rounded-2xl border-2 p-3 text-xs font-bold transition ${recording ? "animate-pulse border-destructive bg-destructive/10 text-destructive" : "border-border hover:bg-muted"}`}>
+          {recording ? "⏹ إيقاف التسجيل" : "🎙️ تسجيل فويس"}
+        </button>
+        <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border p-3 text-center text-xs font-bold hover:bg-muted">
+          🎬 {videoFile ? videoFile.name.slice(0, 18) : videoUrl ? "فيديو محفوظ ✓ (استبدل بالرفع)" : "رفع فيديو"}
+          <input type="file" accept="video/*" className="hidden" onChange={(e) => { setVideoFile(e.target.files?.[0] ?? null); e.target.value = ""; }} />
+        </label>
+      </div>
+
+      {(audioUrl || videoUrl) && (
+        <div className="mt-3 space-y-2 rounded-2xl bg-muted/40 p-3">
+          <div className="text-xs font-bold text-muted-foreground">المرفقات المحفوظة لهذا الأسبوع:</div>
+          {audioUrl && <MediaView src={audioUrl} kind="audio" />}
+          {videoUrl && <MediaView src={videoUrl} kind="video" />}
+        </div>
+      )}
+
+      <button onClick={handleSave} disabled={saving} className="pop mt-4 w-full rounded-2xl bg-sky py-3 font-extrabold text-primary-foreground disabled:opacity-60">
+        {saving ? "جاري الحفظ..." : "حفظ التحضير والمرفقات"}
       </button>
+
+      {/* تحضيرات باقي الخدام */}
+      <div className="mt-5 border-t border-border pt-4">
+        <button onClick={() => setShowOthers(!showOthers)} className="mb-3 w-full rounded-2xl bg-muted py-2.5 font-extrabold">
+          {showOthers ? "▾ إخفاء تحضيرات باقي الخدام" : "▸ استعراض تحضيرات باقي الخدام هذا الأسبوع"}
+        </button>
+        {showOthers && <OtherPreps weekStart={weekStart} userId={userId} />}
+      </div>
+      <ImageLightbox images={gallery} title="صور التحضير" onClose={() => setGallery(null)} />
     </section>
   );
 }
 
+function OtherPreps({ weekStart, userId }: { weekStart: string; userId: string }) {
+  const [gallery, setGallery] = useState<string[] | null>(null);
+  const { data, isLoading } = useQuery({
+    queryKey: ["week-preps", weekStart],
+    queryFn: async () => { const { data, error } = await supabase.rpc("servant_week_preps", { _week: weekStart }); if (error) throw error; return data ?? []; },
+  });
+  const others = (data ?? []).filter((p: any) => p.user_id !== userId);
+  if (isLoading) return <p className="text-center text-sm text-muted-foreground">جاري التحميل...</p>;
+  if (!others.length) return <p className="text-center text-sm text-muted-foreground">لم يرسل باقي الخدام تحضيراتهم لهذا الأسبوع بعد.</p>;
+  return (
+    <div className="space-y-3">
+      {others.map((p: any) => (
+        <div key={p.user_id} className="rounded-2xl border-2 border-border bg-background p-3">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">{p.avatar || "👤"}</span>
+            <span className="font-extrabold">{p.full_name}</span>
+            <span className="mr-auto text-xs text-muted-foreground">{new Date(p.updated_at).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" })}</span>
+          </div>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-7">{p.notes || "بدون نص"}</p>
+          {!!p.images?.length && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {p.images.map((s: string, i: number) => (
+                <img key={i} src={s} alt="" onClick={() => setGallery(p.images)} className="h-16 w-16 cursor-zoom-in rounded-lg object-cover" />
+              ))}
+            </div>
+          )}
+          {(p.audio_url || p.video_url) && (
+            <div className="mt-2 space-y-2">
+              {p.audio_url && <MediaView src={p.audio_url} kind="audio" />}
+              {p.video_url && <MediaView src={p.video_url} kind="video" />}
+            </div>
+          )}
+        </div>
+      ))}
+      <ImageLightbox images={gallery} title="صور التحضير" onClose={() => setGallery(null)} />
+    </div>
+  );
+}
+
 function AiQuizGeneratorSection() {
-  const [sourceType, setSourceType] = useState<"text" | "image" | "voice" | "video">("text");
+  const gen = useServerFn(generateQuizDraft as any);
+  const qc = useQueryClient();
+  const { data: me } = useMe();
+  const [sourceType, setSourceType] = useState<"text" | "image" | "audio" | "video" | "bible">("text");
   const [textContent, setTextContent] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [voiceFile, setVoiceFile] = useState<File | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [book, setBook] = useState(NT_BOOKS[0][1]);
+  const [chapter, setChapter] = useState("1");
+  const [verses, setVerses] = useState("");
+  const [count, setCount] = useState<15 | 20>(15);
   const [loading, setLoading] = useState(false);
-  const [generatedQuestions, setGeneratedQuestions] = useState<any[]>([]);
-  
-  const [quizTitle, setQuizTitle] = useState("مسابقة أبطال الملاك الأسبوعية");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [title, setTitle] = useState("مسابقة أبطال الملاك الأسبوعية");
+  const [opens, setOpens] = useState("");
+  const [closes, setCloses] = useState("");
+  const [draft, setDraft] = useState<{ title: string; questions: { question: string; kind: "tf" | "mcq"; options: string[]; correct: number; points: number }[] } | null>(null);
+
+  // مسابقاتي المرسلة للمراجعة
+  const { data: myQuizzes } = useQuery({
+    queryKey: ["my-quizzes", me?.user.id],
+    enabled: !!me,
+    queryFn: async () => (await supabase.from("quizzes").select("id, title, status, created_at, opens_at, closes_at").eq("created_by", me!.user.id).order("created_at", { ascending: false })).data ?? [],
+  });
+
+  const audioB64 = async (f: File) => new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split("base64,")[1] || ""); r.onerror = rej; r.readAsDataURL(f); });
 
   const handleGenerate = async () => {
-    if (sourceType === "text" && !textContent.trim()) return toast.error("يرجى كتابة نص المسابقة أولاً");
-    if (sourceType === "image" && !selectedImage) return toast.error("يرجى رفع صورة المسابقة أولاً");
-    if (sourceType === "voice" && !voiceFile) return toast.error("يرجى رفع ملف الصوت أولاً");
-    if (sourceType === "video" && !videoFile) return toast.error("يرجى رفع ملف الفيديو أولاً");
-
-    setLoading(true);
-    setTimeout(() => {
+    try {
+      setLoading(true);
+      const data: any = { sourceType, count };
+      if (sourceType === "text") {
+        if (!textContent.trim()) { toast.error("اكتب نص المسابقة أولاً"); return; }
+        data.text = textContent.trim();
+      } else if (sourceType === "image") {
+        if (!selectedImage) { toast.error("ارفع صورة المسابقة أولاً"); return; }
+        data.imageDataUrl = selectedImage;
+      } else if (sourceType === "audio") {
+        if (!voiceFile) { toast.error("ارفع ملف الصوت أولاً"); return; }
+        data.audioBase64 = await audioB64(voiceFile);
+        data.audioMime = voiceFile.type || "audio/mpeg";
+      } else if (sourceType === "video") {
+        if (!videoFile) { toast.error("ارفع ملف الفيديو أولاً"); return; }
+        data.videoBase64 = await audioB64(videoFile);
+        data.videoMime = videoFile.type || "video/mp4";
+      } else {
+        if (!chapter || Number(chapter) < 1) { toast.error("حدد الأصحاح"); return; }
+        data.bible = { book, chapter: Number(chapter), ...(verses.trim() ? (() => { const m = verses.trim().match(/^(\d+)\s*(?:-\s*(\d+))?$/); return m ? { from: Number(m[1]), to: m[2] ? Number(m[2]) : undefined } : {}; })() : {}) };
+      }
+      const out = await gen({ data } as any);
+      if (!out?.questions?.length) throw new Error("لم يتم توليد أسئلة");
+      setTitle(out.title || title);
+      setDraft(out);
+      toast.success(`تم توليد ${out.questions.length} سؤالًا — راجعها وحدد الإجابات قبل الإرسال ✅`);
+    } catch (e: any) {
+      toast.error(e.message || "تعذر توليد المسابقة");
+    } finally {
       setLoading(false);
-      setGeneratedQuestions([
-        { question: "ما هو العنوان الرئيسي للنص أو الملف المرفوع؟", options: ["الخيار الأول", "الخيار الثاني", "الخيار الصحيح"], answer: "الخيار الصحيح", points: 5 },
-        { question: "ما هي التفاصيل الإضافية المستخرجة من المحتوى المرفوع؟", options: ["نعم", "لا"], answer: "نعم", points: 5 }
-      ]);
-      toast.success("تم توليد الأسئلة بنجاح، يمكنك مراجعتها وتعديلها الآن ✅");
-    }, 1500);
+    }
   };
 
-  const handleQuestionChange = (index: number, field: string, value: any) => {
-    const updated = [...generatedQuestions];
-    updated[index][field] = value;
-    setGeneratedQuestions(updated);
+  const upd = (i: number, patch: any) => setDraft((d) => d && ({ ...d, questions: d.questions.map((q, j) => (j === i ? { ...q, ...patch } : q)) }));
+
+  const handleSubmit = async () => {
+    if (!draft) return;
+    if (!title.trim()) return toast.error("اكتب عنوان المسابقة");
+    const missing = draft.questions.findIndex((q) => q.correct < 0 || q.correct >= q.options.length);
+    if (missing >= 0) return toast.error(`حدد الإجابة الصحيحة للسؤال ${missing + 1} قبل الإرسال`);
+    if (opens && closes && new Date(closes) <= new Date(opens)) return toast.error("وقت القفل لازم يكون بعد وقت الفتح");
+    setSubmitting(true);
+    try {
+      const { data: nid, error } = await supabase.rpc("servant_submit_quiz", {
+        _title: title.trim(),
+        _questions: draft.questions,
+        _opens_at: opens ? new Date(opens).toISOString() : null,
+        _closes_at: closes ? new Date(closes).toISOString() : null,
+        _source: sourceType === "image" ? selectedImage : null,
+      });
+      if (error) throw error;
+      toast.success("تم إرسال المسابقة للمشرف للاعتماد قبل نشرها للمخدومين ✅");
+      setDraft(null); setTextContent(""); setSelectedImage(null); setVoiceFile(null); setVideoFile(null);
+      qc.invalidateQueries({ queryKey: ["my-quizzes"] });
+      qc.invalidateQueries({ queryKey: ["admin-quizzes"] });
+    } catch (e: any) {
+      toast.error(e.message || "تعذر إرسال المسابقة");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleSaveQuizToDB = async () => {
-    if (!generatedQuestions.length) return toast.error("لا توجد أسئلة لحفظها");
-    
-    await supabase.from("quizzes" as any).insert({
-      title: quizTitle,
-      questions: generatedQuestions,
-      start_date: startDate || null,
-      end_date: endDate || null,
-      created_at: new Date().toISOString()
-    }).catch(() => {});
-
-    toast.success("تم اعتماد ونشر المسابقة بنجاح لتظهر للمخدومين وتضاف نقاطهم 🚀");
-    setGeneratedQuestions([]);
-    setTextContent("");
-    setSelectedImage(null);
-    setVoiceFile(null);
-    setVideoFile(null);
+  const STATUS: Record<string, { l: string; c: string }> = {
+    pending: { l: "⏳ قيد اعتماد المشرف", c: "bg-amber-500/20 text-amber-600" },
+    published: { l: "✅ منشورة", c: "bg-emerald-500/20 text-emerald-600" },
+    rejected: { l: "🚫 مرفوضة — عدّلها وأعد الإرسال", c: "bg-destructive/20 text-destructive" },
   };
 
   return (
     <div className="space-y-4">
       <section className={card}>
         <h2 className="text-xl font-extrabold">🤖 توليد المسابقات تلقائياً بالذكاء الاصطناعي</h2>
-        <p className="text-xs text-muted-foreground mt-1">اختر مصدر المسابقة، قم برفع الملف، وتوليد الأسئلة ومراجعتها قبل نشرها للمخدومين.</p>
+        <p className="text-xs text-muted-foreground mt-1">اختر المصدر وولّد ١٥ أو ٢٠ سؤالًا (صح/خطأ واختيار من ٣)، راجعها كاملة، ثم أرسلها للمشرف للاعتماد قبل النشر.</p>
 
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <button onClick={() => setSourceType("text")} className={`rounded-xl py-2 text-xs font-bold transition ${sourceType === "text" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>📝 نص مكتوب</button>
-          <button onClick={() => setSourceType("image")} className={`rounded-xl py-2 text-xs font-bold transition ${sourceType === "image" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>📷 صورة</button>
-          <button onClick={() => setSourceType("voice")} className={`rounded-xl py-2 text-xs font-bold transition ${sourceType === "voice" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>🎤 فويس (صوت)</button>
-          <button onClick={() => setSourceType("video")} className={`rounded-xl py-2 text-xs font-bold transition ${sourceType === "video" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>🎬 فيديو</button>
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {([["text", "📝 نص مكتوب"], ["image", "📷 صورة"], ["audio", "🎤 فويس"], ["video", "🎬 فيديو"], ["bible", "📖 شاهد كتابي"]] as const).map(([k, l]) => (
+            <button key={k} onClick={() => setSourceType(k)} className={`rounded-xl py-2 text-xs font-bold transition ${sourceType === k ? "bg-sky text-primary-foreground" : "bg-muted"}`}>{l}</button>
+          ))}
         </div>
 
         <div className="mt-4">
-          {sourceType === "text" && (
-            <Textarea value={textContent} onChange={(e) => setTextContent(e.target.value)} placeholder="اكتب أو الصق نص الدرس هنا..." className="min-h-32" />
-          )}
+          {sourceType === "text" && <Textarea value={textContent} onChange={(e) => setTextContent(e.target.value)} placeholder="اكتب أو الصق نص الدرس هنا..." className="min-h-32" />}
           {sourceType === "image" && (
             <div className="space-y-2">
-              {selectedImage && <img src={selectedImage} alt="Uploaded quiz" className="max-h-48 rounded-2xl object-cover mx-auto" />}
-              <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-6 cursor-pointer hover:bg-muted">
+              {selectedImage && <img src={selectedImage} alt="" className="mx-auto max-h-48 rounded-2xl object-cover" />}
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border p-6 hover:bg-muted">
                 <span>📷 اضغط لرفع صورة المسابقة</span>
                 <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    try { const url = await fileToDataUrl(file, 900, 0.75); setSelectedImage(url); } catch (err) { toast.error((err as Error).message); }
-                  }
+                  const f = e.target.files?.[0];
+                  if (f) { try { setSelectedImage(await fileToDataUrl(f, 900, 0.75)); } catch (err) { toast.error((err as Error).message); } }
+                  e.target.value = "";
                 }} />
               </label>
             </div>
           )}
-          {sourceType === "voice" && (
+          {sourceType === "audio" && (
             <div className="space-y-2">
-              <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-6 cursor-pointer hover:bg-muted">
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border p-6 hover:bg-muted">
                 <span>🎤 اضغط لرفع ملف صوتي (فويس)</span>
-                <input type="file" accept="audio/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) setVoiceFile(file); }} />
+                <input type="file" accept="audio/*" className="hidden" onChange={(e) => { setVoiceFile(e.target.files?.[0] ?? null); e.target.value = ""; }} />
               </label>
-              {voiceFile && <p className="text-xs font-bold text-emerald-600 text-center">تم اختيار الملف الصوتي: {voiceFile.name}</p>}
+              {voiceFile && <p className="text-center text-xs font-bold text-emerald-600">تم اختيار الملف الصوتي: {voiceFile.name}</p>}
             </div>
           )}
           {sourceType === "video" && (
             <div className="space-y-2">
-              <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-6 cursor-pointer hover:bg-muted">
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border p-6 hover:bg-muted">
                 <span>🎬 اضغط لرفع ملف فيديو</span>
-                <input type="file" accept="video/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) setVideoFile(file); }} />
+                <input type="file" accept="video/*" className="hidden" onChange={(e) => { setVideoFile(e.target.files?.[0] ?? null); e.target.value = ""; }} />
               </label>
-              {videoFile && <p className="text-xs font-bold text-emerald-600 text-center">تم اختيار ملف الفيديو: {videoFile.name}</p>}
+              {videoFile && <p className="text-center text-xs font-bold text-emerald-600">تم اختيار ملف الفيديو: {videoFile.name}</p>}
+            </div>
+          )}
+          {sourceType === "bible" && (
+            <div className="grid gap-2 sm:grid-cols-3">
+              <label className="text-xs font-bold">السفر<select value={book} onChange={(e) => setBook(e.target.value)} className="rounded-xl border-2 border-border bg-background px-2 py-1.5 text-sm font-bold">{[...OT_BOOKS, ...NT_BOOKS].map(([, n]) => <option key={n}>{n}</option>)}</select></label>
+              <label className="text-xs font-bold">الأصحاح<input type="number" min={1} value={chapter} onChange={(e) => setChapter(e.target.value)} className="rounded-xl border-2 border-border bg-background px-2 py-1.5 text-sm font-bold" /></label>
+              <label className="text-xs font-bold">الآيات (اختياري)<input value={verses} onChange={(e) => setVerses(e.target.value)} placeholder="مثال: 16 أو 1-5" className="rounded-xl border-2 border-border bg-background px-2 py-1.5 text-sm font-bold" /></label>
             </div>
           )}
         </div>
 
-        <button disabled={loading} onClick={handleGenerate} className="pop mt-4 w-full rounded-2xl bg-sky py-3 text-base font-extrabold text-primary-foreground disabled:opacity-60">
-          {loading ? "جاري تحليل المحتوى وتوليد الأسئلة..." : "توليد الأسئلة تلقائياً ⚡"}
-        </button>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <label className="text-xs font-bold">عدد الأسئلة:
+            <select value={count} onChange={(e) => setCount(Number(e.target.value) as 15 | 20)} className="mr-2 rounded-xl border-2 border-border bg-background px-2 py-1 text-sm font-bold">
+              <option value={15}>١٥ سؤالًا</option>
+              <option value={20}>٢٠ سؤالًا</option>
+            </select>
+          </label>
+          <button disabled={loading} onClick={handleGenerate} className="pop mr-auto rounded-2xl bg-sky px-6 py-2.5 font-extrabold text-primary-foreground disabled:opacity-60">
+            {loading ? "جاري التحليل والتوليد..." : "توليد الأسئلة تلقائياً ⚡"}
+          </button>
+        </div>
       </section>
 
-      {generatedQuestions.length > 0 && (
+      {draft && (
         <section className={card}>
-          <h3 className="text-lg font-extrabold text-emerald-600 mb-3">✨ معاينة وتعديل الأسئلة قبل النشر:</h3>
-          
-          <div className="space-y-3 mb-4 p-3 bg-muted/40 rounded-2xl border border-border">
+          <h3 className="mb-3 text-lg font-extrabold text-emerald-600">✨ مراجعة وتعديل الأسئلة قبل الإرسال ({draft.questions.length} سؤالًا):</h3>
+
+          <div className="mb-4 space-y-3 rounded-2xl border border-border bg-muted/40 p-3">
             <div>
               <label className="text-xs font-bold">عنوان المسابقة:</label>
-              <input type="text" value={quizTitle} onChange={(e) => setQuizTitle(e.target.value)} className="w-full mt-1 rounded-xl border border-border bg-background px-3 py-1.5 text-sm font-bold" />
+              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-1.5 text-sm font-bold" />
             </div>
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              <div>
-                <label className="text-xs font-bold">بداية المسابقة:</label>
-                <input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full mt-1 rounded-xl border border-border bg-background px-2 py-1 text-xs font-bold" />
-              </div>
-              <div>
-                <label className="text-xs font-bold">نهاية المسابقة:</label>
-                <input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full mt-1 rounded-xl border border-border bg-background px-2 py-1 text-xs font-bold" />
-              </div>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-xs font-bold">⏰ فتح المسابقة<input type="datetime-local" value={opens} onChange={(e) => setOpens(e.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-2 py-1 text-xs font-bold" /></label>
+              <label className="text-xs font-bold">🔒 قفل المسابقة<input type="datetime-local" value={closes} onChange={(e) => setCloses(e.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-2 py-1 text-xs font-bold" /></label>
             </div>
+            <p className="text-[11px] text-muted-foreground">اترك الوقت فارغًا لتفتح فورًا بعد اعتماد المشرف ولا تُقفل.</p>
           </div>
 
-          <div className="space-y-4">
-            {generatedQuestions.map((q, idx) => (
-              <div key={idx} className="rounded-xl border-2 border-border bg-background p-4 space-y-2">
+          <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+            {draft.questions.map((q, idx) => (
+              <div key={idx} className="space-y-2 rounded-xl border-2 border-border bg-background p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-black bg-sky/20 text-sky px-2 py-0.5 rounded">السؤال {idx + 1}</span>
+                  <span className="rounded bg-sky/20 px-2 py-0.5 text-xs font-black text-sky">سؤال {idx + 1} · {q.kind === "tf" ? "صح/خطأ" : "اختيار من متعدد"}</span>
                   <div className="flex items-center gap-1">
-                    <span className="text-xs font-bold">نقاط السؤال:</span>
-                    <input 
-                      type="number" 
-                      value={q.points || 5} 
-                      onChange={(e) => handleQuestionChange(idx, "points", Number(e.target.value))} 
-                      className="w-16 rounded-lg border border-border bg-card px-2 py-0.5 text-center text-xs font-bold" 
-                    />
+                    <span className="text-xs font-bold">الدرجة:</span>
+                    <input type="number" value={q.points || 5} onChange={(e) => upd(idx, { points: Number(e.target.value) })} className="w-16 rounded-lg border border-border bg-card px-2 py-0.5 text-center text-xs font-bold" />
+                    <button onClick={() => setDraft((d) => d && ({ ...d, questions: d.questions.filter((_, j) => j !== idx) }))} className="ml-1 text-xs text-destructive" title="حذف السؤال">✕</button>
                   </div>
                 </div>
 
-                <input 
-                  type="text" 
-                  value={q.question} 
-                  onChange={(e) => handleQuestionChange(idx, "question", e.target.value)} 
-                  className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm font-bold" 
-                />
+                <input type="text" value={q.question} onChange={(e) => upd(idx, { question: e.target.value })} className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm font-bold" />
 
-                <div className="text-xs text-muted-foreground mt-1">الإجابة الصحيحة:</div>
-                <input 
-                  type="text" 
-                  value={q.answer} 
-                  onChange={(e) => handleQuestionChange(idx, "answer", e.target.value)} 
-                  className="w-full rounded-xl border border-emerald-500/40 bg-emerald-500/5 px-3 py-1.5 text-xs font-extrabold text-emerald-600" 
-                />
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {q.options.map((o, k) => (
+                    <label key={k} className="flex items-center gap-2">
+                      <input type="radio" checked={q.correct === k} onChange={() => upd(idx, { correct: k })} title="الإجابة الصحيحة" />
+                      <input type="text" value={o} onChange={(e) => upd(idx, { options: q.options.map((x, m) => (m === k ? e.target.value : x)) })} className={`w-full rounded-xl border px-2 py-1.5 text-xs font-extrabold ${q.correct === k ? "border-emerald-500 bg-emerald-500/10 text-emerald-600" : "border-border bg-card"}`} />
+                    </label>
+                  ))}
+                </div>
+                <p className={`text-xs font-bold ${q.correct < 0 || q.correct >= q.options.length ? "text-destructive" : "text-emerald-600"}`}>
+                  {q.correct < 0 || q.correct >= q.options.length ? "⚠️ لم تحدد الإجابة الصحيحة — اضغط الدائرة بجوارها" : `✓ الإجابة الصحيحة: ${q.options[q.correct] || "اختيار " + (q.correct + 1)}`}
+                </p>
               </div>
             ))}
           </div>
 
-          <button onClick={handleSaveQuizToDB} className="pop mt-5 w-full rounded-2xl bg-emerald-600 py-3 text-base font-extrabold text-white shadow-lg">
-            اعتماد ونشر المسابقة فوراً للمخدومين 🚀
+          <button onClick={handleSubmit} disabled={submitting} className="pop mt-5 w-full rounded-2xl bg-emerald-600 py-3 text-base font-extrabold text-white shadow-lg disabled:opacity-60">
+            {submitting ? "جاري الإرسال..." : "إرسال المسابقة للاعتماد 📨"}
           </button>
+        </section>
+      )}
+
+      {!!myQuizzes?.length && (
+        <section className={card}>
+          <h3 className="mb-3 text-lg font-extrabold">📨 مسابقاتي المرسلة</h3>
+          <div className="space-y-2">
+            {myQuizzes.map((z: any) => (
+              <div key={z.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-muted p-3 text-sm">
+                <span className="font-extrabold">🧠 {z.title}</span>
+                <span className="text-xs text-muted-foreground">{new Date(z.created_at).toLocaleDateString("ar-EG")}{z.closes_at && ` · يقفل ${new Date(z.closes_at).toLocaleString("ar-EG")}`}</span>
+                <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${STATUS[z.status]?.c ?? "bg-muted"}`}>{STATUS[z.status]?.l ?? z.status}</span>
+              </div>
+            ))}
+          </div>
         </section>
       )}
     </div>
@@ -402,9 +577,11 @@ function DailyAttendanceSection() {
         .select("*")
         .eq("attendance_date", date);
 
-      const { data: allAttendanceRecords } = await supabase
-        .from("daily_attendance")
-        .select("person_id, status");
+      // العدادات من بداية السنة الخدمية الحالية فقط
+      const { data: sy } = await supabase.from("service_years").select("start_date, end_date").eq("is_current", true).maybeSingle();
+      let qAll = supabase.from("daily_attendance").select("person_id, status");
+      if (sy) qAll = qAll.gte("attendance_date", sy.start_date).lte("attendance_date", sy.end_date);
+      const { data: allAttendanceRecords } = await qAll;
 
       const countsMap: Record<string, { present: number, absent: number }> = {};
       (allAttendanceRecords || []).forEach((rec: any) => {
@@ -506,11 +683,7 @@ function DailyAttendanceSection() {
             const targetCategory = accountType === "servant" ? "الخادم" : "المخدوم";
             toast.warning(`⚠️ تنبيه: ${targetCategory} غاب لمدة أسبوعين متتاليين وتم إخطار المشرف!`);
             
-            await supabase.from("suggestions_and_notes").insert({
-              content: `⚠️ تنبيه غياب متكرر (أسبوعين متتاليين): ${targetCategory} غاب في جمعة ${previousFriday} وجمعة ${date}`,
-              target_type: "all_servants",
-              status: "pending"
-            }).catch(() => {});
+            await supabase.rpc("servant_report_absence_alert", { _message: `⚠️ تنبيه غياب متكرر (أسبوعين متتاليين): ${targetCategory} غاب في جمعة ${previousFriday} وجمعة ${date}` }).catch(() => {});
           }
         }
       }
@@ -555,6 +728,17 @@ function DailyAttendanceSection() {
     }
   };
 
+
+  const closeFriday = async () => {
+    const unmarked = filteredPeople.filter((p: any) => !p.attendance_status);
+    if (!unmarked.length) return toast.info("كل الأفراد مُرصدون بالفعل لهذه الجمعة");
+    if (!confirm(`اعتماد جمعة ${date}؟ سيتم اعتبار ${unmarked.length} شخصًا غائبًا تلقائيًا، مع إمكانية تعديل أي حالة لاحقًا.`)) return;
+    const rows = unmarked.map((p: any) => ({ person_id: p.person_id, attendance_date: date, status: "absent" }));
+    const { error } = await supabase.from("daily_attendance").upsert(rows, { onConflict: "person_id,attendance_date" });
+    if (error) return toast.error(error.message);
+    toast.success("تم اعتماد الجمعة: من لم يُرصد اعتُبر غائبًا ✅");
+    qc.invalidateQueries({ queryKey: ["profiles-attendance-all-fixed"] });
+  };
 
   const presentCount = filteredPeople.filter((p: any) => p.attendance_status === "present").length;
   const absentCount = filteredPeople.filter((p: any) => p.attendance_status === "absent").length;
@@ -612,6 +796,7 @@ function DailyAttendanceSection() {
           </select>
         </div>
       </div>
+        <button onClick={closeFriday} className="rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-black text-white hover:opacity-90">✅ اعتماد الجمعة: من لم يُرصد غائب</button>
 
       <div className="flex gap-2">
         <button onClick={() => setSubTab("record")} className={`flex-1 rounded-2xl border-2 py-2.5 font-extrabold transition ${subTab === "record" ? "border-sky bg-sky text-primary-foreground" : "border-border bg-card"}`}>📝 تسجيل الحضور والغياب الأسبوعي</button>
