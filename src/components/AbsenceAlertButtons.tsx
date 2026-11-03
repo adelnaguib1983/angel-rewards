@@ -15,8 +15,7 @@ export interface AbsentPerson {
   stage?: string;
   absent_count: number;
   phone?: string;
-  // يمكن استقبال تواريخ الغياب أو الأسابيع إذا كانت متوفرة، أو عرضها بناءً على البيانات
-  absence_dates?: string[]; // تاريخ أيام الجمعة التي غاب فيها
+  absence_dates?: string[]; // تواريخ أيام الجمعة (مثال: ["2026-11-06", "2026-10-30"])
 }
 
 interface AbsenceAlertButtonsProps {
@@ -24,7 +23,7 @@ interface AbsenceAlertButtonsProps {
   absentServants?: AbsentPerson[];
 }
 
-// 1. أزرار غياب المخدومين حسب المرحلة (ترتيب الأسابيع وأيام الجمعة)
+// 1. أزرار غياب المخدومين حسب المرحلة (مع عرض تواريخ الجمعة باليوم والشهر والعام)
 export const ConsecutiveAbsenceAlertButtons = ({
   absentPersons = [],
 }: {
@@ -48,31 +47,6 @@ export const ConsecutiveAbsenceAlertButtons = ({
         (p) => (p.stage?.includes(selectedStage.match) || false) && p.absent_count >= 2
       )
     : [];
-
-  // تنظيم البيانات لتظهر مقسمة حسب أيام الجمعة/الأسابيع
-  // سنقوم بتجميع الغياب بناءً على تواريخ الجمعة المسجلة لكل شخص، أو افتراضياً حسب تواريخ الغياب
-  const groupByFriday = () => {
-    const fridaysMap: Record<string, string[]> = {};
-    
-    activeList.forEach((person) => {
-      // إذا كان الشخص لديه تواريخ غياب مسجلة، نوزعها، وإلا نضعها تحت تصنيف عام أو تاريخ الخدمة
-      const dates = person.absence_dates && person.absence_dates.length > 0 
-        ? person.absence_dates 
-        : ["الأسابيع الأخيرة المتتالية"];
-
-      dates.forEach((fridayDate) => {
-        if (!fridaysMap[fridayDate]) {
-          fridaysMap[fridayDate] = [];
-        }
-        fridaysMap[fridayDate].push(person.name);
-      });
-    });
-
-    return fridaysMap;
-  };
-
-  const fridaysData = groupByFriday();
-  const sortedFridays = Object.keys(fridaysData).sort().reverse();
 
   return (
     <>
@@ -107,35 +81,44 @@ export const ConsecutiveAbsenceAlertButtons = ({
           <DialogHeader dir="rtl">
             <DialogTitle className="flex items-center gap-2 text-primary">
               <Calendar className="h-5 w-5" />
-              أرشيف أيام الجمعة - {selectedStage?.label}
+              أرشيف غياب {selectedStage?.label}
             </DialogTitle>
           </DialogHeader>
 
-          {sortedFridays.length === 0 ? (
+          {activeList.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground space-y-2">
               <UserX className="h-10 w-10 mx-auto opacity-40" />
               <p>لا توجد تنبيهات غياب مسجلة لهذه المرحلة.</p>
             </div>
           ) : (
-            <div className="space-y-4 mt-2">
-              {sortedFridays.map((friday) => (
-                <div key={friday} className="p-3 bg-muted/50 rounded-lg border space-y-2">
-                  <div className="flex items-center justify-between border-b pb-2">
-                    <span className="font-bold text-sm text-primary flex items-center gap-1">
-                      📅 جمعة: {friday}
-                    </span>
-                    <Badge variant="outline" className="text-xs">
-                      {fridaysData[friday].length} غائبين
+            <div className="space-y-3 mt-2">
+              {activeList.map((person) => (
+                <div
+                  key={person.id}
+                  className="p-3 bg-muted rounded-lg border space-y-2"
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold text-foreground">{person.name}</span>
+                    <Badge variant="outline" className="text-amber-600 border-amber-500/30">
+                      غائب {person.absent_count} مرات متتالية
                     </Badge>
                   </div>
-                  <ul className="space-y-1 pr-2">
-                    {fridaysData[friday].map((name, idx) => (
-                      <li key={idx} className="text-sm text-foreground flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                        {name}
-                      </li>
-                    ))}
-                  </ul>
+
+                  {/* عرض تواريخ أيام الجمعة بالتحديد (اليوم والشهر والعام) إن وجدت */}
+                  {person.absence_dates && person.absence_dates.length > 0 ? (
+                    <div className="text-xs text-muted-foreground pt-1 border-t border-border/50 flex flex-wrap gap-1 items-center">
+                      <span className="font-medium text-primary">أيام الجمعة المتغيب فيها:</span>
+                      {person.absence_dates.map((dateStr, idx) => (
+                        <span key={idx} className="bg-background px-2 py-0.5 rounded border text-[11px]">
+                          📅 {dateStr}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground pt-1 border-t border-border/50">
+                      <span>📅 الغياب مسجل خلال الأسابيع الأخيرة المتتالية</span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -184,7 +167,7 @@ export const ServantsAbsenceAlertButton = ({
 
           {count === 0 ? (
             <div className="text-center py-8 text-muted-foreground space-y-2">
-              <UserX className="h-10 w-10 mx-auto opacity-40" />
+              <UserX className="h-10 w-10 mx-auto opacity-40" / >
               <p>لا توجد تنبيهات غياب للخدام حالياً.</p>
             </div>
           ) : (
@@ -192,17 +175,24 @@ export const ServantsAbsenceAlertButton = ({
               {absentServants.map((servant) => (
                 <div
                   key={servant.id}
-                  className="p-3 bg-muted rounded-lg flex justify-between items-center text-sm border"
+                  className="p-3 bg-muted rounded-lg border space-y-2"
                 >
-                  <div>
-                    <span className="font-semibold block">{servant.name}</span>
-                    {servant.phone && (
-                      <span className="text-xs text-muted-foreground">{servant.phone}</span>
-                    )}
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold text-foreground">{servant.name}</span>
+                    <Badge variant="outline" className="text-amber-600 border-amber-500/30">
+                      غائب {servant.absent_count} مرات متتالية
+                    </Badge>
                   </div>
-                  <Badge variant="outline" className="text-amber-600 border-amber-500/30">
-                    غائب {servant.absent_count} مرات متتالية
-                  </Badge>
+                  {servant.absence_dates && servant.absence_dates.length > 0 && (
+                    <div className="text-xs text-muted-foreground pt-1 border-t border-border/50 flex flex-wrap gap-1 items-center">
+                      <span className="font-medium text-primary">أيام الجمعة المتغيب فيها:</span>
+                      {servant.absence_dates.map((dateStr, idx) => (
+                        <span key={idx} className="bg-background px-2 py-0.5 rounded border text-[11px]">
+                          📅 {dateStr}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
