@@ -12,6 +12,14 @@ import { uploadServantMedia } from "@/lib/media";
 import { MediaView } from "@/components/MediaPlayers";
 import { ImageLightbox } from "@/components/ImageLightbox";
 import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { BirthdaysButton, PrepArchive, ReadingPlanner, VisitArchive, OT_BOOKS, NT_BOOKS } from "@/components/StaffMemberExtras";
 import { NotificationsBell } from "@/components/MemberExtras";
 import { ServantSuggestionsTab } from "@/components/ServantSuggestionsTab";
@@ -189,7 +197,6 @@ function Prep({ userId }: { userId: string }) {
         className="mt-3 min-h-32"
       />
 
-      {/* صور متعددة */}
       <div className="mt-3 flex flex-wrap gap-2">
         {images.map((s, i) => (
           <div key={i} className="relative">
@@ -545,7 +552,6 @@ function AiQuizGeneratorSection() {
         </div>
       </section>
 
-      {/* قسم مراجعة الأسئلة المولدة بالكامل مع Scroll مرن */}
       {draft && (
         <section className={card}>
           <h3 className="mb-3 text-lg font-extrabold text-emerald-600">✨ مراجعة وتعديل الأسئلة المولدة بالكامل ({draft.questions.length} سؤالًا):</h3>
