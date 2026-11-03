@@ -1,129 +1,182 @@
-import { useState, useMemo } from "react";
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calendar, UserX, AlertTriangle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { AlertTriangle, Users, Calendar, UserX } from 'lucide-react';
 
-interface Profile {
+export interface AbsentPerson {
   id: string;
-  full_name: string;
-  grade?: string | null;
-}
-
-interface AbsenceRecord {
-  member_id: string;
-  friday_date: string;
+  name: string;
+  stage?: string;
+  absent_count: number;
+  phone?: string;
+  weekly_records?: { week: string; date: string }[]; // تفاصيل الأسابيع إن وجدت
 }
 
 interface AbsenceAlertButtonsProps {
-  members: Profile[];
-  absenceRecords?: AbsenceRecord[];
-  getStageName?: (grade?: string | null) => string;
+  absentPersons?: AbsentPerson[];
+  absentServants?: AbsentPerson[];
 }
 
-export function AbsenceAlertButtons({
-  members,
-  absenceRecords = [],
-  getStageName = (grade) => grade || "غير محدد",
-}: AbsenceAlertButtonsProps) {
-  const [selectedGrade, setSelectedGrade] = useState<string | null>(null);
+// 1. أزرار غياب المخدومين حسب المرحلة (مع فتح أرشيف الغياب الأسبوعي)
+export const ConsecutiveAbsenceAlertButtons = ({
+  absentPersons = [],
+}: {
+  absentPersons: AbsentPerson[];
+}) => {
+  const [selectedStage, setSelectedStage] = useState<{ match: string; label: string } | null>(null);
 
-  // تجميع الغياب لكل مرحلة حسب تاريخ الجمعة (الأسبوع)
-  const archiveByGrade = useMemo(() => {
-    const grades = ["أولى إعدادي", "ثانية إعدادي", "ثالثة إعدادي"];
-    const result: Record<string, Record<string, string[]>> = {
-      "أولى إعدادي": {},
-      "ثانية إعدادي": {},
-      "ثالثة إعدادي": {},
-    };
-
-    const memberMap = new Map<string, Profile>();
-    members.forEach((m) => memberMap.set(m.id, m));
-
-    absenceRecords.forEach((record) => {
-      const member = memberMap.get(record.member_id);
-      if (!member) return;
-
-      const stage = getStageName(member.grade);
-      if (grades.includes(stage)) {
-        const date = record.friday_date || "تاريخ غير محدد";
-        if (!result[stage][date]) {
-          result[stage][date] = [];
-        }
-        result[stage][date].push(member.full_name);
-      }
-    });
-
-    return result;
-  }, [members, absenceRecords, getStageName]);
-
-  const gradesList = [
-    { label: "تنبيه غياب أولى إعدادي", value: "أولى إعدادي" },
-    { label: "تنبيه غياب ثانية إعدادي", value: "ثانية إعدادي" },
-    { label: "تنبيه غياب ثالثة إعدادي", value: "ثالثة إعدادي" },
+  const stages = [
+    { id: 'prep_1', label: 'تنبيه غياب أولى إعدادي', match: 'أولى' },
+    { id: 'prep_2', label: 'تنبيه غياب ثانية إعدادي', match: 'ثانية' },
+    { id: 'prep_3', label: 'تنبيه غياب ثالثة إعدادي', match: 'ثالثة' },
   ];
 
-  const currentArchive = selectedGrade ? archiveByGrade[selectedGrade] || {} : {};
-  const dates = Object.keys(currentArchive).sort().reverse();
+  const getStageList = (matchText: string) =>
+    absentPersons.filter(
+      (p) => (p.stage?.includes(matchText) || false) && p.absent_count >= 2
+    );
+
+  const activeList = selectedStage
+    ? absentPersons.filter(
+        (p) => (p.stage?.includes(selectedStage.match) || false) && p.absent_count >= 2
+      )
+    : [];
 
   return (
     <>
       <div className="space-y-2 w-full my-3">
-        {gradesList.map((g) => (
-          <Button
-            key={g.value}
-            variant="outline"
-            className="w-full justify-between dir-rtl text-right border-amber-500/30 hover:border-amber-500 hover:bg-amber-500/10"
-            onClick={() => setSelectedGrade(g.value)}
-          >
-            <span className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-500" />
-              {g.label}
-            </span>
-            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-              عرض الأرشيف
-            </span>
-          </Button>
-        ))}
+        {stages.map((stg) => {
+          const list = getStageList(stg.match);
+          const count = list.length;
+
+          return (
+            <Button
+              key={stg.id}
+              variant={count > 0 ? "destructive" : "outline"}
+              className="w-full flex justify-between items-center text-right dir-rtl"
+              onClick={() => setSelectedStage({ match: stg.match, label: stg.label })}
+            >
+              <span className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                {stg.label}
+              </span>
+              {count > 0 && (
+                <Badge variant="secondary" className="bg-background text-foreground">
+                  {count}
+                </Badge>
+              )}
+            </Button>
+          );
+        })}
       </div>
 
-      <Dialog open={!!selectedGrade} onOpenChange={(open) => !open && setSelectedGrade(null)}>
+      <Dialog open={!!selectedStage} onOpenChange={(open) => !open && setSelectedStage(null)}>
         <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto text-right dir-rtl">
           <DialogHeader dir="rtl">
             <DialogTitle className="flex items-center gap-2 text-primary">
               <Calendar className="h-5 w-5" />
-              أرشيف غياب {selectedGrade}
+              أرشيف غياب {selectedStage?.label}
             </DialogTitle>
           </DialogHeader>
 
-          {dates.length === 0 ? (
+          {activeList.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground space-y-2">
               <UserX className="h-10 w-10 mx-auto opacity-40" />
-              <p>لا يوجد سجلات غياب محفوظة لهذه المرحلة حتى الآن.</p>
+              <p>لا توجد تنبيهات غياب مسجلة لهذه المرحلة.</p>
             </div>
           ) : (
-            <div className="space-y-4 mt-2">
-              {dates.map((date) => {
-                const names = currentArchive[date];
-                return (
-                  <div key={date} className="p-3 border rounded-lg bg-card/60 space-y-2">
-                    <div className="flex items-center justify-between text-xs font-bold text-amber-600 bg-amber-500/10 px-2 py-1 rounded">
-                      <span>جمعة: {date}</span>
-                      <span>عدد الغائبين: {names.length}</span>
-                    </div>
-                    <ul className="text-sm space-y-1 pr-2 border-r-2 border-amber-500/40">
-                      {names.map((name, idx) => (
-                        <li key={idx} className="text-foreground">
-                          • {name}
-                        </li>
-                      ))}
-                    </ul>
+            <div className="space-y-3 mt-2">
+              {activeList.map((person) => (
+                <div
+                  key={person.id}
+                  className="p-3 bg-muted rounded-lg flex justify-between items-center text-sm border"
+                >
+                  <div>
+                    <span className="font-semibold block">{person.name}</span>
+                    {person.phone && <span className="text-xs text-muted-foreground">{person.phone}</span>}
                   </div>
-                );
-              })}
+                  <Badge variant="outline" className="text-amber-600 border-amber-500/30">
+                    غائب {person.absent_count} مرات متتالية
+                  </Badge>
+                </div>
+              ))}
             </div>
           )}
         </DialogContent>
       </Dialog>
     </>
   );
-}
+};
+
+// 2. زر تنبيه غياب الخدام (لصفحة المشرف)
+export const ServantsAbsenceAlertButton = ({
+  absentServants = [],
+}: {
+  absentServants: AbsentPerson[];
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const count = absentServants.length;
+
+  return (
+    <>
+      <Button
+        variant={count > 0 ? "destructive" : "outline"}
+        className="w-full flex justify-between items-center text-right dir-rtl my-2"
+        onClick={() => setIsOpen(true)}
+      >
+        <span className="flex items-center gap-2">
+          <Users className="h-4 w-4" />
+          تنبيه غياب الخدام
+        </span>
+        {count > 0 && (
+          <Badge variant="secondary" className="bg-background text-foreground">
+            {count}
+          </Badge>
+        )}
+      </Button>
+
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto text-right dir-rtl">
+          <DialogHeader dir="rtl">
+            <DialogTitle className="flex items-center gap-2 text-primary">
+              <Users className="h-5 w-5" />
+              الخدام المتغيبين مرتين متتاليتين أو أكثر
+            </DialogTitle>
+          </DialogHeader>
+
+          {count === 0 ? (
+            <div className="text-center py-8 text-muted-foreground space-y-2">
+              <UserX className="h-10 w-10 mx-auto opacity-40" />
+              <p>لا توجد تنبيهات غياب للخدام حالياً.</p>
+            </div>
+          ) : (
+            <div className="space-y-3 mt-2">
+              {absentServants.map((servant) => (
+                <div
+                  key={servant.id}
+                  className="p-3 bg-muted rounded-lg flex justify-between items-center text-sm border"
+                >
+                  <div>
+                    <span className="font-semibold block">{servant.name}</span>
+                    {servant.phone && (
+                      <span className="text-xs text-muted-foreground">{servant.phone}</span>
+                    )}
+                  </div>
+                  <Badge variant="outline" className="text-amber-600 border-amber-500/30">
+                    غائب {servant.absent_count} مرات متتالية
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
