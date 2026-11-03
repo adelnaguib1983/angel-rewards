@@ -197,7 +197,9 @@ export const NT_BOOKS: [number, string, number][] = [
   [64, "يوحنا الثالثة", 1], [65, "يهوذا", 1], [66, "رؤيا يوحنا", 22],
 ];
 const OT_N = ["التكوين",50,"الخروج",40,"اللاويين",27,"العدد",36,"التثنية",34,"يشوع",24,"القضاة",21,"راعوث",4,"صموئيل الأول",31,"صموئيل الثاني",24,"الملوك الأول",22,"الملوك الثاني",25,"أخبار الأيام الأول",29,"أخبار الأيام الثاني",36,"عزرا",10,"نحميا",13,"أستير",10,"أيوب",42,"المزامير",150,"الأمثال",31,"الجامعة",12,"نشيد الأنشاد",8,"إشعياء",66,"إرميا",52,"مراثي إرميا",5,"حزقيال",48,"دانيال",12,"هوشع",14,"يوئيل",3,"عاموس",9,"عوبديا",1,"يونان",4,"ميخا",7,"ناحوم",3,"حبقوق",3,"صفنيا",3,"حجي",2,"زكريا",14,"ملاخي",4] as const;
-export const OT_BOOKS_N: [number, string, number][] = Array.from({ length: 39 }, (_, i) => [i + 1, OT_N[i * 2] as string, OT_N[i * 2 + 1] as number]);
+export const OT_BOOKS_N: [number, string,
+export const OT_BOOKS = OT_BOOKS_N;
+number][] = Array.from({ length: 39 }, (_, i) => [i + 1, OT_N[i * 2] as string, OT_N[i * 2 + 1] as number]);
 export const ALL_BOOKS = [...OT_BOOKS_N, ...NT_BOOKS];
 const sel = "rounded-xl border-2 border-border bg-background px-3 py-2 font-bold";
 function BookPicker({ book, chapter, onChange }: { book: number; chapter: number; onChange: (b: number, c: number) => void }) {
