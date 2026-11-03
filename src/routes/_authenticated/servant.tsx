@@ -577,9 +577,11 @@ function DailyAttendanceSection() {
         .select("*")
         .eq("attendance_date", date);
 
-      const { data: allAttendanceRecords } = await supabase
-        .from("daily_attendance")
-        .select("person_id, status");
+      // العدادات من بداية السنة الخدمية الحالية فقط
+      const { data: sy } = await supabase.from("service_years").select("start_date, end_date").eq("is_current", true).maybeSingle();
+      let qAll = supabase.from("daily_attendance").select("person_id, status");
+      if (sy) qAll = qAll.gte("attendance_date", sy.start_date).lte("attendance_date", sy.end_date);
+      const { data: allAttendanceRecords } = await qAll;
 
       const countsMap: Record<string, { present: number, absent: number }> = {};
       (allAttendanceRecords || []).forEach((rec: any) => {
@@ -681,11 +683,7 @@ function DailyAttendanceSection() {
             const targetCategory = accountType === "servant" ? "الخادم" : "المخدوم";
             toast.warning(`⚠️ تنبيه: ${targetCategory} غاب لمدة أسبوعين متتاليين وتم إخطار المشرف!`);
             
-            await supabase.from("suggestions_and_notes").insert({
-              content: `⚠️ تنبيه غياب متكرر (أسبوعين متتاليين): ${targetCategory} غاب في جمعة ${previousFriday} وجمعة ${date}`,
-              target_type: "all_servants",
-              status: "pending"
-            }).catch(() => {});
+            await supabase.rpc("servant_report_absence_alert", { _message: `⚠️ تنبيه غياب متكرر (أسبوعين متتاليين): ${targetCategory} غاب في جمعة ${previousFriday} وجمعة ${date}` }).catch(() => {});
           }
         }
       }
@@ -730,6 +728,17 @@ function DailyAttendanceSection() {
     }
   };
 
+
+  const closeFriday = async () => {
+    const unmarked = filteredPeople.filter((p: any) => !p.attendance_status);
+    if (!unmarked.length) return toast.info("كل الأفراد مُرصدون بالفعل لهذه الجمعة");
+    if (!confirm(`اعتماد جمعة ${date}؟ سيتم اعتبار ${unmarked.length} شخصًا غائبًا تلقائيًا، مع إمكانية تعديل أي حالة لاحقًا.`)) return;
+    const rows = unmarked.map((p: any) => ({ person_id: p.person_id, attendance_date: date, status: "absent" }));
+    const { error } = await supabase.from("daily_attendance").upsert(rows, { onConflict: "person_id,attendance_date" });
+    if (error) return toast.error(error.message);
+    toast.success("تم اعتماد الجمعة: من لم يُرصد اعتُبر غائبًا ✅");
+    qc.invalidateQueries({ queryKey: ["profiles-attendance-all-fixed"] });
+  };
 
   const presentCount = filteredPeople.filter((p: any) => p.attendance_status === "present").length;
   const absentCount = filteredPeople.filter((p: any) => p.attendance_status === "absent").length;
@@ -787,6 +796,7 @@ function DailyAttendanceSection() {
           </select>
         </div>
       </div>
+        <button onClick={closeFriday} className="rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-black text-white hover:opacity-90">✅ اعتماد الجمعة: من لم يُرصد غائب</button>
 
       <div className="flex gap-2">
         <button onClick={() => setSubTab("record")} className={`flex-1 rounded-2xl border-2 py-2.5 font-extrabold transition ${subTab === "record" ? "border-sky bg-sky text-primary-foreground" : "border-border bg-card"}`}>📝 تسجيل الحضور والغياب الأسبوعي</button>
