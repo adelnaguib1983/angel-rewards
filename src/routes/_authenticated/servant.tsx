@@ -1,11 +1,14 @@
 // @ts-nocheck
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
-import { ACADEMIC_YEARS, fileToDataUrl, useMe } from "@/lib/app";
+import { ACADEMIC_YEARS, cairoDate, fileToDataUrl, fridayOf, useMe } from "@/lib/app";
+import { uploadServantMedia, isStoredPath, MEDIA_BUCKET } from "@/lib/media";
+import { MediaView } from "@/components/MediaPlayers";
+import { ImageLightbox } from "@/components/ImageLightbox";
 import { Textarea } from "@/components/ui/textarea";
 import { BirthdaysButton, PrepArchive, ReadingPlanner, VisitArchive } from "@/components/StaffMemberExtras";
 import { NotificationsBell } from "@/components/MemberExtras";
