@@ -243,7 +243,7 @@ function Tracker({ userId }: { userId: string }) {
     if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; }
     setYm({ y, m });
   };
-  const total = (settings?.length ?? 0) * 4;
+  const total = (settings?.length ?? 0) * Math.max(4, periods.length);
   const done = (logs ?? []).filter((l) => l.status === "approved").length;
   const pct = total ? Math.round((done / total) * 100) : 0;
   const books = bv.t === "OT" ? OT_BOOKS : NT_BOOK_NAMES;
@@ -277,11 +277,10 @@ function Tracker({ userId }: { userId: string }) {
               <span className="rounded-full bg-background/90 px-3 py-1 text-sm font-extrabold text-foreground">+{s.points} ⭐</span>
             </div>
             <div className="grid grid-cols-4 gap-2 p-3">
-              {[1, 2, 3, 4].map((w) => {
+              {periods.map(({ w, from }) => {
                 const log = logs?.find((l) => l.activity === s.key && l.week === w);
                 const ok = log?.status === "approved";
-                const current = cw === w;
-                const future = w > cw;
+                const current = isCurMonth && curPeriod.w === w;
                 return (
                   <button key={w} title={log?.verse ?? log?.admin_note ?? ""} disabled={!current}
                     onClick={() => {
@@ -290,8 +289,9 @@ function Tracker({ userId }: { userId: string }) {
                       add.mutate({ activity: s.key, week: w });
                     }}
                     className={`flex flex-col items-center justify-center rounded-2xl py-2 text-xs font-bold transition active:scale-90 ${ok ? `bg-gradient-to-b ${GRADS[i % 4]} text-primary-foreground` : log ? "bg-destructive/20" : current ? "animate-pulse border-2 border-primary bg-primary/10 text-primary hover:scale-105" : "bg-muted text-muted-foreground opacity-70"}`}>
-                    <span className="text-lg">{ok ? "✓" : log ? "✗" : current ? "✍️" : future ? "🔒" : "—"}</span>
+                    <span className="text-lg">{ok ? "✓" : log ? "✗" : current ? "✍️" : "🔒"}</span>
                     <span>{current && !log ? "سجّل الآن" : `أسبوع ${w}`}</span>
+                    <span className="text-[9px] opacity-70">جمعة {from.slice(8)}</span>
                   </button>
                 );
               })}
