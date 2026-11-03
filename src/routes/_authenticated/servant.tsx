@@ -292,7 +292,7 @@ function AiQuizGeneratorSection() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [voiceFile, setVoiceFile] = useState<File | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [book, setBook] = useState(NT_BOOKS[0][1]);
+  const [book, setBook] = useState(NT_BOOKS[0]?.[1] || "إنجيل متى");
   const [chapter, setChapter] = useState("1");
   const [verses, setVerses] = useState("");
   const [count, setCount] = useState<15 | 20>(15);
@@ -301,41 +301,83 @@ function AiQuizGeneratorSection() {
   const [title, setTitle] = useState("مسابقة أبطال الملاك الأسبوعية");
   const [opens, setOpens] = useState("");
   const [closes, setCloses] = useState("");
-  const [draft, setDraft] = useState<{ title: string; questions: { question: string; kind: "tf" | "mcq"; options: string[]; correct: number; points: number }[] } | null>(null);
+  const [draft, setDraft] = useState<{
+    title: string;
+    questions: { question: string; kind: "tf" | "mcq"; options: string[]; correct: number; points: number }[];
+  } | null>(null);
 
   // مسابقاتي المرسلة للمراجعة
   const { data: myQuizzes } = useQuery({
     queryKey: ["my-quizzes", me?.user.id],
     enabled: !!me,
-    queryFn: async () => (await supabase.from("quizzes").select("id, title, status, created_at, opens_at, closes_at").eq("created_by", me!.user.id).order("created_at", { ascending: false })).data ?? [],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("quizzes")
+          .select("id, title, status, created_at, opens_at, closes_at")
+          .eq("created_by", me!.user.id)
+          .order("created_at", { ascending: false })
+      ).data ?? [],
   });
 
-  const audioB64 = async (f: File) => new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split("base64,")[1] || ""); r.onerror = rej; r.readAsDataURL(f); });
+  const audioB64 = async (f: File) =>
+    new Promise<string>((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result).split("base64,")[1] || "");
+      r.onerror = rej;
+      r.readAsDataURL(f);
+    });
 
   const handleGenerate = async () => {
     try {
       setLoading(true);
       const data: any = { sourceType, count };
       if (sourceType === "text") {
-        if (!textContent.trim()) { toast.error("اكتب نص المسابقة أولاً"); return; }
+        if (!textContent.trim()) {
+          toast.error("اكتب نص المسابقة أولاً");
+          return;
+        }
         data.text = textContent.trim();
       } else if (sourceType === "image") {
-        if (!selectedImage) { toast.error("ارفع صورة المسابقة أولاً"); return; }
+        if (!selectedImage) {
+          toast.error("ارفع صورة المسابقة أولاً");
+          return;
+        }
         data.imageDataUrl = selectedImage;
       } else if (sourceType === "audio") {
-        if (!voiceFile) { toast.error("ارفع ملف الصوت أولاً"); return; }
+        if (!voiceFile) {
+          toast.error("ارفع ملف الصوت أولاً");
+          return;
+        }
         data.audioBase64 = await audioB64(voiceFile);
         data.audioMime = voiceFile.type || "audio/mpeg";
       } else if (sourceType === "video") {
-        if (!videoFile) { toast.error("ارفع ملف الفيديو أولاً"); return; }
+        if (!videoFile) {
+          toast.error("ارفع ملف الفيديو أولاً");
+          return;
+        }
         data.videoBase64 = await audioB64(videoFile);
         data.videoMime = videoFile.type || "video/mp4";
       } else {
-        if (!chapter || Number(chapter) < 1) { toast.error("حدد الأصحاح"); return; }
-        data.bible = { book, chapter: Number(chapter), ...(verses.trim() ? (() => { const m = verses.trim().match(/^(\d+)\s*(?:-\s*(\d+))?$/); return m ? { from: Number(m[1]), to: m[2] ? Number(m[2]) : undefined } : {}; })() : {}) };
+        if (!chapter || Number(chapter) < 1) {
+          toast.error("حدد الأصحاح");
+          return;
+        }
+        data.bible = {
+          book,
+          chapter: Number(chapter),
+          ...(verses.trim()
+            ? (() => {
+                const m = verses.trim().match(/^(\d+)\s*(?:-\s*(\d+))?$/);
+                return m ? { from: Number(m[1]), to: m[2] ? Number(m[2]) : undefined } : {};
+              })()
+            : {}),
+        };
       }
+
       const out = await gen({ data } as any);
       if (!out?.questions?.length) throw new Error("لم يتم توليد أسئلة");
+      
       setTitle(out.title || title);
       setDraft(out);
       toast.success(`تم توليد ${out.questions.length} سؤالًا — راجعها وحدد الإجابات قبل الإرسال ✅`);
@@ -346,7 +388,26 @@ function AiQuizGeneratorSection() {
     }
   };
 
-  const upd = (i: number, patch: any) => setDraft((d) => d && ({ ...d, questions: d.questions.map((q, j) => (j === i ? { ...q, ...patch } : q)) }));
+  const upd = (i: number, patch: any) =>
+    setDraft((d) => (d ? { ...d, questions: d.questions.map((q, j) => (j === i ? { ...q, ...patch } : q)) } : null));
+
+  // إضافة سؤال جديد يدوياً
+  const handleAddQuestion = () => {
+    if (!draft) return;
+    setDraft({
+      ...draft,
+      questions: [
+        ...draft.questions,
+        {
+          question: "سؤال جديد...",
+          kind: "mcq",
+          options: ["اختيار 1", "اختيار 2", "اختيار 3"],
+          correct: 0,
+          points: 5,
+        },
+      ],
+    });
+  };
 
   const handleSubmit = async () => {
     if (!draft) return;
@@ -354,6 +415,7 @@ function AiQuizGeneratorSection() {
     const missing = draft.questions.findIndex((q) => q.correct < 0 || q.correct >= q.options.length);
     if (missing >= 0) return toast.error(`حدد الإجابة الصحيحة للسؤال ${missing + 1} قبل الإرسال`);
     if (opens && closes && new Date(closes) <= new Date(opens)) return toast.error("وقت القفل لازم يكون بعد وقت الفتح");
+    
     setSubmitting(true);
     try {
       const { data: nid, error } = await supabase.rpc("servant_submit_quiz", {
@@ -364,8 +426,13 @@ function AiQuizGeneratorSection() {
         _source: sourceType === "image" ? selectedImage : null,
       });
       if (error) throw error;
+
       toast.success("تم إرسال المسابقة للمشرف للاعتماد قبل نشرها للمخدومين ✅");
-      setDraft(null); setTextContent(""); setSelectedImage(null); setVoiceFile(null); setVideoFile(null);
+      setDraft(null);
+      setTextContent("");
+      setSelectedImage(null);
+      setVoiceFile(null);
+      setVideoFile(null);
       qc.invalidateQueries({ queryKey: ["my-quizzes"] });
       qc.invalidateQueries({ queryKey: ["admin-quizzes"] });
     } catch (e: any) {
@@ -385,26 +452,60 @@ function AiQuizGeneratorSection() {
     <div className="space-y-4">
       <section className={card}>
         <h2 className="text-xl font-extrabold">🤖 توليد المسابقات تلقائياً بالذكاء الاصطناعي</h2>
-        <p className="text-xs text-muted-foreground mt-1">اختر المصدر وولّد ١٥ أو ٢٠ سؤالًا (صح/خطأ واختيار من ٣)، راجعها كاملة، ثم أرسلها للمشرف للاعتماد قبل النشر.</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          اختر المصدر وولّد ١٥ أو ٢٠ سؤالًا (صح/خطأ واختيار من ٣)، راجعها كاملة، ثم أرسلها للمشرف للاعتماد قبل النشر.
+        </p>
 
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
-          {([["text", "📝 نص مكتوب"], ["image", "📷 صورة"], ["audio", "🎤 فويس"], ["video", "🎬 فيديو"], ["bible", "📖 شاهد كتابي"]] as const).map(([k, l]) => (
-            <button key={k} onClick={() => setSourceType(k)} className={`rounded-xl py-2 text-xs font-bold transition ${sourceType === k ? "bg-sky text-primary-foreground" : "bg-muted"}`}>{l}</button>
+          {[
+            ["text", "📝 نص مكتوب"],
+            ["image", "📷 صورة"],
+            ["audio", "🎤 فويس"],
+            ["video", "🎬 فيديو"],
+            ["bible", "📖 شاهد كتابي"],
+          ].map(([k, l]) => (
+            <button
+              key={k}
+              onClick={() => setSourceType(k as any)}
+              className={`rounded-xl py-2 text-xs font-bold transition ${
+                sourceType === k ? "bg-sky text-primary-foreground" : "bg-muted"
+              }`}
+            >
+              {l}
+            </button>
           ))}
         </div>
 
         <div className="mt-4">
-          {sourceType === "text" && <Textarea value={textContent} onChange={(e) => setTextContent(e.target.value)} placeholder="اكتب أو الصق نص الدرس هنا..." className="min-h-32" />}
+          {sourceType === "text" && (
+            <Textarea
+              value={textContent}
+              onChange={(e) => setTextContent(e.target.value)}
+              placeholder="اكتب أو الصق نص الدرس هنا..."
+              className="min-h-32"
+            />
+          )}
           {sourceType === "image" && (
             <div className="space-y-2">
               {selectedImage && <img src={selectedImage} alt="" className="mx-auto max-h-48 rounded-2xl object-cover" />}
               <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border p-6 hover:bg-muted">
                 <span>📷 اضغط لرفع صورة المسابقة</span>
-                <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  if (f) { try { setSelectedImage(await fileToDataUrl(f, 900, 0.75)); } catch (err) { toast.error((err as Error).message); } }
-                  e.target.value = "";
-                }} />
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      try {
+                        setSelectedImage(await fileToDataUrl(f, 900, 0.75));
+                      } catch (err) {
+                        toast.error((err as Error).message);
+                      }
+                    }
+                    e.target.value = "";
+                  }}
+                />
               </label>
             </div>
           )}
@@ -412,7 +513,15 @@ function AiQuizGeneratorSection() {
             <div className="space-y-2">
               <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border p-6 hover:bg-muted">
                 <span>🎤 اضغط لرفع ملف صوتي (فويس)</span>
-                <input type="file" accept="audio/*" className="hidden" onChange={(e) => { setVoiceFile(e.target.files?.[0] ?? null); e.target.value = ""; }} />
+                <input
+                  type="file"
+                  accept="audio/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    setVoiceFile(e.target.files?.[0] ?? null);
+                    e.target.value = "";
+                  }}
+                />
               </label>
               {voiceFile && <p className="text-center text-xs font-bold text-emerald-600">تم اختيار الملف الصوتي: {voiceFile.name}</p>}
             </div>
@@ -421,28 +530,73 @@ function AiQuizGeneratorSection() {
             <div className="space-y-2">
               <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border p-6 hover:bg-muted">
                 <span>🎬 اضغط لرفع ملف فيديو</span>
-                <input type="file" accept="video/*" className="hidden" onChange={(e) => { setVideoFile(e.target.files?.[0] ?? null); e.target.value = ""; }} />
+                <input
+                  type="file"
+                  accept="video/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    setVideoFile(e.target.files?.[0] ?? null);
+                    e.target.value = "";
+                  }}
+                />
               </label>
               {videoFile && <p className="text-center text-xs font-bold text-emerald-600">تم اختيار ملف الفيديو: {videoFile.name}</p>}
             </div>
           )}
           {sourceType === "bible" && (
             <div className="grid gap-2 sm:grid-cols-3">
-              <label className="text-xs font-bold">السفر<select value={book} onChange={(e) => setBook(e.target.value)} className="rounded-xl border-2 border-border bg-background px-2 py-1.5 text-sm font-bold">{[...OT_BOOKS, ...NT_BOOKS].map(([, n]) => <option key={n}>{n}</option>)}</select></label>
-              <label className="text-xs font-bold">الأصحاح<input type="number" min={1} value={chapter} onChange={(e) => setChapter(e.target.value)} className="rounded-xl border-2 border-border bg-background px-2 py-1.5 text-sm font-bold" /></label>
-              <label className="text-xs font-bold">الآيات (اختياري)<input value={verses} onChange={(e) => setVerses(e.target.value)} placeholder="مثال: 16 أو 1-5" className="rounded-xl border-2 border-border bg-background px-2 py-1.5 text-sm font-bold" /></label>
+              <label className="text-xs font-bold">
+                السفر
+                <select
+                  value={book}
+                  onChange={(e) => setBook(e.target.value)}
+                  className="rounded-xl border-2 border-border bg-background px-2 py-1.5 text-sm font-bold"
+                >
+                  {[...OT_BOOKS, ...NT_BOOKS].map(([, n]) => (
+                    <option key={n}>{n}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs font-bold">
+                الأصحاح
+                <input
+                  type="number"
+                  min={1}
+                  value={chapter}
+                  onChange={(e) => setChapter(e.target.value)}
+                  className="rounded-xl border-2 border-border bg-background px-2 py-1.5 text-sm font-bold"
+                />
+              </label>
+              <label className="text-xs font-bold">
+                الآيات (اختياري)
+                <input
+                  value={verses}
+                  onChange={(e) => setVerses(e.target.value)}
+                  placeholder="مثال: 16 أو 1-5"
+                  className="rounded-xl border-2 border-border bg-background px-2 py-1.5 text-sm font-bold"
+                />
+              </label>
             </div>
           )}
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <label className="text-xs font-bold">عدد الأسئلة:
-            <select value={count} onChange={(e) => setCount(Number(e.target.value) as 15 | 20)} className="mr-2 rounded-xl border-2 border-border bg-background px-2 py-1 text-sm font-bold">
+          <label className="text-xs font-bold">
+            عدد الأسئلة:
+            <select
+              value={count}
+              onChange={(e) => setCount(Number(e.target.value) as 15 | 20)}
+              className="mr-2 rounded-xl border-2 border-border bg-background px-2 py-1 text-sm font-bold"
+            >
               <option value={15}>١٥ سؤالًا</option>
               <option value={20}>٢٠ سؤالًا</option>
             </select>
           </label>
-          <button disabled={loading} onClick={handleGenerate} className="pop mr-auto rounded-2xl bg-sky px-6 py-2.5 font-extrabold text-primary-foreground disabled:opacity-60">
+          <button
+            disabled={loading}
+            onClick={handleGenerate}
+            className="pop mr-auto rounded-2xl bg-sky px-6 py-2.5 font-extrabold text-primary-foreground disabled:opacity-60"
+          >
             {loading ? "جاري التحليل والتوليد..." : "توليد الأسئلة تلقائياً ⚡"}
           </button>
         </div>
@@ -450,16 +604,47 @@ function AiQuizGeneratorSection() {
 
       {draft && (
         <section className={card}>
-          <h3 className="mb-3 text-lg font-extrabold text-emerald-600">✨ مراجعة وتعديل الأسئلة قبل الإرسال ({draft.questions.length} سؤالًا):</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-extrabold text-emerald-600">
+              ✨ مراجعة وتعديل الأسئلة ({draft.questions.length} سؤالًا):
+            </h3>
+            <button
+              onClick={handleAddQuestion}
+              className="rounded-xl bg-primary/10 text-primary px-3 py-1 text-xs font-bold hover:bg-primary/20"
+            >
+              ➕ إضافة سؤال
+            </button>
+          </div>
 
           <div className="mb-4 space-y-3 rounded-2xl border border-border bg-muted/40 p-3">
             <div>
               <label className="text-xs font-bold">عنوان المسابقة:</label>
-              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-1.5 text-sm font-bold" />
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-1.5 text-sm font-bold"
+              />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <label className="text-xs font-bold">⏰ فتح المسابقة<input type="datetime-local" value={opens} onChange={(e) => setOpens(e.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-2 py-1 text-xs font-bold" /></label>
-              <label className="text-xs font-bold">🔒 قفل المسابقة<input type="datetime-local" value={closes} onChange={(e) => setCloses(e.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-2 py-1 text-xs font-bold" /></label>
+              <label className="text-xs font-bold">
+                ⏰ فتح المسابقة
+                <input
+                  type="datetime-local"
+                  value={opens}
+                  onChange={(e) => setOpens(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-border bg-background px-2 py-1 text-xs font-bold"
+                />
+              </label>
+              <label className="text-xs font-bold">
+                🔒 قفل المسابقة
+                <input
+                  type="datetime-local"
+                  value={closes}
+                  onChange={(e) => setCloses(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-border bg-background px-2 py-1 text-xs font-bold"
+                />
+              </label>
             </div>
             <p className="text-[11px] text-muted-foreground">اترك الوقت فارغًا لتفتح فورًا بعد اعتماد المشرف ولا تُقفل.</p>
           </div>
@@ -468,32 +653,80 @@ function AiQuizGeneratorSection() {
             {draft.questions.map((q, idx) => (
               <div key={idx} className="space-y-2 rounded-xl border-2 border-border bg-background p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="rounded bg-sky/20 px-2 py-0.5 text-xs font-black text-sky">سؤال {idx + 1} · {q.kind === "tf" ? "صح/خطأ" : "اختيار من متعدد"}</span>
+                  <span className="rounded bg-sky/20 px-2 py-0.5 text-xs font-black text-sky">
+                    سؤال {idx + 1} · {q.kind === "tf" ? "صح/خطأ" : "اختيار من متعدد"}
+                  </span>
                   <div className="flex items-center gap-1">
                     <span className="text-xs font-bold">الدرجة:</span>
-                    <input type="number" value={q.points || 5} onChange={(e) => upd(idx, { points: Number(e.target.value) })} className="w-16 rounded-lg border border-border bg-card px-2 py-0.5 text-center text-xs font-bold" />
-                    <button onClick={() => setDraft((d) => d && ({ ...d, questions: d.questions.filter((_, j) => j !== idx) }))} className="ml-1 text-xs text-destructive" title="حذف السؤال">✕</button>
+                    <input
+                      type="number"
+                      value={q.points || 5}
+                      onChange={(e) => upd(idx, { points: Number(e.target.value) })}
+                      className="w-16 rounded-lg border border-border bg-card px-2 py-0.5 text-center text-xs font-bold"
+                    />
+                    <button
+                      onClick={() =>
+                        setDraft((d) => (d ? { ...d, questions: d.questions.filter((_, j) => j !== idx) } : null))
+                      }
+                      className="ml-1 rounded bg-destructive/10 px-2 py-0.5 text-xs font-bold text-destructive hover:bg-destructive/20"
+                      title="حذف السؤال"
+                    >
+                      ✕ حذف
+                    </button>
                   </div>
                 </div>
 
-                <input type="text" value={q.question} onChange={(e) => upd(idx, { question: e.target.value })} className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm font-bold" />
+                <input
+                  type="text"
+                  value={q.question}
+                  onChange={(e) => upd(idx, { question: e.target.value })}
+                  className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm font-bold"
+                />
 
                 <div className="grid gap-2 sm:grid-cols-3">
                   {q.options.map((o, k) => (
                     <label key={k} className="flex items-center gap-2">
-                      <input type="radio" checked={q.correct === k} onChange={() => upd(idx, { correct: k })} title="الإجابة الصحيحة" />
-                      <input type="text" value={o} onChange={(e) => upd(idx, { options: q.options.map((x, m) => (m === k ? e.target.value : x)) })} className={`w-full rounded-xl border px-2 py-1.5 text-xs font-extrabold ${q.correct === k ? "border-emerald-500 bg-emerald-500/10 text-emerald-600" : "border-border bg-card"}`} />
+                      <input
+                        type="radio"
+                        checked={q.correct === k}
+                        onChange={() => upd(idx, { correct: k })}
+                        title="الإجابة الصحيحة"
+                      />
+                      <input
+                        type="text"
+                        value={o}
+                        onChange={(e) =>
+                          upd(idx, {
+                            options: q.options.map((x, m) => (m === k ? e.target.value : x)),
+                          })
+                        }
+                        className={`w-full rounded-xl border px-2 py-1.5 text-xs font-extrabold ${
+                          q.correct === k
+                            ? "border-emerald-500 bg-emerald-500/10 text-emerald-600"
+                            : "border-border bg-card"
+                        }`}
+                      />
                     </label>
                   ))}
                 </div>
-                <p className={`text-xs font-bold ${q.correct < 0 || q.correct >= q.options.length ? "text-destructive" : "text-emerald-600"}`}>
-                  {q.correct < 0 || q.correct >= q.options.length ? "⚠️ لم تحدد الإجابة الصحيحة — اضغط الدائرة بجوارها" : `✓ الإجابة الصحيحة: ${q.options[q.correct] || "اختيار " + (q.correct + 1)}`}
+                <p
+                  className={`text-xs font-bold ${
+                    q.correct < 0 || q.correct >= q.options.length ? "text-destructive" : "text-emerald-600"
+                  }`}
+                >
+                  {q.correct < 0 || q.correct >= q.options.length
+                    ? "⚠️ لم تحدد الإجابة الصحيحة — اضغط الدائرة بجوارها"
+                    : `✓ الإجابة الصحيحة: ${q.options[q.correct] || "اختيار " + (q.correct + 1)}`}
                 </p>
               </div>
             ))}
           </div>
 
-          <button onClick={handleSubmit} disabled={submitting} className="pop mt-5 w-full rounded-2xl bg-emerald-600 py-3 text-base font-extrabold text-white shadow-lg disabled:opacity-60">
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="pop mt-5 w-full rounded-2xl bg-emerald-600 py-3 text-base font-extrabold text-white shadow-lg disabled:opacity-60"
+          >
             {submitting ? "جاري الإرسال..." : "إرسال المسابقة للاعتماد 📨"}
           </button>
         </section>
@@ -506,8 +739,13 @@ function AiQuizGeneratorSection() {
             {myQuizzes.map((z: any) => (
               <div key={z.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-muted p-3 text-sm">
                 <span className="font-extrabold">🧠 {z.title}</span>
-                <span className="text-xs text-muted-foreground">{new Date(z.created_at).toLocaleDateString("ar-EG")}{z.closes_at && ` · يقفل ${new Date(z.closes_at).toLocaleString("ar-EG")}`}</span>
-                <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${STATUS[z.status]?.c ?? "bg-muted"}`}>{STATUS[z.status]?.l ?? z.status}</span>
+                <span className="text-xs text-muted-foreground">
+                  {new Date(z.created_at).toLocaleDateString("ar-EG")}
+                  {z.closes_at && ` · يقفل ${new Date(z.closes_at).toLocaleString("ar-EG")}`}
+                </span>
+                <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${STATUS[z.status]?.c ?? "bg-muted"}`}>
+                  {STATUS[z.status]?.l ?? z.status}
+                </span>
               </div>
             ))}
           </div>
