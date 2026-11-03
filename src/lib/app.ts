@@ -99,14 +99,12 @@ export function useSettings() {
 export function cairoDate(d: Date | string) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(d));
 }
-/** Sunday..Saturday Cairo dates for week offset (0 = this week) */
+/** Friday..Thursday Cairo dates for week offset (0 = the Friday period containing today) */
 export function cairoWeek(offset = 0) {
-  const today = cairoDate(new Date());
-  const [y, m, d] = today.split("-").map(Number);
-  const base = new Date(Date.UTC(y, m - 1, d));
-  const dow = base.getUTCDay();
-  const start = new Date(base.getTime() - (dow + offset * 7) * 86400000);
-  return Array.from({ length: 7 }, (_, i) => new Date(start.getTime() + i * 86400000).toISOString().slice(0, 10));
+  const from = fridayOf(cairoDate(new Date()));
+  const start = new Date(from + "T00:00:00Z");
+  const base = new Date(start.getTime() - offset * 7 * 86400000);
+  return Array.from({ length: 7 }, (_, i) => new Date(base.getTime() + i * 86400000).toISOString().slice(0, 10));
 }
 
 export async function signOut(queryClient: { cancelQueries: () => Promise<void>; clear: () => void }) {
