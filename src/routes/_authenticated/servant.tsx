@@ -84,85 +84,197 @@ function ServantPage() {
 }
 
 function Prep({ userId }: { userId: string }) {
+  const qc = useQueryClient();
   const [content, setContent] = useState("");
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>([]);
   const [voiceFile, setVoiceFile] = useState<File | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [recording, setRecording] = useState(false);
+  const [mr, setMr] = useState<MediaRecorder | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [gallery, setGallery] = useState<string[] | null>(null);
+  const [showOthers, setShowOthers] = useState(false);
+  const loadedRef = useRef(false);
+  const weekStart = fridayOf(cairoDate(new Date()));
+
+  // تحميل تحضير هذا الأسبوع إن وجد لاستكماله (يبقى محفوظًا دائمًا في الأرشيف)
+  const { data: mine } = useQuery({
+    queryKey: ["my-prep", weekStart],
+    queryFn: async () => (await supabase.from("servant_preparations").select("*").eq("user_id", userId).eq("week_start", weekStart).maybeSingle()).data,
+  });
+  useEffect(() => {
+    if (mine && !loadedRef.current) {
+      loadedRef.current = true;
+      setContent(mine.notes || "");
+      setImages(mine.images || []);
+      setAudioUrl(mine.audio_url || null);
+      setVideoUrl(mine.video_url || null);
+    }
+  }, [mine]);
+
+  const startRec = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+      rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+        setVoiceFile(new File([blob], `voice-${Date.now()}.webm`, { type: blob.type }));
+      };
+      rec.start(); setMr(rec); setRecording(true);
+    } catch { toast.error("تعذر الوصول إلى الميكروفون"); }
+  };
+  const stopRec = () => { mr?.stop(); setRecording(false); setMr(null); };
 
   const handleSave = async () => {
-    if (!content.trim() && !selectedImage && !voiceFile && !videoFile) {
+    if (!content.trim() && !images.length && !voiceFile && !audioUrl && !videoFile && !videoUrl) {
       return toast.error("يرجى كتابة التحضير أو إرفاق ملف أولاً");
     }
+    setSaving(true);
+    try {
+      let audio = audioUrl;
+      let video = videoUrl;
+      if (voiceFile) audio = await uploadServantMedia(voiceFile, userId);
+      if (videoFile) video = await uploadServantMedia(videoFile, userId);
 
-        const images = selectedImage ? [selectedImage] : [];
+      const { error } = await supabase.from("servant_preparations").upsert({
+        user_id: userId,
+        week_start: weekStart,
+        notes: content.trim(),
+        images,
+        audio_url: audio,
+        video_url: video,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id,week_start" });
 
-    const { error } = await supabase.from("servant_preparations").upsert({
-      user_id: userId,
-      notes: content.trim(),
-      images: images,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "user_id,week_start" });
+      if (error) { toast.error("فشل حفظ التحضير: " + error.message); return; }
 
-    if (error) {
-      toast.error("فشل حفظ التحضير: " + error.message);
-      return;
+      toast.success("تم حفظ التحضير الأسبوعي والمرفقات بنجاح ✅");
+      setVoiceFile(null); setVideoFile(null);
+      qc.invalidateQueries({ queryKey: ["my-prep"] });
+      qc.invalidateQueries({ queryKey: ["prep-archive"] });
+      qc.invalidateQueries({ queryKey: ["week-preps"] });
+    } catch (err: any) {
+      toast.error(err.message || "تعذر رفع المرفقات");
+    } finally {
+      setSaving(false);
     }
-
-
-    toast.success("تم حفظ التحضير الأسبوعي والمرفقات بنجاح ✅");
-    setContent("");
-    setSelectedImage(null);
-    setVoiceFile(null);
-    setVideoFile(null);
   };
 
   return (
     <section className={card}>
       <h2 className="text-xl font-extrabold">📘 تحضير الخادم الأسبوعي</h2>
-      <p className="text-xs text-muted-foreground mt-1">سجل تحضير الدرس، الآيات، وارفع الصور، الفويس، أو الفيديوهات الخاصة بخدمة هذا الأسبوع.</p>
-      
-      <Textarea 
-        value={content} 
-        onChange={(e) => setContent(e.target.value)} 
-        placeholder="اكتب عناصر الدرس، الآيات، والنشاط هنا..." 
-        className="mt-3 min-h-32" 
+      <p className="text-xs text-muted-foreground mt-1">سجل تحضير الدرس، الآيات، وارفع عدة صور معًا أو منفصلة، الفويس (رفع أو تسجيل)، أو الفيديو — والتحضير يبقى محفوظًا في الأرشيف دائمًا.</p>
+
+      <Textarea
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        placeholder="اكتب عناصر الدرس، الآيات، والنشاط هنا..."
+        className="mt-3 min-h-32"
       />
 
-      <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <div>
-          {selectedImage && <img src={selectedImage} alt="Prep preview" className="mb-2 max-h-24 rounded-xl object-cover mx-auto" />}
-          <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-3 cursor-pointer hover:bg-muted text-xs font-bold text-center">
-            <span>📷 إرفاق صورة</span>
-            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                try { const url = await fileToDataUrl(file, 900, 0.75); setSelectedImage(url); } catch (err) { toast.error((err as Error).message); }
-              }
+      {/* صور متعددة */}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {images.map((s, i) => (
+          <div key={i} className="relative">
+            <img src={s} alt="" className="h-20 w-20 rounded-xl object-cover" />
+            <button type="button" onClick={() => setImages(images.filter((_, j) => j !== i))} className="absolute -left-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-destructive text-xs text-destructive-foreground">✕</button>
+          </div>
+        ))}
+        {images.length < 6 && (
+          <label className="grid h-20 w-20 cursor-pointer place-items-center rounded-xl border-2 border-dashed border-border text-center text-xs font-bold hover:bg-muted">
+            📷<br />صور
+            <input type="file" accept="image/*" multiple className="hidden" onChange={async (e) => {
+              const files = Array.from(e.target.files ?? []).slice(0, 6 - images.length);
+              try {
+                const urls = await Promise.all(files.map((f) => fileToDataUrl(f, 900, 0.75)));
+                setImages([...images, ...urls]);
+              } catch (err) { toast.error((err as Error).message); }
+              e.target.value = "";
             }} />
           </label>
-        </div>
-
-        <div>
-          <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-3 cursor-pointer hover:bg-muted text-xs font-bold text-center h-full">
-            <span>🎤 إرفاق فويس (صوت)</span>
-            <input type="file" accept="audio/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) setVoiceFile(file); }} />
-          </label>
-          {voiceFile && <p className="text-[10px] text-emerald-600 text-center mt-1 font-bold">{voiceFile.name}</p>}
-        </div>
-
-        <div>
-          <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-3 cursor-pointer hover:bg-muted text-xs font-bold text-center h-full">
-            <span>🎬 إرفاق فيديو</span>
-            <input type="file" accept="video/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) setVideoFile(file); }} />
-          </label>
-          {videoFile && <p className="text-[10px] text-emerald-600 text-center mt-1 font-bold">{videoFile.name}</p>}
-        </div>
+        )}
       </div>
 
-      <button onClick={handleSave} className="pop mt-4 w-full rounded-2xl bg-sky py-3 font-extrabold text-primary-foreground">
-        حفظ التحضير والمرفقات
+      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border p-3 text-center text-xs font-bold hover:bg-muted">
+          🎤 {voiceFile ? voiceFile.name.slice(0, 18) : audioUrl ? "صوت محفوظ ✓ (استبدل بالرفع)" : "رفع فويس (صوت)"}
+          <input type="file" accept="audio/*" className="hidden" onChange={(e) => { setVoiceFile(e.target.files?.[0] ?? null); e.target.value = ""; }} />
+        </label>
+        <button type="button" onClick={() => (recording ? stopRec() : startRec())}
+          className={`rounded-2xl border-2 p-3 text-xs font-bold transition ${recording ? "animate-pulse border-destructive bg-destructive/10 text-destructive" : "border-border hover:bg-muted"}`}>
+          {recording ? "⏹ إيقاف التسجيل" : "🎙️ تسجيل فويس"}
+        </button>
+        <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border p-3 text-center text-xs font-bold hover:bg-muted">
+          🎬 {videoFile ? videoFile.name.slice(0, 18) : videoUrl ? "فيديو محفوظ ✓ (استبدل بالرفع)" : "رفع فيديو"}
+          <input type="file" accept="video/*" className="hidden" onChange={(e) => { setVideoFile(e.target.files?.[0] ?? null); e.target.value = ""; }} />
+        </label>
+      </div>
+
+      {(audioUrl || videoUrl) && (
+        <div className="mt-3 space-y-2 rounded-2xl bg-muted/40 p-3">
+          <div className="text-xs font-bold text-muted-foreground">المرفقات المحفوظة لهذا الأسبوع:</div>
+          {audioUrl && <MediaView src={audioUrl} kind="audio" />}
+          {videoUrl && <MediaView src={videoUrl} kind="video" />}
+        </div>
+      )}
+
+      <button onClick={handleSave} disabled={saving} className="pop mt-4 w-full rounded-2xl bg-sky py-3 font-extrabold text-primary-foreground disabled:opacity-60">
+        {saving ? "جاري الحفظ..." : "حفظ التحضير والمرفقات"}
       </button>
+
+      {/* تحضيرات باقي الخدام */}
+      <div className="mt-5 border-t border-border pt-4">
+        <button onClick={() => setShowOthers(!showOthers)} className="mb-3 w-full rounded-2xl bg-muted py-2.5 font-extrabold">
+          {showOthers ? "▾ إخفاء تحضيرات باقي الخدام" : "▸ استعراض تحضيرات باقي الخدام هذا الأسبوع"}
+        </button>
+        {showOthers && <OtherPreps weekStart={weekStart} userId={userId} />}
+      </div>
+      <ImageLightbox images={gallery} title="صور التحضير" onClose={() => setGallery(null)} />
     </section>
+  );
+}
+
+function OtherPreps({ weekStart, userId }: { weekStart: string; userId: string }) {
+  const [gallery, setGallery] = useState<string[] | null>(null);
+  const { data, isLoading } = useQuery({
+    queryKey: ["week-preps", weekStart],
+    queryFn: async () => { const { data, error } = await supabase.rpc("servant_week_preps", { _week: weekStart }); if (error) throw error; return data ?? []; },
+  });
+  const others = (data ?? []).filter((p: any) => p.user_id !== userId);
+  if (isLoading) return <p className="text-center text-sm text-muted-foreground">جاري التحميل...</p>;
+  if (!others.length) return <p className="text-center text-sm text-muted-foreground">لم يرسل باقي الخدام تحضيراتهم لهذا الأسبوع بعد.</p>;
+  return (
+    <div className="space-y-3">
+      {others.map((p: any) => (
+        <div key={p.user_id} className="rounded-2xl border-2 border-border bg-background p-3">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">{p.avatar || "👤"}</span>
+            <span className="font-extrabold">{p.full_name}</span>
+            <span className="mr-auto text-xs text-muted-foreground">{new Date(p.updated_at).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" })}</span>
+          </div>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-7">{p.notes || "بدون نص"}</p>
+          {!!p.images?.length && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {p.images.map((s: string, i: number) => (
+                <img key={i} src={s} alt="" onClick={() => setGallery(p.images)} className="h-16 w-16 cursor-zoom-in rounded-lg object-cover" />
+              ))}
+            </div>
+          )}
+          {(p.audio_url || p.video_url) && (
+            <div className="mt-2 space-y-2">
+              {p.audio_url && <MediaView src={p.audio_url} kind="audio" />}
+              {p.video_url && <MediaView src={p.video_url} kind="video" />}
+            </div>
+          )}
+        </div>
+      ))}
+      <ImageLightbox images={gallery} title="صور التحضير" onClose={() => setGallery(null)} />
+    </div>
   );
 }
 
