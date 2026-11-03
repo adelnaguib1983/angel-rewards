@@ -224,7 +224,7 @@ export function ServantSuggestionsTab({ userId }: { userId: string }) {
           </div>
         )}
       </div>
-      <ImageLightbox images={gallery ?? undefined} title="صور الاقتراح" onClose={() => setGallery(null)} />
+      <ImageLightbox images={gallery} title="صور الاقتراح" onClose={() => setGallery(null)} />
     </div>
   );
 }
