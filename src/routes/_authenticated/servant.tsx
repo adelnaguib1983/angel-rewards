@@ -282,174 +282,233 @@ function OtherPreps({ weekStart, userId }: { weekStart: string; userId: string }
 }
 
 function AiQuizGeneratorSection() {
-  const [sourceType, setSourceType] = useState<"text" | "image" | "voice" | "video">("text");
+  const gen = useServerFn(generateQuizDraft as any);
+  const qc = useQueryClient();
+  const { data: me } = useMe();
+  const [sourceType, setSourceType] = useState<"text" | "image" | "audio" | "video" | "bible">("text");
   const [textContent, setTextContent] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [voiceFile, setVoiceFile] = useState<File | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [book, setBook] = useState(NT_BOOKS[0][1]);
+  const [chapter, setChapter] = useState("1");
+  const [verses, setVerses] = useState("");
+  const [count, setCount] = useState<15 | 20>(15);
   const [loading, setLoading] = useState(false);
-  const [generatedQuestions, setGeneratedQuestions] = useState<any[]>([]);
-  
-  const [quizTitle, setQuizTitle] = useState("مسابقة أبطال الملاك الأسبوعية");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [title, setTitle] = useState("مسابقة أبطال الملاك الأسبوعية");
+  const [opens, setOpens] = useState("");
+  const [closes, setCloses] = useState("");
+  const [draft, setDraft] = useState<{ title: string; questions: { question: string; kind: "tf" | "mcq"; options: string[]; correct: number; points: number }[] } | null>(null);
+
+  // مسابقاتي المرسلة للمراجعة
+  const { data: myQuizzes } = useQuery({
+    queryKey: ["my-quizzes", me?.user.id],
+    enabled: !!me,
+    queryFn: async () => (await supabase.from("quizzes").select("id, title, status, created_at, opens_at, closes_at").eq("created_by", me!.user.id).order("created_at", { ascending: false })).data ?? [],
+  });
+
+  const audioB64 = async (f: File) => new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split("base64,")[1] || ""); r.onerror = rej; r.readAsDataURL(f); });
 
   const handleGenerate = async () => {
-    if (sourceType === "text" && !textContent.trim()) return toast.error("يرجى كتابة نص المسابقة أولاً");
-    if (sourceType === "image" && !selectedImage) return toast.error("يرجى رفع صورة المسابقة أولاً");
-    if (sourceType === "voice" && !voiceFile) return toast.error("يرجى رفع ملف الصوت أولاً");
-    if (sourceType === "video" && !videoFile) return toast.error("يرجى رفع ملف الفيديو أولاً");
-
-    setLoading(true);
-    setTimeout(() => {
+    try {
+      setLoading(true);
+      const data: any = { sourceType, count };
+      if (sourceType === "text") {
+        if (!textContent.trim()) { toast.error("اكتب نص المسابقة أولاً"); return; }
+        data.text = textContent.trim();
+      } else if (sourceType === "image") {
+        if (!selectedImage) { toast.error("ارفع صورة المسابقة أولاً"); return; }
+        data.imageDataUrl = selectedImage;
+      } else if (sourceType === "audio") {
+        if (!voiceFile) { toast.error("ارفع ملف الصوت أولاً"); return; }
+        data.audioBase64 = await audioB64(voiceFile);
+        data.audioMime = voiceFile.type || "audio/mpeg";
+      } else if (sourceType === "video") {
+        if (!videoFile) { toast.error("ارفع ملف الفيديو أولاً"); return; }
+        data.videoBase64 = await audioB64(videoFile);
+        data.videoMime = videoFile.type || "video/mp4";
+      } else {
+        if (!chapter || Number(chapter) < 1) { toast.error("حدد الأصحاح"); return; }
+        data.bible = { book, chapter: Number(chapter), ...(verses.trim() ? (() => { const m = verses.trim().match(/^(\d+)\s*(?:-\s*(\d+))?$/); return m ? { from: Number(m[1]), to: m[2] ? Number(m[2]) : undefined } : {}; })() : {}) };
+      }
+      const out = await gen({ data } as any);
+      if (!out?.questions?.length) throw new Error("لم يتم توليد أسئلة");
+      setTitle(out.title || title);
+      setDraft(out);
+      toast.success(`تم توليد ${out.questions.length} سؤالًا — راجعها وحدد الإجابات قبل الإرسال ✅`);
+    } catch (e: any) {
+      toast.error(e.message || "تعذر توليد المسابقة");
+    } finally {
       setLoading(false);
-      setGeneratedQuestions([
-        { question: "ما هو العنوان الرئيسي للنص أو الملف المرفوع؟", options: ["الخيار الأول", "الخيار الثاني", "الخيار الصحيح"], answer: "الخيار الصحيح", points: 5 },
-        { question: "ما هي التفاصيل الإضافية المستخرجة من المحتوى المرفوع؟", options: ["نعم", "لا"], answer: "نعم", points: 5 }
-      ]);
-      toast.success("تم توليد الأسئلة بنجاح، يمكنك مراجعتها وتعديلها الآن ✅");
-    }, 1500);
+    }
   };
 
-  const handleQuestionChange = (index: number, field: string, value: any) => {
-    const updated = [...generatedQuestions];
-    updated[index][field] = value;
-    setGeneratedQuestions(updated);
+  const upd = (i: number, patch: any) => setDraft((d) => d && ({ ...d, questions: d.questions.map((q, j) => (j === i ? { ...q, ...patch } : q)) }));
+
+  const handleSubmit = async () => {
+    if (!draft) return;
+    if (!title.trim()) return toast.error("اكتب عنوان المسابقة");
+    const missing = draft.questions.findIndex((q) => q.correct < 0 || q.correct >= q.options.length);
+    if (missing >= 0) return toast.error(`حدد الإجابة الصحيحة للسؤال ${missing + 1} قبل الإرسال`);
+    if (opens && closes && new Date(closes) <= new Date(opens)) return toast.error("وقت القفل لازم يكون بعد وقت الفتح");
+    setSubmitting(true);
+    try {
+      const { data: nid, error } = await supabase.rpc("servant_submit_quiz", {
+        _title: title.trim(),
+        _questions: draft.questions,
+        _opens_at: opens ? new Date(opens).toISOString() : null,
+        _closes_at: closes ? new Date(closes).toISOString() : null,
+        _source: sourceType === "image" ? selectedImage : null,
+      });
+      if (error) throw error;
+      toast.success("تم إرسال المسابقة للمشرف للاعتماد قبل نشرها للمخدومين ✅");
+      setDraft(null); setTextContent(""); setSelectedImage(null); setVoiceFile(null); setVideoFile(null);
+      qc.invalidateQueries({ queryKey: ["my-quizzes"] });
+      qc.invalidateQueries({ queryKey: ["admin-quizzes"] });
+    } catch (e: any) {
+      toast.error(e.message || "تعذر إرسال المسابقة");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleSaveQuizToDB = async () => {
-    if (!generatedQuestions.length) return toast.error("لا توجد أسئلة لحفظها");
-    
-    await supabase.from("quizzes" as any).insert({
-      title: quizTitle,
-      questions: generatedQuestions,
-      start_date: startDate || null,
-      end_date: endDate || null,
-      created_at: new Date().toISOString()
-    }).catch(() => {});
-
-    toast.success("تم اعتماد ونشر المسابقة بنجاح لتظهر للمخدومين وتضاف نقاطهم 🚀");
-    setGeneratedQuestions([]);
-    setTextContent("");
-    setSelectedImage(null);
-    setVoiceFile(null);
-    setVideoFile(null);
+  const STATUS: Record<string, { l: string; c: string }> = {
+    pending: { l: "⏳ قيد اعتماد المشرف", c: "bg-amber-500/20 text-amber-600" },
+    published: { l: "✅ منشورة", c: "bg-emerald-500/20 text-emerald-600" },
+    rejected: { l: "🚫 مرفوضة — عدّلها وأعد الإرسال", c: "bg-destructive/20 text-destructive" },
   };
 
   return (
     <div className="space-y-4">
       <section className={card}>
         <h2 className="text-xl font-extrabold">🤖 توليد المسابقات تلقائياً بالذكاء الاصطناعي</h2>
-        <p className="text-xs text-muted-foreground mt-1">اختر مصدر المسابقة، قم برفع الملف، وتوليد الأسئلة ومراجعتها قبل نشرها للمخدومين.</p>
+        <p className="text-xs text-muted-foreground mt-1">اختر المصدر وولّد ١٥ أو ٢٠ سؤالًا (صح/خطأ واختيار من ٣)، راجعها كاملة، ثم أرسلها للمشرف للاعتماد قبل النشر.</p>
 
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <button onClick={() => setSourceType("text")} className={`rounded-xl py-2 text-xs font-bold transition ${sourceType === "text" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>📝 نص مكتوب</button>
-          <button onClick={() => setSourceType("image")} className={`rounded-xl py-2 text-xs font-bold transition ${sourceType === "image" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>📷 صورة</button>
-          <button onClick={() => setSourceType("voice")} className={`rounded-xl py-2 text-xs font-bold transition ${sourceType === "voice" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>🎤 فويس (صوت)</button>
-          <button onClick={() => setSourceType("video")} className={`rounded-xl py-2 text-xs font-bold transition ${sourceType === "video" ? "bg-sky text-primary-foreground" : "bg-muted"}`}>🎬 فيديو</button>
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {([["text", "📝 نص مكتوب"], ["image", "📷 صورة"], ["audio", "🎤 فويس"], ["video", "🎬 فيديو"], ["bible", "📖 شاهد كتابي"]] as const).map(([k, l]) => (
+            <button key={k} onClick={() => setSourceType(k)} className={`rounded-xl py-2 text-xs font-bold transition ${sourceType === k ? "bg-sky text-primary-foreground" : "bg-muted"}`}>{l}</button>
+          ))}
         </div>
 
         <div className="mt-4">
-          {sourceType === "text" && (
-            <Textarea value={textContent} onChange={(e) => setTextContent(e.target.value)} placeholder="اكتب أو الصق نص الدرس هنا..." className="min-h-32" />
-          )}
+          {sourceType === "text" && <Textarea value={textContent} onChange={(e) => setTextContent(e.target.value)} placeholder="اكتب أو الصق نص الدرس هنا..." className="min-h-32" />}
           {sourceType === "image" && (
             <div className="space-y-2">
-              {selectedImage && <img src={selectedImage} alt="Uploaded quiz" className="max-h-48 rounded-2xl object-cover mx-auto" />}
-              <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-6 cursor-pointer hover:bg-muted">
+              {selectedImage && <img src={selectedImage} alt="" className="mx-auto max-h-48 rounded-2xl object-cover" />}
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border p-6 hover:bg-muted">
                 <span>📷 اضغط لرفع صورة المسابقة</span>
                 <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    try { const url = await fileToDataUrl(file, 900, 0.75); setSelectedImage(url); } catch (err) { toast.error((err as Error).message); }
-                  }
+                  const f = e.target.files?.[0];
+                  if (f) { try { setSelectedImage(await fileToDataUrl(f, 900, 0.75)); } catch (err) { toast.error((err as Error).message); } }
+                  e.target.value = "";
                 }} />
               </label>
             </div>
           )}
-          {sourceType === "voice" && (
+          {sourceType === "audio" && (
             <div className="space-y-2">
-              <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-6 cursor-pointer hover:bg-muted">
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border p-6 hover:bg-muted">
                 <span>🎤 اضغط لرفع ملف صوتي (فويس)</span>
-                <input type="file" accept="audio/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) setVoiceFile(file); }} />
+                <input type="file" accept="audio/*" className="hidden" onChange={(e) => { setVoiceFile(e.target.files?.[0] ?? null); e.target.value = ""; }} />
               </label>
-              {voiceFile && <p className="text-xs font-bold text-emerald-600 text-center">تم اختيار الملف الصوتي: {voiceFile.name}</p>}
+              {voiceFile && <p className="text-center text-xs font-bold text-emerald-600">تم اختيار الملف الصوتي: {voiceFile.name}</p>}
             </div>
           )}
           {sourceType === "video" && (
             <div className="space-y-2">
-              <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-6 cursor-pointer hover:bg-muted">
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border p-6 hover:bg-muted">
                 <span>🎬 اضغط لرفع ملف فيديو</span>
-                <input type="file" accept="video/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) setVideoFile(file); }} />
+                <input type="file" accept="video/*" className="hidden" onChange={(e) => { setVideoFile(e.target.files?.[0] ?? null); e.target.value = ""; }} />
               </label>
-              {videoFile && <p className="text-xs font-bold text-emerald-600 text-center">تم اختيار ملف الفيديو: {videoFile.name}</p>}
+              {videoFile && <p className="text-center text-xs font-bold text-emerald-600">تم اختيار ملف الفيديو: {videoFile.name}</p>}
+            </div>
+          )}
+          {sourceType === "bible" && (
+            <div className="grid gap-2 sm:grid-cols-3">
+              <label className="text-xs font-bold">السفر<select value={book} onChange={(e) => setBook(e.target.value)} className="rounded-xl border-2 border-border bg-background px-2 py-1.5 text-sm font-bold">{[...OT_BOOKS, ...NT_BOOKS].map(([, n]) => <option key={n}>{n}</option>)}</select></label>
+              <label className="text-xs font-bold">الأصحاح<input type="number" min={1} value={chapter} onChange={(e) => setChapter(e.target.value)} className="rounded-xl border-2 border-border bg-background px-2 py-1.5 text-sm font-bold" /></label>
+              <label className="text-xs font-bold">الآيات (اختياري)<input value={verses} onChange={(e) => setVerses(e.target.value)} placeholder="مثال: 16 أو 1-5" className="rounded-xl border-2 border-border bg-background px-2 py-1.5 text-sm font-bold" /></label>
             </div>
           )}
         </div>
 
-        <button disabled={loading} onClick={handleGenerate} className="pop mt-4 w-full rounded-2xl bg-sky py-3 text-base font-extrabold text-primary-foreground disabled:opacity-60">
-          {loading ? "جاري تحليل المحتوى وتوليد الأسئلة..." : "توليد الأسئلة تلقائياً ⚡"}
-        </button>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <label className="text-xs font-bold">عدد الأسئلة:
+            <select value={count} onChange={(e) => setCount(Number(e.target.value) as 15 | 20)} className="mr-2 rounded-xl border-2 border-border bg-background px-2 py-1 text-sm font-bold">
+              <option value={15}>١٥ سؤالًا</option>
+              <option value={20}>٢٠ سؤالًا</option>
+            </select>
+          </label>
+          <button disabled={loading} onClick={handleGenerate} className="pop mr-auto rounded-2xl bg-sky px-6 py-2.5 font-extrabold text-primary-foreground disabled:opacity-60">
+            {loading ? "جاري التحليل والتوليد..." : "توليد الأسئلة تلقائياً ⚡"}
+          </button>
+        </div>
       </section>
 
-      {generatedQuestions.length > 0 && (
+      {draft && (
         <section className={card}>
-          <h3 className="text-lg font-extrabold text-emerald-600 mb-3">✨ معاينة وتعديل الأسئلة قبل النشر:</h3>
-          
-          <div className="space-y-3 mb-4 p-3 bg-muted/40 rounded-2xl border border-border">
+          <h3 className="mb-3 text-lg font-extrabold text-emerald-600">✨ مراجعة وتعديل الأسئلة قبل الإرسال ({draft.questions.length} سؤالًا):</h3>
+
+          <div className="mb-4 space-y-3 rounded-2xl border border-border bg-muted/40 p-3">
             <div>
               <label className="text-xs font-bold">عنوان المسابقة:</label>
-              <input type="text" value={quizTitle} onChange={(e) => setQuizTitle(e.target.value)} className="w-full mt-1 rounded-xl border border-border bg-background px-3 py-1.5 text-sm font-bold" />
+              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-1.5 text-sm font-bold" />
             </div>
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              <div>
-                <label className="text-xs font-bold">بداية المسابقة:</label>
-                <input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full mt-1 rounded-xl border border-border bg-background px-2 py-1 text-xs font-bold" />
-              </div>
-              <div>
-                <label className="text-xs font-bold">نهاية المسابقة:</label>
-                <input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full mt-1 rounded-xl border border-border bg-background px-2 py-1 text-xs font-bold" />
-              </div>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-xs font-bold">⏰ فتح المسابقة<input type="datetime-local" value={opens} onChange={(e) => setOpens(e.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-2 py-1 text-xs font-bold" /></label>
+              <label className="text-xs font-bold">🔒 قفل المسابقة<input type="datetime-local" value={closes} onChange={(e) => setCloses(e.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-2 py-1 text-xs font-bold" /></label>
             </div>
+            <p className="text-[11px] text-muted-foreground">اترك الوقت فارغًا لتفتح فورًا بعد اعتماد المشرف ولا تُقفل.</p>
           </div>
 
-          <div className="space-y-4">
-            {generatedQuestions.map((q, idx) => (
-              <div key={idx} className="rounded-xl border-2 border-border bg-background p-4 space-y-2">
+          <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+            {draft.questions.map((q, idx) => (
+              <div key={idx} className="space-y-2 rounded-xl border-2 border-border bg-background p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-black bg-sky/20 text-sky px-2 py-0.5 rounded">السؤال {idx + 1}</span>
+                  <span className="rounded bg-sky/20 px-2 py-0.5 text-xs font-black text-sky">سؤال {idx + 1} · {q.kind === "tf" ? "صح/خطأ" : "اختيار من متعدد"}</span>
                   <div className="flex items-center gap-1">
-                    <span className="text-xs font-bold">نقاط السؤال:</span>
-                    <input 
-                      type="number" 
-                      value={q.points || 5} 
-                      onChange={(e) => handleQuestionChange(idx, "points", Number(e.target.value))} 
-                      className="w-16 rounded-lg border border-border bg-card px-2 py-0.5 text-center text-xs font-bold" 
-                    />
+                    <span className="text-xs font-bold">الدرجة:</span>
+                    <input type="number" value={q.points || 5} onChange={(e) => upd(idx, { points: Number(e.target.value) })} className="w-16 rounded-lg border border-border bg-card px-2 py-0.5 text-center text-xs font-bold" />
+                    <button onClick={() => setDraft((d) => d && ({ ...d, questions: d.questions.filter((_, j) => j !== idx) }))} className="ml-1 text-xs text-destructive" title="حذف السؤال">✕</button>
                   </div>
                 </div>
 
-                <input 
-                  type="text" 
-                  value={q.question} 
-                  onChange={(e) => handleQuestionChange(idx, "question", e.target.value)} 
-                  className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm font-bold" 
-                />
+                <input type="text" value={q.question} onChange={(e) => upd(idx, { question: e.target.value })} className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm font-bold" />
 
-                <div className="text-xs text-muted-foreground mt-1">الإجابة الصحيحة:</div>
-                <input 
-                  type="text" 
-                  value={q.answer} 
-                  onChange={(e) => handleQuestionChange(idx, "answer", e.target.value)} 
-                  className="w-full rounded-xl border border-emerald-500/40 bg-emerald-500/5 px-3 py-1.5 text-xs font-extrabold text-emerald-600" 
-                />
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {q.options.map((o, k) => (
+                    <label key={k} className="flex items-center gap-2">
+                      <input type="radio" checked={q.correct === k} onChange={() => upd(idx, { correct: k })} title="الإجابة الصحيحة" />
+                      <input type="text" value={o} onChange={(e) => upd(idx, { options: q.options.map((x, m) => (m === k ? e.target.value : x)) })} className={`w-full rounded-xl border px-2 py-1.5 text-xs font-extrabold ${q.correct === k ? "border-emerald-500 bg-emerald-500/10 text-emerald-600" : "border-border bg-card"}`} />
+                    </label>
+                  ))}
+                </div>
+                <p className={`text-xs font-bold ${q.correct < 0 || q.correct >= q.options.length ? "text-destructive" : "text-emerald-600"}`}>
+                  {q.correct < 0 || q.correct >= q.options.length ? "⚠️ لم تحدد الإجابة الصحيحة — اضغط الدائرة بجوارها" : `✓ الإجابة الصحيحة: ${q.options[q.correct] || "اختيار " + (q.correct + 1)}`}
+                </p>
               </div>
             ))}
           </div>
 
-          <button onClick={handleSaveQuizToDB} className="pop mt-5 w-full rounded-2xl bg-emerald-600 py-3 text-base font-extrabold text-white shadow-lg">
-            اعتماد ونشر المسابقة فوراً للمخدومين 🚀
+          <button onClick={handleSubmit} disabled={submitting} className="pop mt-5 w-full rounded-2xl bg-emerald-600 py-3 text-base font-extrabold text-white shadow-lg disabled:opacity-60">
+            {submitting ? "جاري الإرسال..." : "إرسال المسابقة للاعتماد 📨"}
           </button>
+        </section>
+      )}
+
+      {!!myQuizzes?.length && (
+        <section className={card}>
+          <h3 className="mb-3 text-lg font-extrabold">📨 مسابقاتي المرسلة</h3>
+          <div className="space-y-2">
+            {myQuizzes.map((z: any) => (
+              <div key={z.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-muted p-3 text-sm">
+                <span className="font-extrabold">🧠 {z.title}</span>
+                <span className="text-xs text-muted-foreground">{new Date(z.created_at).toLocaleDateString("ar-EG")}{z.closes_at && ` · يقفل ${new Date(z.closes_at).toLocaleString("ar-EG")}`}</span>
+                <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${STATUS[z.status]?.c ?? "bg-muted"}`}>{STATUS[z.status]?.l ?? z.status}</span>
+              </div>
+            ))}
+          </div>
         </section>
       )}
     </div>
