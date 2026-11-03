@@ -234,7 +234,10 @@ function Tracker({ userId }: { userId: string }) {
 
   const isNow = ym.y === now.getFullYear() && ym.m === now.getMonth() + 1;
   const isPast = ym.y < now.getFullYear() || (ym.y === now.getFullYear() && ym.m < now.getMonth() + 1);
-  const cw = isNow ? currentWeek(now) : isPast ? 5 : 0;
+  // الأسبوع الحالي يبدأ الجمعة وينتهي الخميس، وقد يقع بدايته في الشهر السابق
+  const curPeriod = currentPeriod(now);
+  const isCurMonth = curPeriod.y === ym.y && curPeriod.m === ym.m && !isPast;
+  const periods = monthPeriods(ym.y, ym.m);
   const shift = (d: number) => {
     let m = ym.m + d, y = ym.y;
     if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; }
