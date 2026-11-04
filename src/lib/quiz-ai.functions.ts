@@ -5,9 +5,11 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 const bible = z.object({
   book: z.string().max(60),
   chapter: z.number().int().min(1).max(200),
+  chapterTo: z.number().int().min(1).max(200).optional(),
   from: z.number().int().min(1).max(200).optional(),
   to: z.number().int().min(1).max(200).optional(),
 });
+
 
 const inputSchema = z.object({
   sourceType: z.enum(["text", "image", "audio", "video", "bible"]),
