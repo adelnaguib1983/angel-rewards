@@ -989,32 +989,7 @@ function ServiceYearCard() {
 }
 
 function ServantConsecutiveAbsence() {
-  const { data: att } = useQuery({
-    queryKey: ["servant-attendance-4w"],
-    queryFn: async () => {
-      const res = await Promise.all([0, 1, 2, 3].map((o) => supabase.rpc("admin_servant_attendance", { _offset: o })));
-      return res.map((r) => r.data ?? []);
-    },
-  });
-  const absent = useMemo(() => {
-    if (!att?.length) return [] as { id: string; name: string; absent_count: number }[];
-    const names = new Map<string, string>();
-    const attended = new Map<string, boolean[]>();
-    att.forEach((week: any[]) => (week ?? []).forEach((s: any) => {
-      names.set(s.user_id, s.full_name);
-      const arr = attended.get(s.user_id) ?? [];
-      arr.push(!!s.attended);
-      attended.set(s.user_id, arr);
-    }));
-    const out: { id: string; name: string; absent_count: number }[] = [];
-    attended.forEach((arr, id) => {
-      let n = 0;
-      for (const a of arr) { if (!a) n++; else break; }
-      if (n >= 2) out.push({ id, name: names.get(id) ?? "", absent_count: n });
-    });
-    return out;
-  }, [att]);
-  return <ServantsAbsenceAlertButton absentServants={absent} />;
+  return <ServantsAbsenceAlertButton />;
 }
 
 /* ---------- Quizzes ---------- */

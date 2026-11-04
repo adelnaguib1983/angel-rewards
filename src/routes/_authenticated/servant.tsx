@@ -23,7 +23,7 @@ import {
 import { BirthdaysButton, PrepArchive, ReadingPlanner, VisitArchive, OT_BOOKS, NT_BOOKS } from "@/components/StaffMemberExtras";
 import { NotificationsBell } from "@/components/MemberExtras";
 import { ServantSuggestionsTab } from "@/components/ServantSuggestionsTab";
-import { AlertTriangle, Users, Calendar, UserX } from 'lucide-react';
+import { StageAbsenceAlerts } from "@/components/AbsenceAlertButtons";
 
 export const Route = createFileRoute("/_authenticated/servant")({
   head: () => ({
@@ -296,101 +296,6 @@ function OtherPreps({ weekStart, userId }: { weekStart: string; userId: string }
   );
 }
 
-export const ConsecutiveAbsenceAlertButtons = ({
-  absentPersons = [],
-}: {
-  absentPersons: AbsentPerson[];
-}) => {
-  const [selectedStage, setSelectedStage] = useState<{ match: string; label: string } | null>(null);
-
-  const stages = [
-    { id: 'prep_1', label: 'تنبيه غياب أولى إعدادي', match: 'أولى' },
-    { id: 'prep_2', label: 'تنبيه غياب ثانية إعدادي', match: 'ثانية' },
-    { id: 'prep_3', label: 'تنبيه غياب ثالثة إعدادي', match: 'ثالثة' },
-  ];
-
-  const getStageList = (matchText: string) =>
-    absentPersons.filter(
-      (p) => (p.stage?.includes(matchText) || false) && p.absent_count >= 2
-    );
-
-  const activeList = selectedStage
-    ? absentPersons.filter(
-        (p) => (p.stage?.includes(selectedStage.match) || false) && p.absent_count >= 2
-      )
-    : [];
-
-  return (
-    <>
-      <div className="space-y-2 w-full my-3">
-        {stages.map((stg) => {
-          const list = getStageList(stg.match);
-          const count = list.length;
-
-          return (
-            <Button
-              key={stg.id}
-              variant={count > 0 ? "destructive" : "outline"}
-              className="w-full flex justify-between items-center text-right dir-rtl"
-              onClick={() => setSelectedStage({ match: stg.match, label: stg.label })}
-            >
-              <span className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                {stg.label}
-              </span>
-              {count > 0 && (
-                <Badge variant="secondary" className="bg-background text-foreground">
-                  {count}
-                </Badge>
-              )}
-            </Button>
-          );
-        })}
-      </div>
-
-      <Dialog open={!!selectedStage} onOpenChange={(open) => !open && setSelectedStage(null)}>
-        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto text-right dir-rtl">
-          <DialogHeader dir="rtl">
-            <DialogTitle className="flex items-center gap-2 text-primary">
-              <Calendar className="h-5 w-5" />
-              أرشيف غياب {selectedStage?.label}
-            </DialogTitle>
-          </DialogHeader>
-
-          {activeList.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground space-y-2">
-              <UserX className="h-10 w-10 mx-auto opacity-40" />
-              <p>لا توجد تنبيهات غياب مسجلة لهذه المرحلة.</p>
-            </div>
-          ) : (
-            <div className="space-y-3 mt-2">
-              {activeList.map((person) => (
-                <div key={person.id} className="p-3 bg-muted rounded-lg border space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="font-semibold text-foreground">{person.name}</span>
-                    <Badge variant="outline" className="text-amber-600 border-amber-500/30">
-                      غائب {person.absent_count} مرات متتالية
-                    </Badge>
-                  </div>
-                  {person.absence_dates && person.absence_dates.length > 0 && (
-                    <div className="text-xs text-muted-foreground pt-1 border-t border-border/50 flex flex-wrap gap-1 items-center">
-                      <span className="font-medium text-primary">أيام الجمعة المتغيب فيها:</span>
-                      {person.absence_dates.map((dateStr, idx) => (
-                        <span key={idx} className="bg-background px-2 py-0.5 rounded border text-[11px]">
-                          📅 {dateStr}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-};
 
 function AiQuizGeneratorSection() {
   const gen = useServerFn(generateQuizDraft as any);
@@ -731,17 +636,6 @@ function DailyAttendanceSection() {
 
   const people = profilesData || [];
 
-  const absentPersonsList = useMemo(() => {
-    return (people || [])
-      .filter((p: any) => (p.absent_count || 0) >= 2)
-      .map((p: any) => ({
-        id: p.person_id,
-        name: p.full_name,
-        stage: p.academic_year,
-        absent_count: p.absent_count,
-        absence_dates: p.absence_dates,
-      }));
-  }, [people]);
 
   const filteredPeople = filterYear 
     ? people.filter((p: any) => p.academic_year === filterYear) 
@@ -809,7 +703,7 @@ function DailyAttendanceSection() {
 
   return (
     <div className="space-y-4">
-      <ConsecutiveAbsenceAlertButtons absentPersons={absentPersonsList} />
+      <StageAbsenceAlerts />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div onClick={() => setStatsDialogType("total")} className="rounded-2xl border-2 border-border bg-card p-3 text-center cursor-pointer hover:bg-muted/50 transition">
