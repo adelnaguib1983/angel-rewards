@@ -346,8 +346,12 @@ function AiQuizGeneratorSection() {
         data.videoMime = videoFile.type || "video/mp4";
       } else {
         if (!chapter || Number(chapter) < 1) { toast.error("حدد الأصحاح"); return; }
-        data.bible = { book, chapter: Number(chapter), ...(verses.trim() ? (() => { const m = verses.trim().match(/^(\d+)\s*(?:-\s*(\d+))?$/); return m ? { from: Number(m[1]), to: m[2] ? Number(m[2]) : undefined } : {}; })() : {}) };
-      }
+       data.bible = { 
+  book, 
+  chapter: Number(chapter), 
+  ...(chapterTo && Number(chapterTo) > Number(chapter) ? { chapterTo: Number(chapterTo) } : {}),
+  ...(verses.trim() ? (() => { const m = verses.trim().match(/^(\d+)\s*(?:-\s*(\d+))?$/); return m ? { from: Number(m[1]), to: m[2] ? Number(m[2]) : undefined } : {}; })() : {}) 
+};
       const out = await gen({ data } as any);
       if (!out?.questions?.length) throw new Error("لم يتم توليد أسئلة");
       setTitle(out.title || title);
@@ -436,14 +440,14 @@ function AiQuizGeneratorSection() {
               {videoFile && <p className="text-center text-xs font-bold text-emerald-600">تم اختيار ملف الفيديو: {videoFile.name}</p>}
             </div>
           )}
-          {sourceType === "bible" && (
-            <div className="grid gap-2 sm:grid-cols-3">
-              <label className="text-xs font-bold">السفر<select value={book} onChange={(e) => setBook(e.target.value)} className="rounded-xl border-2 border-border bg-background px-2 py-1.5 text-sm font-bold">{[...OT_BOOKS, ...NT_BOOKS].map(([, n]) => <option key={n}>{n}</option>)}</select></label>
-              <label className="text-xs font-bold">الأصحاح<input type="number" min={1} value={chapter} onChange={(e) => setChapter(e.target.value)} className="rounded-xl border-2 border-border bg-background px-2 py-1.5 text-sm font-bold" /></label>
-              <label className="text-xs font-bold">الآيات (اختياري)<input value={verses} onChange={(e) => setVerses(e.target.value)} placeholder="مثال: 16 أو 1-5" className="rounded-xl border-2 border-border bg-background px-2 py-1.5 text-sm font-bold" /></label>
-            </div>
-          )}
-        </div>
+         {sourceType === "bible" && (
+  <div className="grid gap-2 sm:grid-cols-4">
+    <label className="text-xs font-bold">السفر<select value={book} onChange={(e) => setBook(e.target.value)} className="rounded-xl border-2 border-border bg-background px-2 py-1.5 text-sm font-bold">{[...OT_BOOKS, ...NT_BOOKS].map(([, n]) => <option key={n}>{n}</option>)}</select></label>
+    <label className="text-xs font-bold">من أصحاح<input type="number" min={1} value={chapter} onChange={(e) => setChapter(e.target.value)} className="rounded-xl border-2 border-border bg-background px-2 py-1.5 text-sm font-bold" /></label>
+    <label className="text-xs font-bold">إلى أصحاح (اختياري)<input type="number" min={1} value={chapterTo} onChange={(e) => setChapterTo(e.target.value)} placeholder="اختياري" className="rounded-xl border-2 border-border bg-background px-2 py-1.5 text-sm font-bold" /></label>
+    <label className="text-xs font-bold">الآيات (اختياري)<input value={verses} onChange={(e) => setVerses(e.target.value)} placeholder="مثال: 16 أو 1-5" className="rounded-xl border-2 border-border bg-background px-2 py-1.5 text-sm font-bold" /></label>
+  </div>
+)}
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <label className="text-xs font-bold">عدد الأسئلة: 
@@ -472,7 +476,8 @@ function AiQuizGeneratorSection() {
             </div>
           </div>
 
-          <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
+         <div className="space-y-3 pr-1">
+
             {draft.questions.map((q, idx) => (
               <div key={idx} className="space-y-2 rounded-xl border-2 border-border bg-background p-4">
                 <div className="flex items-center justify-between gap-2">
@@ -498,6 +503,19 @@ function AiQuizGeneratorSection() {
               </div>
             ))}
           </div>
+<button
+  type="button"
+  onClick={() => setDraft((d) => d && ({
+    ...d,
+    questions: [
+      ...d.questions,
+      { question: "", kind: "mcq", options: ["", "", ""], correct: 0, points: 5 }
+    ]
+  }))}
+  className="w-full rounded-xl border-2 border-dashed border-sky p-2 text-xs font-bold text-sky hover:bg-sky/10"
+>
+  ➕ إضافة سؤال جديد يدوياً للمسابقة
+</button>
 
           <button onClick={handleSubmit} disabled={submitting} className="pop mt-5 w-full rounded-2xl bg-emerald-600 py-3 text-base font-extrabold text-white shadow-lg disabled:opacity-60">
             {submitting ? "جاري الإرسال..." : "إرسال المسابقة للاعتماد 📨"}
