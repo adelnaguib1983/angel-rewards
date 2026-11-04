@@ -308,6 +308,7 @@ function AiQuizGeneratorSection() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [book, setBook] = useState(NT_BOOKS[0][1]);
   const [chapter, setChapter] = useState("1");
+  const [chapterTo, setChapterTo] = useState("");
   const [verses, setVerses] = useState("");
   const [count, setCount] = useState<15 | 20>(15);
   const [loading, setLoading] = useState(false);
