@@ -636,17 +636,6 @@ function DailyAttendanceSection() {
 
   const people = profilesData || [];
 
-  const absentPersonsList = useMemo(() => {
-    return (people || [])
-      .filter((p: any) => (p.absent_count || 0) >= 2)
-      .map((p: any) => ({
-        id: p.person_id,
-        name: p.full_name,
-        stage: p.academic_year,
-        absent_count: p.absent_count,
-        absence_dates: p.absence_dates,
-      }));
-  }, [people]);
 
   const filteredPeople = filterYear 
     ? people.filter((p: any) => p.academic_year === filterYear) 
@@ -714,7 +703,7 @@ function DailyAttendanceSection() {
 
   return (
     <div className="space-y-4">
-      <ConsecutiveAbsenceAlertButtons absentPersons={absentPersonsList} />
+      <StageAbsenceAlerts />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div onClick={() => setStatsDialogType("total")} className="rounded-2xl border-2 border-border bg-card p-3 text-center cursor-pointer hover:bg-muted/50 transition">
