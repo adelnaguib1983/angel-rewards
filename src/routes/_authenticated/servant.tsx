@@ -23,7 +23,7 @@ import {
 import { BirthdaysButton, PrepArchive, ReadingPlanner, VisitArchive, OT_BOOKS, NT_BOOKS } from "@/components/StaffMemberExtras";
 import { NotificationsBell } from "@/components/MemberExtras";
 import { ServantSuggestionsTab } from "@/components/ServantSuggestionsTab";
-import { AlertTriangle, Users, Calendar, UserX } from 'lucide-react';
+import { StageAbsenceAlerts } from "@/components/AbsenceAlertButtons";
 
 export const Route = createFileRoute("/_authenticated/servant")({
   head: () => ({
