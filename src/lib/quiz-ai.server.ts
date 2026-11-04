@@ -53,7 +53,8 @@ type QuizInput = {
   audioMime?: string | undefined;
   videoBase64?: string | undefined;
   videoMime?: string | undefined;
-  bible?: { book: string; chapter: number; from?: number | undefined; to?: number | undefined } | undefined;
+ bible?: { book: string; chapter: number; chapterTo?: number | undefined; from?: number | undefined; to?: number | undefined } | undefined;
+
   count: 15 | 20;
 };
 
@@ -104,10 +105,13 @@ async function generateQuizJson(input: QuizInput): Promise<QuizDraft> {
   const parts: object[] = [];
   let userText = "";
   if (input.sourceType === "text") userText = `المصدر (نص مكتوب):\n${(input.text || "").trim()}`;
-  else if (input.sourceType === "bible") {
+   } else if (input.sourceType === "bible") {
     const b = input.bible!;
-    const range = b.from && b.to && b.to > b.from ? `الآيات ${b.from}-${b.to}` : b.from ? `الآية ${b.from}` : `الأصحاح كاملًا`;
-    userText = `المصدر (شاهد كتابي): سفر ${b.book}، أصحاح ${b.chapter}، ${range}. استخدم معرفتك بالنص الكتابي نفسه لتوليد الأسئلة، والتزم بدقة بما ورد فيه.`;
+    const chRange = b.chapterTo && b.chapterTo > b.chapter ? `الأصحاحات من ${b.chapter} إلى ${b.chapterTo}` : `أصحاح ${b.chapter}`;
+    const range = b.from && b.to && b.to > b.from ? `الآيات ${b.from}-${b.to}` : b.from ? `الآية ${b.from}` : (b.chapterTo && b.chapterTo > b.chapter ? `كاملة` : `الأصحاح كاملًا`);
+    userText = `المصدر (شاهد كتابي): سفر ${b.book}، ${chRange}، ${range}. استخدم معرفتك بالنص الكتابي نفسه لتوليد الأسئلة، والتزم بدقة بما ورد فيه.`;
+  }
+
   } else if (input.sourceType === "image") {
     userText = "المصدر: صورة مرفوعة. اقرأ كل ما فيها بدقة (نصوص ومعلومات) وولّد الأسئلة منها.";
   } else {
