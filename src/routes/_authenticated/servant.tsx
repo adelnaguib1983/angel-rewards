@@ -352,6 +352,7 @@ function AiQuizGeneratorSection() {
   ...(chapterTo && Number(chapterTo) > Number(chapter) ? { chapterTo: Number(chapterTo) } : {}),
   ...(verses.trim() ? (() => { const m = verses.trim().match(/^(\d+)\s*(?:-\s*(\d+))?$/); return m ? { from: Number(m[1]), to: m[2] ? Number(m[2]) : undefined } : {}; })() : {}) 
 };
+      }
       const out = await gen({ data } as any);
       if (!out?.questions?.length) throw new Error("لم يتم توليد أسئلة");
       setTitle(out.title || title);
