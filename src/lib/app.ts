@@ -55,6 +55,11 @@ export function currentPeriod(d = new Date()) {
   return { y, m, w, from, to };
 }
 
+/** رقم الأسبوع الحالي (1..5) داخل شهر بداية الأسبوع — يطابق طريقة تسجيل activity_logs */
+export function currentWeek(d: Date = new Date()): number {
+  return currentPeriod(d).w;
+}
+
 /** فترات الأسابيع (الجمعة → الخميس) داخل شهر معين */
 export function monthPeriods(y: number, m: number) {
   const first = new Date(Date.UTC(y, m - 1, 1));
