@@ -449,6 +449,7 @@ function AiQuizGeneratorSection() {
     <label className="text-xs font-bold">الآيات (اختياري)<input value={verses} onChange={(e) => setVerses(e.target.value)} placeholder="مثال: 16 أو 1-5" className="rounded-xl border-2 border-border bg-background px-2 py-1.5 text-sm font-bold" /></label>
   </div>
 )}
+        </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <label className="text-xs font-bold">عدد الأسئلة: 
