@@ -16,3 +16,4 @@
 - Notification categories use persisted kinds for events and live weekly RPC results for absence/missing-preparation alerts — why: event history stays auditable while weekly status never becomes stale.
 - Servant attendance is self-recorded once per Cairo week and is the sole source for servant absence reports — why: attendance should reflect presence rather than inferred activity.
 - Staff-added members are profile-only rows (no login) created via `staff_add_member`; yearly promotion runs via pg_cron `promote_academic_years` and graduates 3rd-year members to status 'graduated' — why: servants can track children without accounts, and history is archived rather than deleted.
+- AI gateway inference runs through `@lovable.dev/ai-gateway` in server-only helpers, called by authenticated `*.functions.ts` wrappers — why: keep inference credentials and model contracts server-side in the Worker runtime.
