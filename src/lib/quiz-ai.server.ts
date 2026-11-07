@@ -1,4 +1,5 @@
 import { GatewayError, generateChatCompletion, generateResponse } from "@lovable.dev/ai-gateway";
+import type { ResponsesInputItem } from "@lovable.dev/ai-gateway";
 
 const QUIZ_MODEL = "openai/gpt-6-astra";
 const MEDIA_MODEL = "google/gemini-3.8-flash";
@@ -82,7 +83,7 @@ function gatewayFailure(error: GatewayError): Error {
     invalid_response: "وصل رد غير مكتمل من خدمة التوليد. حاول مرة أخرى.",
     unknown: "تعذر إكمال التوليد حاليًا. حاول مرة أخرى بعد قليل.",
   };
-  return new Error(messages[error.code] ?? messages.unknown);
+  return new Error(messages[error.code] ?? messages["unknown"]);
 }
 
 function toUserError(error: unknown): Error {
@@ -159,17 +160,22 @@ async function generateQuizJson(input: QuizInput): Promise<QuizDraft> {
     userText = `المصدر (${isAudio ? "تسجيل صوتي" : "فيديو"}) بعد تحليله:\n${transcript}`;
   }
 
-  const content = [{ type: "input_text" as const, text: `${userText}\n\nأنشئ بالضبط ${input.count} سؤالًا.` }];
+  const requestInput: ResponsesInputItem[] = [{
+    role: "user",
+    content: `${userText}\n\nأنشئ بالضبط ${input.count} سؤالًا.`,
+  }];
   if (input.sourceType === "image" && input.imageDataUrl) {
-    content.push({ type: "input_image" as const, image_url: input.imageDataUrl, detail: "high" as const });
+    requestInput.push({
+      role: "user",
+      content: [{ type: "input_image", image_url: input.imageDataUrl, detail: "high" }],
+    });
   }
 
   try {
     const response = await generateResponse({
       model: QUIZ_MODEL,
-      store: false,
       instructions: `${SYSTEM}\nعدد الأسئلة المطلوب بالضبط: ${input.count}.`,
-      input: [{ role: "user", content }],
+      input: requestInput,
       max_output_tokens: 12000,
       reasoning: { effort: "medium", summary: "auto" },
       text: { format: { type: "json_schema", ...QUIZ_SCHEMA } },
