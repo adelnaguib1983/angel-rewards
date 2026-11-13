@@ -16,6 +16,41 @@ const fmt = (d) => new Date(d).toLocaleString("ar-EG", { timeZone: "Africa/Cairo
 
 /* ---------- Visitation history for one member ---------- */
 export function VisitHistoryDialog({ member, onClose }: { member: { id: string; name: string } | null; onClose: () => void }) {
+{(() => {
+  // جلب رقم الهاتف من الحقل المباشر أو عبر العلاقة الجديدة في قاعدة البيانات
+  const phoneNumber = staff?.phone || staff?.person?.phone || staff?.phone_number;
+
+  // إذا لم يتوفر رقم، لا يتم عرض الأزرار نهائياً لمنع الأخطاء
+  if (!phoneNumber) return null;
+
+  // تنظيف الرقم من أي مسافات أو رموز ليعمل رابط الواتساب والاتصال بشكل صحيح
+  const cleanPhone = phoneNumber.replace(/\D/g, '');
+
+  return (
+    <div className="flex items-center gap-2">
+      {/* زر الاتصال السريع */}
+      <a
+        href={`tel:${phoneNumber}`}
+        className="p-2 text-green-700 transition-colors bg-green-100 rounded-full hover:bg-green-200"
+        title="اتصال سريع"
+      >
+        📞
+      </a>
+      
+      {/* زر محادثة الواتساب */}
+      <a
+        href={`https://wa.me/${cleanPhone}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="p-2 text-emerald-700 transition-colors bg-emerald-100 rounded-full hover:bg-emerald-200"
+        title="محادثة واتساب"
+      >
+        💬
+      </a>
+    </div>
+  );
+})()}
+
   const { data, isLoading } = useQuery({
     queryKey: ["visit-history", member?.id], enabled: !!member,
     queryFn: async () => { const { data, error } = await supabase.rpc("member_visit_history", { _member: member.id }); if (error) throw error; return data; },
