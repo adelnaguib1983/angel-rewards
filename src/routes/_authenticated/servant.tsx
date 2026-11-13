@@ -894,15 +894,26 @@ function DailyAttendanceSection() {
         </div>
       )}
 
-      {statsDialogType && (
+           {statsDialogType && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="w-full max-w-lg rounded-3xl border-2 border-border bg-card p-6 shadow-2xl max-h-[85vh] flex flex-col pop">
             <div className="flex items-center justify-between pb-4 border-b border-border">
-              <h3 className="text-lg font-extrabold">قائمة الأفراد</h3>
+              <h3 className="text-lg font-extrabold">
+                {statsDialogType === "present" 
+                  ? "👥 قائمة الحاضرين في الجمعة" 
+                  : statsDialogType === "absent" 
+                  ? "⚠️ قائمة الغائبين في الجمعة" 
+                  : "📊 إجمالي الأفراد"}
+              </h3>
               <button onClick={() => setStatsDialogType(null)} className="rounded-xl bg-muted px-3 py-1.5 text-sm font-bold">✕ إغلاق</button>
             </div>
             <div className="mt-4 flex-1 overflow-y-auto space-y-2.5 pr-1">
-              {filteredPeople.map((item: any) => (
+              {(statsDialogType === "present" 
+                ? filteredPeople.filter((p: any) => p.attendance_status === "present")
+                : statsDialogType === "absent" 
+                ? filteredPeople.filter((p: any) => p.attendance_status === "absent")
+                : filteredPeople
+              ).map((item: any) => (
                 <div key={item.person_id} className="flex items-center justify-between rounded-2xl border border-border bg-background p-3.5 shadow-sm">
                   <div className="flex items-center gap-3">
                     {item.photo_url ? <img src={item.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="text-2xl">{item.avatar || "👤"}</span>}
@@ -921,6 +932,7 @@ function DailyAttendanceSection() {
           </div>
         </div>
       )}
+
     </div>
   );
 }
