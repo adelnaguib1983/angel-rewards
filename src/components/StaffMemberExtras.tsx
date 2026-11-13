@@ -179,6 +179,12 @@ export function SuggestionDetail({ id, onClose }: { id: string | null; onClose: 
           <div className="text-xs text-muted-foreground">{fmt(data.created_at)}</div>
           <p className="whitespace-pre-wrap leading-7">{data.body}</p>
           {data.images?.map((s, i) => <img key={i} src={s} alt="" onClick={() => setGallery(data.images)} className="w-full cursor-zoom-in rounded-xl" />)}
+          {(data.audio_url || data.video_url) && (
+            <div className="mt-3 space-y-2">
+              {data.audio_url && <MediaView src={data.audio_url} kind="audio" />}
+              {data.video_url && <MediaView src={data.video_url} kind="video" />}
+            </div>
+          )}
         </>}
       </div>
     </DialogContent><ImageLightbox images={gallery} title="صور الاقتراح" onClose={() => setGallery(null)} /></Dialog>
@@ -188,8 +194,29 @@ export function SuggestionDetail({ id, onClose }: { id: string | null; onClose: 
 export function PrepDetail({ id, onClose }: { id: string | null; onClose: () => void }) {
   const [gallery, setGallery] = useState<string[] | null>(null);
   const { data } = useQuery({ queryKey: ["prep-detail", id], enabled: !!id, queryFn: async () => (await supabase.from("servant_preparations").select("*,profiles:user_id(full_name)").eq("id", id).maybeSingle()).data });
-  return <><Dialog open={!!id} onOpenChange={(o) => !o && onClose()}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>📘 تحضير {data?.profiles?.full_name ?? "الخادم"}</DialogTitle></DialogHeader><div className="max-h-[65vh] overflow-y-auto"><div className="text-xs text-muted-foreground">أسبوع {data?.week_start ?? ""}</div><p className="my-3 whitespace-pre-wrap leading-7">{data?.notes || "بدون نص"}</p>{!!data?.images?.length && <button onClick={() => setGallery(data.images)} className="rounded-xl bg-primary px-4 py-2 font-bold text-primary-foreground">فتح الصور ({data.images.length})</button>}</div></DialogContent></Dialog><ImageLightbox images={gallery} title="صور التحضير" onClose={() => setGallery(null)} /></>;
+  return (
+    <>
+      <Dialog open={!!id} onOpenChange={(o) => !o && onClose()}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader><DialogTitle>📘 تحضير {data?.profiles?.full_name ?? "الخادم"}</DialogTitle></DialogHeader>
+          <div className="max-h-[65vh] overflow-y-auto space-y-3">
+            <div className="text-xs text-muted-foreground">أسبوع {data?.week_start ?? ""}</div>
+            <p className="my-3 whitespace-pre-wrap leading-7">{data?.notes || "بدون نص"}</p>
+            {!!data?.images?.length && <button onClick={() => setGallery(data.images)} className="rounded-xl bg-primary px-4 py-2 font-bold text-primary-foreground">فتح الصور ({data.images.length})</button>}
+            {(data?.audio_url || data?.video_url) && (
+              <div className="space-y-2">
+                {data.audio_url && <MediaView src={data.audio_url} kind="audio" />}
+                {data.video_url && <MediaView src={data.video_url} kind="video" />}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      <ImageLightbox images={gallery} title="صور التحضير" onClose={() => setGallery(null)} />
+    </>
+  );
 }
+
 
 /* ---------- Bible / daily readings ---------- */
 export const NT_BOOKS: [number, string, number][] = [
