@@ -46,6 +46,16 @@ export interface AbsentPerson {
   absence_dates?: string[];
 }
 
+function formatWhatsAppLink(phone?: string | null) {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) return null;
+  // تحويل الرقم المصري (01xxxxxxxxx) إلى الصيغة الدولية (+201xxxxxxxxx)
+  const intl = digits.startsWith("0") ? "2" + digits : digits.startsWith("2") ? digits : "20" + digits;
+  return `https://wa.me/${intl}`;
+}
+
+
 function ServantPage() {
   const { data: me, isLoading } = useMe();
   const [tab, setTab] = useState<string>("prep");
