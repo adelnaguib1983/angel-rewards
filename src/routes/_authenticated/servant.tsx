@@ -596,9 +596,9 @@ function DailyAttendanceSection() {
 
   const filterYear = selectedYear === "all" ? null : selectedYear;
 
-  const { data: profilesData, isLoading } = useQuery({
+    const { data: profilesData, isLoading } = useQuery({
     queryKey: ["profiles-attendance-all-fixed", accountType, date],
-      queryFn: async () => {
+    queryFn: async () => {
       const { data: profiles, error: profErr } = await supabase
         .from("profiles")
         .select("id, user_id, full_name, avatar, photo_url, academic_year, account_type, status, phone, email, registered_externally")
@@ -650,7 +650,7 @@ function DailyAttendanceSection() {
         const phoneVal = m.phone || m.phone_number || m.mobile || m.person?.phone || null;
 
         return {
-          person_id: personId, // ✅ تم التصحيح لاستخدام المتغير الآمن
+          person_id: personId,
           full_name: m.full_name || m.name || m.username || "بدون اسم",
           avatar: m.avatar || "👤",
           photo_url: m.photo_url,
@@ -663,6 +663,11 @@ function DailyAttendanceSection() {
           auth_user_id: m.auth_user_id,
           email: m.email,
           registered_externally: m.registered_externally,
+        };
+      });
+    },
+  });
+
         };
       });
     },
