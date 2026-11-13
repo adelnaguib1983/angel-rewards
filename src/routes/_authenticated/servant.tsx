@@ -598,12 +598,11 @@ function DailyAttendanceSection() {
 
   const { data: profilesData, isLoading } = useQuery({
     queryKey: ["profiles-attendance-all-fixed", accountType, date],
-    queryFn: async () => {
+      queryFn: async () => {
       const { data: profiles, error: profErr } = await supabase
-  .from("profiles")
-  .select("id, full_name, avatar, photo_url, academic_year, account_type, status, phone")
-  .eq("status", "approved");
-
+        .from("profiles")
+        .select("id, user_id, full_name, avatar, photo_url, academic_year, account_type, status, phone, email, registered_externally")
+        .eq("status", "approved");
 
       if (profErr) throw profErr;
 
@@ -643,31 +642,31 @@ function DailyAttendanceSection() {
 
       const listToUse = filtered.length > 0 ? filtered : allProfiles;
 
-            return listToUse.map((m: any) => {
-  const personId = m.id || m.user_id;
-  const att = (attendanceRecords || []).find((a: any) => a.person_id === personId);
-  const personCounts = countsMap[personId] || { present: 0, absent: 0, absence_dates: [] };
+      return listToUse.map((m: any) => {
+        const personId = m.id || m.user_id;
+        const att = (attendanceRecords || []).find((a: any) => a.person_id === personId);
+        const personCounts = countsMap[personId] || { present: 0, absent: 0, absence_dates: [] };
 
-  // البحث عن رقم الهاتف في أكثر من احتمال لضمان عدم فقده
-  const phoneVal = m.phone || m.phone_number || m.mobile || m.person?.phone || null;
+        const phoneVal = m.phone || m.phone_number || m.mobile || m.person?.phone || null;
 
-  return {
-    person_id: m.id,
-    full_name: m.full_name || m.name || m.username || "بدون اسم",
-    avatar: m.avatar || "👤",
-    photo_url: m.photo_url,
-    phone: phoneVal, // <-- حفظ الرقم هنا
-    academic_year: m.academic_year || m.grade || "مرحلة عامة",
-    attendance_status: att?.status === "present" ? "present" : att?.status === "absent" ? "absent" : null,
-    present_count: personCounts.present,
-    absent_count: personCounts.absent,
-    absence_dates: personCounts.absence_dates,
-  };
-});
- personCounts.absence_dates,
+        return {
+          person_id: personId, // ✅ تم التصحيح لاستخدام المتغير الآمن
+          full_name: m.full_name || m.name || m.username || "بدون اسم",
+          avatar: m.avatar || "👤",
+          photo_url: m.photo_url,
+          phone: phoneVal,
+          academic_year: m.academic_year || m.grade || "مرحلة عامة",
+          attendance_status: att?.status === "present" ? "present" : att?.status === "absent" ? "absent" : null,
+          present_count: personCounts.present,
+          absent_count: personCounts.absent,
+          absence_dates: personCounts.absence_dates,
           auth_user_id: m.auth_user_id,
           email: m.email,
           registered_externally: m.registered_externally,
+        };
+      });
+    },
+
         };
       });
 
