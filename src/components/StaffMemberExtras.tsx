@@ -162,7 +162,12 @@ export function SuggestionForm() {
       </div>
       <button disabled={busy} onClick={send} className="pop mt-3 w-full rounded-2xl bg-primary py-3 font-extrabold text-primary-foreground disabled:opacity-60">{busy ? "..." : "إرسال الاقتراح"}</button>
       {!!mine?.length && <div className="mt-4 space-y-2"><h3 className="font-bold">اقتراحاتي السابقة</h3>{mine.map((s) => (
-        <div key={s.id} className="rounded-xl bg-muted p-2 text-sm"><p className="whitespace-pre-wrap">{s.body}</p><div className="text-[10px] text-muted-foreground">{fmt(s.created_at)}</div></div>
+       <div key={s.id} className="rounded-xl bg-muted p-2 text-sm space-y-2">
+  <p className="whitespace-pre-wrap">{s.body}</p>
+  {s.audio_url && <MediaView src={s.audio_url} kind="audio" />}
+  <div className="text-[10px] text-muted-foreground">{fmt(s.created_at)}</div>
+</div>
+
       ))}</div>}
     </section>
   );
