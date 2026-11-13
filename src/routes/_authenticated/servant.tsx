@@ -801,29 +801,51 @@ function DailyAttendanceSection() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
-                    <button 
-                      disabled={loadingPersons[item.person_id] || item.attendance_status === "present"}
-                      onClick={() => handleStatusChange(item.person_id, "present", item.attendance_status)} 
-                      className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${item.attendance_status === "present" ? "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400" : "bg-muted text-muted-foreground hover:bg-emerald-100"}`}
-                    >
-                      <span>✓ حاضر</span>
-                      <span className="rounded-full bg-black/25 px-2 py-0.5 text-[11px] text-white">{item.present_count || 0}</span>
-                    </button>
-
-                    <button 
-                      disabled={loadingPersons[item.person_id] || item.attendance_status === "absent"}
-                      onClick={() => handleStatusChange(item.person_id, "absent", item.attendance_status)} 
-                      className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${item.attendance_status === "absent" ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-red-400" : "bg-muted text-muted-foreground hover:bg-red-100"}`}
-                    >
-                      <span>✕ غائب</span>
-                      <span className="rounded-full bg-black/25 px-2 py-0.5 text-[11px] text-white">{item.absent_count || 0}</span>
-                    </button>
-
-                    {item.attendance_status && (
-                      <button type="button" title="مسح الرصد" disabled={loadingPersons[item.person_id]} onClick={() => handleClearAttendance(item.person_id)} className="rounded-lg p-1.5 text-xs text-muted-foreground hover:bg-muted">↺</button>
-                    )}
+                                   <div className="flex flex-col items-end gap-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        disabled={loadingPersons[item.person_id] || item.attendance_status === "present"}
+                        onClick={() => handleStatusChange(item.person_id, "present", item.attendance_status)}
+                        className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${item.attendance_status === "present" ? "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400" : "bg-muted text-muted-foreground hover:bg-emerald-100"}`}
+                      >
+                        <span>✓ حاضر</span>
+                      </button>
+                      <button
+                        disabled={loadingPersons[item.person_id] || item.attendance_status === "absent"}
+                        onClick={() => handleStatusChange(item.person_id, "absent", item.attendance_status)}
+                        className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${item.attendance_status === "absent" ? "bg-destructive text-destructive-foreground shadow-md ring-2 ring-red-400" : "bg-muted text-muted-foreground hover:bg-red-100"}`}
+                      >
+                        <span>✕ غائب</span>
+                      </button>
+                      {item.attendance_status && (
+                        <button type="button" title="مسح الرصد" disabled={loadingPersons[item.person_id]} onClick={() => handleClearAttendance(item.person_id)} className="rounded-lg p-1.5 text-xs text-muted-foreground hover:bg-muted">↺</button>
+                      )}
+                    </div>
+                    {/* أزرار الاتصال والواتساب السريعة أسفل حاضر وغائب */}
+                    <div className="flex items-center justify-end gap-2 w-full pt-1">
+                      <a
+                        href={item.phone ? `tel:${item.phone}` : undefined}
+                        title={item.phone ? `اتصال: ${item.phone}` : "لا يوجد رقم مسجل"}
+                        className={`flex h-8 w-8 items-center justify-center rounded-full text-white shadow transition text-sm ${
+                          item.phone ? "bg-sky hover:opacity-90 active:scale-95" : "bg-muted text-muted-foreground opacity-30 pointer-events-none"
+                        }`}
+                      >
+                        📞
+                      </a>
+                      <a
+                        href={formatWhatsAppLink(item.phone) || undefined}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={item.phone ? `واتساب: ${item.phone}` : "لا يوجد رقم مسجل"}
+                        className={`flex h-8 w-8 items-center justify-center rounded-full text-white shadow transition text-sm ${
+                          item.phone ? "bg-emerald-600 hover:opacity-90 active:scale-95" : "bg-muted text-muted-foreground opacity-30 pointer-events-none"
+                        }`}
+                      >
+                        💬
+                      </a>
+                    </div>
                   </div>
+
                 </div>
               ))}
             </div>
