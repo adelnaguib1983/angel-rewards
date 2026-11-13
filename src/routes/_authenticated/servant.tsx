@@ -648,13 +648,16 @@ function DailyAttendanceSection() {
         const att = (attendanceRecords || []).find((a: any) => a.person_id === personId);
         const personCounts = countsMap[personId] || { present: 0, absent: 0, absence_dates: [] };
 
-        return {
-          person_id: personId,
+                return {
+          person_id: m.id,
           full_name: m.full_name || m.name || m.username || "بدون اسم",
           avatar: m.avatar || "👤",
           photo_url: m.photo_url,
+          phone: m.phone || m.phone2 || null,
           academic_year: m.academic_year || m.grade || "مرحلة عامة",
           attendance_status: att ? att.status : null,
+        };
+
           present_count: personCounts.present,
           absent_count: personCounts.absent,
           absence_dates: personCounts.absence_dates,
