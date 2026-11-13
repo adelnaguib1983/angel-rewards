@@ -864,7 +864,30 @@ function DailyAttendanceSection() {
                       <div className="text-xs text-muted-foreground">{item.academic_year}</div>
                     </div>
                   </div>
-                  <button disabled={loadingPersons[item.person_id]} onClick={() => handleStatusChange(item.person_id, "present", item.attendance_status)} className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow">تعديل إلى حاضر ✓</button>
+                                   <div className="flex items-center gap-2">
+                    <a
+                      href={item.phone ? `tel:${item.phone}` : undefined}
+                      title={item.phone ? `اتصال: ${item.phone}` : "لا يوجد رقم مسجل"}
+                      className={`flex h-8 w-8 items-center justify-center rounded-full text-white shadow transition text-sm ${
+                        item.phone ? "bg-sky hover:opacity-90 active:scale-95" : "bg-muted text-muted-foreground opacity-30 pointer-events-none"
+                      }`}
+                    >
+                      📞
+                    </a>
+                    <a
+                      href={formatWhatsAppLink(item.phone) || undefined}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={item.phone ? `واتساب: ${item.phone}` : "لا يوجد رقم مسجل"}
+                      className={`flex h-8 w-8 items-center justify-center rounded-full text-white shadow transition text-sm ${
+                        item.phone ? "bg-emerald-600 hover:opacity-90 active:scale-95" : "bg-muted text-muted-foreground opacity-30 pointer-events-none"
+                      }`}
+                    >
+                      💬
+                    </a>
+                    <button disabled={loadingPersons[item.person_id]} onClick={() => handleStatusChange(item.person_id, "present", item.attendance_status)} className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow">تعديل إلى حاضر ✓</button>
+                  </div>
+
                 </div>
               ))}
             </div>
