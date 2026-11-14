@@ -665,6 +665,7 @@ function DailyAttendanceSection() {
     },
   });
 
+
   const people = profilesData || [];
 
 
