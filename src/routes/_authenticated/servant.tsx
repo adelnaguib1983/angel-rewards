@@ -601,7 +601,7 @@ function DailyAttendanceSection() {
     queryFn: async () => {
       const { data: profiles, error: profErr } = await supabase
         .from("profiles")
-        .select("id, user_id, full_name, avatar, photo_url, academic_year, account_type, status, phone, email, registered_externally")
+        .select("id, full_name, avatar, photo_url, academic_year, account_type, status, phone")
         .eq("status", "approved");
 
       if (profErr) throw profErr;
@@ -643,38 +643,25 @@ function DailyAttendanceSection() {
       const listToUse = filtered.length > 0 ? filtered : allProfiles;
 
       return listToUse.map((m: any) => {
-        const personId = m.id || m.user_id;
+        const personId = m.id;
         const att = (attendanceRecords || []).find((a: any) => a.person_id === personId);
         const personCounts = countsMap[personId] || { present: 0, absent: 0, absence_dates: [] };
 
-        const phoneVal = m.phone || m.phone_number || m.mobile || m.person?.phone || null;
+        const phoneVal = m.phone || null;
 
         return {
           person_id: personId,
-          full_name: m.full_name || m.name || m.username || "بدون اسم",
+          full_name: m.full_name || "بدون اسم",
           avatar: m.avatar || "👤",
           photo_url: m.photo_url,
           phone: phoneVal,
-          academic_year: m.academic_year || m.grade || "مرحلة عامة",
+          academic_year: m.academic_year || "مرحلة عامة",
           attendance_status: att?.status === "present" ? "present" : att?.status === "absent" ? "absent" : null,
           present_count: personCounts.present,
           absent_count: personCounts.absent,
           absence_dates: personCounts.absence_dates,
-          auth_user_id: m.auth_user_id,
-          email: m.email,
-          registered_externally: m.registered_externally,
         };
       });
-    },
-  });
-
-        };
-      });
-    },
-
-        };
-      });
-
     },
   });
 
