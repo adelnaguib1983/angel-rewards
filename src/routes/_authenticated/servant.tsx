@@ -601,8 +601,7 @@ function DailyAttendanceSection() {
     queryFn: async () => {
       const { data: profiles, error: profErr } = await supabase
         .from("profiles")
-        .select("id, full_name, avatar, photo_url, academic_year, account_type, status, phone")
-        .eq("status", "approved");
+        .select("id, full_name, avatar, photo_url, academic_year, account_type, status, phone");
 
       if (profErr) throw profErr;
 
