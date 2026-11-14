@@ -627,17 +627,20 @@ function DailyAttendanceSection() {
         }
       });
 
-      const allProfiles = profiles || [];
+            const allProfiles = profiles || [];
       const filtered = allProfiles.filter((m: any) => {
         const type = (m.account_type || "").toLowerCase();
         const hasYear = Boolean(m.academic_year && m.academic_year.trim() !== "");
 
         if (accountType === "servant") {
-          return type.includes("servant") || type.includes("admin") || !hasYear;
+          // إضافة دعم الكلمات العربية والإنجليزية للخدام
+          return type.includes("servant") || type.includes("admin") || type.includes("خادم") || !hasYear;
         } else {
-          return hasYear || type.includes("student") || type.includes("member") || type === "";
+          // إضافة دعم الكلمات العربية والإنجليزية للمخدومين
+          return hasYear || type.includes("student") || type.includes("member") || type.includes("مخدوم") || type === "";
         }
       });
+
 
       const listToUse = filtered.length > 0 ? filtered : allProfiles;
 
