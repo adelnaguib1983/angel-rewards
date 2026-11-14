@@ -668,6 +668,7 @@ function DailyAttendanceSection() {
 
   const people = profilesData || [];
 
+console.log({ accountType, date, count: people.length, isLoading });
 
   const filteredPeople = filterYear 
     ? people.filter((p: any) => p.academic_year === filterYear) 
