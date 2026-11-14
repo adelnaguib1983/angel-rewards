@@ -627,19 +627,20 @@ function DailyAttendanceSection() {
         }
       });
 
-            const allProfiles = profiles || [];
+        const allProfiles = profiles || [];
       const filtered = allProfiles.filter((m: any) => {
         const type = (m.account_type || "").toLowerCase();
         const hasYear = Boolean(m.academic_year && m.academic_year.trim() !== "");
 
         if (accountType === "servant") {
-          // إضافة دعم الكلمات العربية والإنجليزية للخدام
+          // السماح بالخدام، المشرفين، أو من ليس لديه سنة دراسية، مع دعم العربية والإنجليزية
           return type.includes("servant") || type.includes("admin") || type.includes("خادم") || !hasYear;
         } else {
-          // إضافة دعم الكلمات العربية والإنجليزية للمخدومين
+          // السماح للمخدومين الذين لديهم سنة دراسية أو تصنيف مخدوم
           return hasYear || type.includes("student") || type.includes("member") || type.includes("مخدوم") || type === "";
         }
       });
+
 
 
       const listToUse = filtered.length > 0 ? filtered : allProfiles;
