@@ -1,5 +1,4 @@
-const GEMINI_MODEL = "gemini-2.0-flash";
-
+const GEMINI_MODEL = "gemini-flash-latest";
 
 export type QuizDraft = {
   title: string;
