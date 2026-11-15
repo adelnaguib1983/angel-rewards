@@ -174,27 +174,82 @@ export function SuggestionForm() {
 }
 
 export function SuggestionDetail({ id, onClose }: { id: string | null; onClose: () => void }) {
+  const qc = useQueryClient();
   const [gallery, setGallery] = useState<string[] | null>(null);
-  const { data } = useQuery({ queryKey: ["suggestion", id], enabled: !!id, queryFn: async () => (await supabase.from("suggestions").select("*").eq("id", id).maybeSingle()).data });
+  const [deleting, setDeleting] = useState(false);
+
+  const { data } = useQuery({
+    queryKey: ["suggestion", id],
+    enabled: !!id,
+    queryFn: async () => (await supabase.from("suggestions").select("*").eq("id", id).maybeSingle()).data,
+  });
+
+  const handleDelete = async () => {
+    if (!window.confirm("هل أنت متأكد من حذف هذا الاقتراح نهائيًا؟")) return;
+    setDeleting(true);
+    const { error } = await supabase.from("suggestions").delete().eq("id", id);
+    setDeleting(false);
+
+    if (error) {
+      toast.error("فشل حذف الاقتراح: " + error.message);
+    } else {
+      toast.success("تم حذف الاقتراح بنجاح ✅");
+      qc.invalidateQueries({ queryKey: ["suggestion", id] });
+      qc.invalidateQueries({ queryKey: ["admin-notifications"] });
+      qc.invalidateQueries({ queryKey: ["servant-suggestions-feed"] });
+      onClose();
+    }
+  };
+
   return (
-    <Dialog open={!!id} onOpenChange={(o) => !o && onClose()}><DialogContent>
-      <DialogHeader><DialogTitle>💡 تفاصيل الاقتراح</DialogTitle></DialogHeader>
-      <div className="max-h-[65vh] space-y-2 overflow-y-auto">
-        {!data ? <p className="text-muted-foreground">جاري التحميل...</p> : <>
-          <div className="text-xs text-muted-foreground">{fmt(data.created_at)}</div>
-          <p className="whitespace-pre-wrap leading-7">{data.body}</p>
-          {data.images?.map((s, i) => <img key={i} src={s} alt="" onClick={() => setGallery(data.images)} className="w-full cursor-zoom-in rounded-xl" />)}
-          {(data.audio_url || data.video_url) && (
-            <div className="mt-3 space-y-2">
-              {data.audio_url && <MediaView src={data.audio_url} kind="audio" />}
-              {data.video_url && <MediaView src={data.video_url} kind="video" />}
-            </div>
+    <Dialog open={!!id} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>💡 تفاصيل الاقتراح</DialogTitle>
+        </DialogHeader>
+        <div className="max-h-[65vh] space-y-3 overflow-y-auto">
+          {!data ? (
+            <p className="text-muted-foreground">جاري التحميل...</p>
+          ) : (
+            <>
+              <div className="text-xs text-muted-foreground">{fmt(data.created_at)}</div>
+              <p className="whitespace-pre-wrap leading-7">{data.body}</p>
+              {data.images?.map((s, i) => (
+                <img
+                  key={i}
+                  src={s}
+                  alt=""
+                  onClick={() => setGallery(data.images)}
+                  className="w-full cursor-zoom-in rounded-xl"
+                />
+              ))}
+              {(data.audio_url || data.video_url) && (
+                <div className="mt-3 space-y-2">
+                  {data.audio_url && <MediaView src={data.audio_url} kind="audio" />}
+                  {data.video_url && <MediaView src={data.video_url} kind="video" />}
+                </div>
+              )}
+
+              {/* زر الحذف */}
+              <div className="pt-3 border-t border-border">
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={handleDelete}
+                  className="w-full rounded-2xl bg-destructive py-2.5 text-sm font-extrabold text-destructive-foreground transition hover:opacity-90 disabled:opacity-50"
+                >
+                  {deleting ? "جاري الحذف..." : "🗑️ حذف هذا الاقتراح"}
+                </button>
+              </div>
+            </>
           )}
-        </>}
-      </div>
-    </DialogContent><ImageLightbox images={gallery} title="صور الاقتراح" onClose={() => setGallery(null)} /></Dialog>
+        </div>
+      </DialogContent>
+      <ImageLightbox images={gallery} title="صور الاقتراح" onClose={() => setGallery(null)} />
+    </Dialog>
   );
 }
+
 
 export function PrepDetail({ id, onClose }: { id: string | null; onClose: () => void }) {
   const [gallery, setGallery] = useState<string[] | null>(null);
