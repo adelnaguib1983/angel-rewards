@@ -47,6 +47,7 @@ export function ServantSuggestionsTab({ userId }: { userId: string }) {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [gallery, setGallery] = useState<string[] | null>(null);
   const rec = useRecorder();
 
@@ -93,6 +94,21 @@ export function ServantSuggestionsTab({ userId }: { userId: string }) {
       toast.error(err.message || "حدث خطأ أثناء الإرسال");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteSuggestion = async (id: string) => {
+    if (!window.confirm("هل أنت متأكد من حذف هذا الاقتراح نهائيًا؟")) return;
+    setDeletingId(id);
+    const { error } = await supabase.from("suggestions").delete().eq("id", id);
+    setDeletingId(null);
+
+    if (error) {
+      toast.error("فشل حذف الاقتراح: " + error.message);
+    } else {
+      toast.success("تم حذف الاقتراح بنجاح ✅");
+      qc.invalidateQueries({ queryKey: ["servant-suggestions-feed"] });
+      qc.invalidateQueries({ queryKey: ["admin-notif"] });
     }
   };
 
@@ -192,8 +208,8 @@ export function ServantSuggestionsTab({ userId }: { userId: string }) {
 
               return (
                 <div key={item.id} className="space-y-2 rounded-2xl border border-border bg-muted/30 p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xl">{author?.avatar || "👤"}</span>
                       <span className="text-sm font-extrabold">{author?.full_name || "مستخدم"}</span>
                       {author?.academic_year && (
@@ -203,8 +219,21 @@ export function ServantSuggestionsTab({ userId }: { userId: string }) {
                         {item.target_type === "all" ? "📢 للجميع" : "🔒 خاص بالخدام"}
                       </span>
                     </div>
-                    <span className="text-xs text-muted-foreground">{dateStr}</span>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">{dateStr}</span>
+                      <button
+                        type="button"
+                        disabled={deletingId === item.id}
+                        onClick={() => handleDeleteSuggestion(item.id)}
+                        className="rounded-lg bg-destructive/10 px-2 py-1 text-xs font-bold text-destructive hover:bg-destructive hover:text-destructive-foreground transition disabled:opacity-50"
+                        title="حذف هذا الاقتراح"
+                      >
+                        {deletingId === item.id ? "..." : "🗑️ حذف"}
+                      </button>
+                    </div>
                   </div>
+
                   <p className="text-sm font-medium leading-relaxed text-foreground/90 whitespace-pre-line">{item.body}</p>
                   {!!item.images?.length && (
                     <div className="flex flex-wrap gap-2">
