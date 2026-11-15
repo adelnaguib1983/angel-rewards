@@ -1,5 +1,6 @@
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
 
+
 export type QuizDraft = {
   title: string;
   questions: { question: string; kind: "tf" | "mcq"; options: string[]; correct: number; points: number }[];
