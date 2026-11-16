@@ -326,6 +326,10 @@ function AiQuizGeneratorSection() {
   const [title, setTitle] = useState("مسابقة أبطال الملاك الأسبوعية");
   const [opens, setOpens] = useState("");
   const [closes, setCloses] = useState("");
+  const [editTimingQuiz, setEditTimingQuiz] = useState<any>(null);
+  const [newOpens, setNewOpens] = useState("");
+  const [newCloses, setNewCloses] = useState("");
+  const [savingTiming, setSavingTiming] = useState(false);
   const [draft, setDraft] = useState<{ title: string; questions: { question: string; kind: "tf" | "mcq"; options: string[]; correct: number; points: number }[] } | null>(null);
 
   const { data: myQuizzes } = useQuery({
@@ -333,6 +337,44 @@ function AiQuizGeneratorSection() {
     enabled: !!me,
     queryFn: async () => (await supabase.from("quizzes").select("id, title, status, created_at, opens_at, closes_at").eq("created_by", me!.user.id).order("created_at", { ascending: false })).data ?? [],
   });
+
+  const toLocalDateTimeInput = (value: string | null) => {
+    if (!value) return "";
+    const date = new Date(value);
+    const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return localDate.toISOString().slice(0, 16);
+  };
+
+  const openEditTiming = (z: any) => {
+    setEditTimingQuiz(z);
+    setNewOpens(toLocalDateTimeInput(z.opens_at));
+    setNewCloses(toLocalDateTimeInput(z.closes_at));
+  };
+
+  const handleSaveTiming = async () => {
+    if (!editTimingQuiz) return;
+    if (newOpens && newCloses && new Date(newCloses) <= new Date(newOpens)) {
+      toast.error("وقت القفل لازم يكون بعد وقت الفتح");
+      return;
+    }
+    setSavingTiming(true);
+    try {
+      const { error } = await supabase.rpc("update_quiz_schedule", {
+        _quiz: editTimingQuiz.id,
+        _opens_at: newOpens ? new Date(newOpens).toISOString() : null,
+        _closes_at: newCloses ? new Date(newCloses).toISOString() : null,
+      });
+      if (error) throw error;
+      toast.success("تم تحديث وقت المسابقة بنجاح ✅");
+      setEditTimingQuiz(null);
+      qc.invalidateQueries({ queryKey: ["my-quizzes"] });
+      qc.invalidateQueries({ queryKey: ["admin-quizzes"] });
+    } catch (e: any) {
+      toast.error(e.message || "تعذر تحديث الوقت");
+    } finally {
+      setSavingTiming(false);
+    }
+  };
 
   const audioB64 = async (f: File) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split("base64,")[1] || ""); r.onerror = rej; r.readAsDataURL(f); });
 
@@ -541,18 +583,53 @@ function AiQuizGeneratorSection() {
           <div className="space-y-2">
             {myQuizzes.map((z: any) => (
               <div key={z.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-muted p-3 text-sm">
-                <span className="font-extrabold">🧠 {z.title}</span>
-                <span className="text-xs text-muted-foreground">{new Date(z.created_at).toLocaleDateString("ar-EG")}</span>
-                <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${STATUS[z.status]?.c ?? "bg-muted"}`}>{STATUS[z.status]?.l ?? z.status}</span>
+                <div>
+                  <span className="font-extrabold">🧠 {z.title}</span>
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    {new Date(z.created_at).toLocaleDateString("ar-EG")}
+                    {z.opens_at && ` · يفتح: ${new Date(z.opens_at).toLocaleString("ar-EG")}`}
+                    {z.closes_at && ` · يقفل: ${new Date(z.closes_at).toLocaleString("ar-EG")}`}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${STATUS[z.status]?.c ?? "bg-muted"}`}>{STATUS[z.status]?.l ?? z.status}</span>
+                  <button type="button" onClick={() => openEditTiming(z)} className="rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-bold hover:bg-muted">
+                    ⏰ تعديل الوقت
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         </section>
       )}
+
+      <Dialog open={!!editTimingQuiz} onOpenChange={(open) => !open && setEditTimingQuiz(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>⏰ تعديل وقت المسابقة</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm font-bold text-muted-foreground">{editTimingQuiz?.title}</p>
+          <div className="mt-4 space-y-3">
+            <label className="block text-xs font-bold">
+              ⏰ وقت الفتح:
+              <input type="datetime-local" value={newOpens} onChange={(e) => setNewOpens(e.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-xs font-bold" />
+            </label>
+            <label className="block text-xs font-bold">
+              🔒 وقت القفل:
+              <input type="datetime-local" value={newCloses} onChange={(e) => setNewCloses(e.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-xs font-bold" />
+            </label>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setEditTimingQuiz(null)}>إلغاء</Button>
+              <Button onClick={handleSaveTiming} disabled={savingTiming}>
+                {savingTiming ? "جاري الحفظ..." : "حفظ التوقيت"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-
 function getThisWeekFriday(): string {
   const d = new Date();
   const day = d.getDay();
