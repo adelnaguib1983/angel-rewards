@@ -24,13 +24,14 @@ export function AppHeader({ name, avatar, photo, isAdmin, stage = "member", chil
         </div>
         <div className="flex items-center gap-2">
           {children}
-          {isAdmin && (
-            <nav className="flex gap-1 text-xs font-bold">
-              {stage !== "member" && <Link to="/home" className="rounded-xl bg-primary px-2 py-1.5 text-primary-foreground">المخدومين</Link>}
-              {stage !== "servant" && <Link to="/servant" className="rounded-xl bg-sky px-2 py-1.5 text-primary-foreground">الخدام</Link>}
-              {stage !== "admin" && <Link to="/admin" className="rounded-xl bg-secondary px-2 py-1.5 text-secondary-foreground">المشرف</Link>}
-            </nav>
-          )}
+        {(isAdmin || stage === "servant") && (
+  <nav className="flex gap-1 text-xs font-bold">
+    {stage !== "member" && <Link to="/home" className="rounded-xl bg-primary px-2 py-1.5 text-primary-foreground">المخدومين 👁️</Link>}
+    {stage !== "servant" && <Link to="/servant" className="rounded-xl bg-sky px-2 py-1.5 text-primary-foreground">الخدام</Link>}
+    {isAdmin && stage !== "admin" && <Link to="/admin" className="rounded-xl bg-secondary px-2 py-1.5 text-secondary-foreground">المشرف</Link>}
+  </nav>
+)}
+
           <span className="hidden items-center gap-1 text-sm text-muted-foreground sm:inline-flex">
             {photo ? <img src={photo} alt="" className="h-7 w-7 rounded-full object-cover" /> : avatar} {name}
           </span>
