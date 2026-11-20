@@ -29,6 +29,17 @@ export function NotificationsBell({ onOpen, onQuiz }: { onOpen?: (id: string) =>
   // حساب عدد التنبيهات غير المقروءة
   const unreadCount = data?.filter((n) => !n.read).length ?? 0;
 
+// تحديث شارة الأيقونة الخارجية على شاشة الموبايل (PWA Badge)
+useEffect(() => {
+  if (typeof navigator !== "undefined" && "setAppBadge" in navigator) {
+    if (unreadCount > 0) {
+      navigator.setAppBadge(unreadCount).catch(() => {});
+    } else {
+      navigator.clearAppBadge().catch(() => {});
+    }
+  }
+}, [unreadCount]);
+
   // الاستماع اللحظي (Realtime) للإشعارات الجديدة
   useEffect(() => {
     const channel = supabase
