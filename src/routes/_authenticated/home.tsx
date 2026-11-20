@@ -54,7 +54,9 @@ function Home() {
   if (isLoading || !me) return <div className="p-10 text-center">...</div>;
   const p = me.profile;
 
-  if (!me.isAdmin && p?.account_type === "servant") return <Navigate to="/servant" />;
+  // السماح للخادم بمعاينة صفحة المخدوم دون إعادة توجيهه
+const isServantPreview = p?.account_type === "servant";
+
   if (!me.isAdmin && (!p || p.status !== "approved")) {
     return (
       <>
