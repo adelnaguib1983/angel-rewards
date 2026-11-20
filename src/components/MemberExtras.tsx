@@ -59,15 +59,14 @@ useEffect(() => {
   }, [qc]);
 
   async function click(n) {
-    setOpen(false);
-    if (!n.read) {
-      await supabase.from("member_notifications").update({ read: true }).eq("id", n.id);
-      qc.invalidateQueries({ queryKey: ["myNotifs"] });
-    }
-    if ((n.quiz_id || n.kind === "quiz") && onQuiz) onQuiz();
-    else if (n.announcement_id && onOpen) onOpen(n.announcement_id);
-    else setDetail(n);
+  setOpen(false);
+  if (!n.read) {
+    await supabase.from("member_notifications").update({ read: true }).eq("id", n.id);
+    qc.invalidateQueries({ queryKey: ["myNotifs"] });
   }
+  setDetail(n); // فتح المودال التفاعلي فوراً
+}
+
 
   const icon = { quiz: "🧠", suggestion: "💡", absence: "🚫", announcement: "📣" };
 
