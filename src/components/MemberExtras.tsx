@@ -111,7 +111,78 @@ useEffect(() => {
           </div>
         </PopoverContent>
       </Popover>
-      <NotificationDetail n={detail} onClose={() => setDetail(null)} />
+           {/* نافذة تفاعلية منبثقة لتفاصيل الإشعار والإجراء السريع */}
+      <Dialog open={!!detail} onOpenChange={(isOpen) => !isOpen && setDetail(null)}>
+        <DialogContent className="max-w-md text-right" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+              <span className="text-2xl">{icon[detail?.kind] ?? "🔔"}</span>
+              <span>تفاصيل الإشعار</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-2">
+            {/* نص الإشعار بالكامل */}
+            <p className="whitespace-pre-wrap text-base leading-relaxed text-foreground bg-muted/40 p-3 rounded-2xl border border-border">
+              {detail?.message}
+            </p>
+
+            {/* تاريخ ووقت الإرسال */}
+            {detail?.created_at && (
+              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                <span>🕒</span>
+                <span>{new Date(detail.created_at).toLocaleString("ar-EG", { dateStyle: "full", timeStyle: "short" })}</span>
+              </div>
+            )}
+
+            {/* أزرار الإجراء السريع بحسب نوع الإشعار */}
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-border">
+              {/* زر الإعلان / الرحلة */}
+              {(detail?.announcement_id || detail?.kind === "announcement") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const id = detail.announcement_id || detail.ref_id;
+                    setDetail(null);
+                    if (onOpen && id) {
+                      onOpen(id);
+                    } else if (id) {
+                      openAnnouncement(id);
+                    }
+                  }}
+                  className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:opacity-90 transition-opacity"
+                >
+                  📢 فتح الإعلان والتسجيل
+                </button>
+              )}
+
+              {/* زر المسابقة */}
+              {(detail?.quiz_id || detail?.kind === "quiz") && onQuiz && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDetail(null);
+                    onQuiz();
+                  }}
+                  className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:opacity-90 transition-opacity"
+                >
+                  🧠 بدء المسابقة الآن
+                </button>
+              )}
+
+              {/* زر الإغلاق */}
+              <button
+                type="button"
+                onClick={() => setDetail(null)}
+                className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </>
   );
 }
