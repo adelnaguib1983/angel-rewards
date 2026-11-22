@@ -7,6 +7,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
+import { MonthlyProgram } from "@/components/servant/MonthlyProgram";
+
 import { ACADEMIC_YEARS, cairoDate, fileToDataUrl, fridayOf, useMe } from "@/lib/app";
 import { uploadServantMedia } from "@/lib/media";
 import { MediaView } from "@/components/MediaPlayers";
