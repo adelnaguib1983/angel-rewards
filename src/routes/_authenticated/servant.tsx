@@ -110,6 +110,8 @@ function ServantPage() {
             {tab === "preparch" && <PrepArchive userId={me.user.id} />}
             {tab === "visitarch" && <VisitArchive />}
             {tab === "read" && <ReadingPlanner />}
+{tab === "monthly" && <MonthlyProgram userId={me.user.id} isAdmin={me.isAdmin} />}
+
           </>
         )}
       </main>
