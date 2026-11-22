@@ -20,7 +20,9 @@ const inputSchema = z.object({
   videoBase64: z.string().max(30_000_000).optional(),
   videoMime: z.string().max(80).optional(),
   bible: bible.optional(),
-  count: z.union([z.literal(15), z.literal(20)]),
+    count: z.number().int().min(1).max(50),
+  pointsPerQuestion: z.number().int().min(1).max(50).optional(),
+
 });
 
 export const generateQuizDraft = createServerFn({ method: "POST" })
