@@ -14,8 +14,10 @@ export type QuizInput = {
   videoBase64?: string | undefined;
   videoMime?: string | undefined;
   bible?: { book: string; chapter: number; chapterTo?: number | undefined; from?: number | undefined; to?: number | undefined } | undefined;
-  count: 15 | 20;
+  count: number;
+  pointsPerQuestion?: number | undefined;
 };
+
 
 const SYSTEM_INSTRUCTION = [
   "أنت مساعد خدام مدارس الأحد القبطية الأرثوذكسية، متخصص في إعداد مسابقات تربوية للفتيان من ١١ إلى ١٤ سنة.",
