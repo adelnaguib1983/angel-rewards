@@ -11,6 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LuckyWheel } from "@/components/LuckyWheel";
+
 import { AnnouncementsBoard, NotificationsBell, Quizzes, openAnnouncement } from "@/components/MemberExtras";
 import { Birthdays, DailyReadings, QuizLeague, SuggestionForm } from "@/components/StaffMemberExtras";
 import { fileToDataUrl, OT_BOOKS, NT_BOOK_NAMES } from "@/lib/app";
@@ -31,7 +33,8 @@ export const Route = createFileRoute("/_authenticated/home")({
 });
 
 const TABS = [
-  ["track", "🗓️", "إنجازاتي"], ["read", "📖", "قراءات يومية"], ["cal", "📅", "التقويم"], ["coach", "✨", "مرشدي"], ["badges", "🏅", "الأوسمة"], ["shop", "🎁", "الهدايا"], ["board", "🏆", "الشرف"], ["quiz", "🧠", "المسابقة"], ["bday", "🎂", "أعياد الميلاد"], ["suggest", "💡", "اقتراحات"],
+  ["track", "🗓️", "إنجازاتي"], ["read", "📖", "قراءات يومية"], ["wheel", "🎡", "عجلة الحظ"],
+ ["coach", "✨", "مرشدي"], ["badges", "🏅", "الأوسمة"], ["shop", "🎁", "الهدايا"], ["board", "🏆", "الشرف"], ["quiz", "🧠", "المسابقة"], ["bday", "🎂", "أعياد الميلاد"], ["suggest", "💡", "اقتراحات"],
 ] as const;
 
 function Home() {
@@ -98,7 +101,8 @@ const isServantPreview = p?.account_type === "servant";
         {tab === "read" && <DailyReadings />}
         {tab === "bday" && <Birthdays />}
         {tab === "suggest" && <SuggestionForm />}
-        {tab === "cal" && <CalendarView />}
+        {tab === "wheel" && <LuckyWheel userId={me.user.id} />}
+
         {tab === "coach" && <WeeklyCoach />}
         {tab === "badges" && <><Badges /><StreakBadges /></>}
         {tab === "shop" && <Shop />}
