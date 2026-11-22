@@ -506,17 +506,44 @@ const [pointsPerQuestion, setPointsPerQuestion] = useState<number>(3);
 )}
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <label className="text-xs font-bold">عدد الأسئلة: 
-            <select value={count} onChange={(e) => setCount(Number(e.target.value) as 15 | 20)} className="mr-2 rounded-xl border-2 border-border bg-background px-2 py-1 text-sm font-bold">
+               <div className="mt-4 flex flex-wrap items-center gap-4">
+          <label className="text-xs font-bold flex items-center gap-1.5">
+            عدد الأسئلة:
+            <select 
+              value={count} 
+              onChange={(e) => setCount(Number(e.target.value))} 
+              className="rounded-xl border-2 border-border bg-background px-3 py-1.5 text-sm font-bold"
+            >
+              <option value={5}>٥ أسئلة</option>
+              <option value={10}>١٠ أسئلة</option>
               <option value={15}>١٥ سؤالًا</option>
               <option value={20}>٢٠ سؤالًا</option>
+              <option value={25}>٢٥ سؤالًا</option>
+              <option value={30}>٣٠ سؤالًا</option>
             </select>
           </label>
+
+          <label className="text-xs font-bold flex items-center gap-1.5">
+            درجة كل سؤال:
+            <select 
+              value={pointsPerQuestion} 
+              onChange={(e) => setPointsPerQuestion(Number(e.target.value))} 
+              className="rounded-xl border-2 border-border bg-background px-3 py-1.5 text-sm font-bold"
+            >
+              <option value={1}>١ درجة</option>
+              <option value={2}>درجتان (٢)</option>
+              <option value={3}>٣ درجات</option>
+              <option value={4}>٤ درجات</option>
+              <option value={5}>٥ درجات</option>
+              <option value={10}>١٠ درجات</option>
+            </select>
+          </label>
+
           <button disabled={loading} onClick={handleGenerate} className="pop mr-auto rounded-2xl bg-sky px-6 py-2.5 font-extrabold text-primary-foreground disabled:opacity-60">
             {loading ? "جاري التحليل والتوليد..." : "توليد الأسئلة تلقائياً ⚡"}
           </button>
         </div>
+
       </section>
 
       {draft && (
