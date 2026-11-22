@@ -1,4 +1,5 @@
-const GEMINI_MODEL = "gemini-flash-latest";
+const GEMINI_MODELS = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"];
+
 
 export type QuizDraft = {
   title: string;
@@ -92,41 +93,38 @@ export async function generateQuiz(input: QuizInput): Promise<QuizDraft> {
 
   parts.push({ text: `${userText}\n\nالمطلوب: أنشئ بالضبط ${input.count} سؤالًا بالعدد والمواصفات المحددة.` });
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+    let response: Response | null = null;
+  for (const model of GEMINI_MODELS) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-  const payload = {
-    systemInstruction: {
-      parts: [{ text: `${SYSTEM_INSTRUCTION}\nعدد الأسئلة المطلوب بالضبط: ${input.count}.` }],
-    },
-    contents: [
-      {
-        role: "user",
-        parts,
-      },
-    ],
-    generationConfig: {
-      temperature: 0.3,
-      responseMimeType: "application/json",
-      responseSchema: QUIZ_SCHEMA,
-    },
-  };
+      if (response.ok || (response.status !== 503 && response.status !== 429)) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+    if (response && response.ok) break;
+  }
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    if (response.status === 429) {
+  if (!response || !response.ok) {
+    if (response?.status === 503) {
+      throw new Error("سيرفرات الذكاء الاصطناعي تواجه ضغطاً مؤقتاً، يرجى المحاولة بعد قليل.");
+    }
+    if (response?.status === 429) {
       throw new Error("تم تجاوز حد الطلبات في Gemini مؤقتًا. انتظر دقيقة ثم حاول ثانية.");
     }
-    if (response.status === 400 || response.status === 403) {
+    if (response?.status === 400 || response?.status === 403) {
       throw new Error("مفتاح Gemini API غير صالح أو تنقصه الصلاحية. تحقق من الإعدادات.");
     }
-    const errBody = await response.text().catch(() => "");
-    throw new Error(`تعذر إنشاء المسابقة عبر Gemini (${response.status}): ${errBody.slice(0, 150)}`);
+    const errBody = await response?.text().catch(() => "") || "";
+    throw new Error(`تعذر إنشاء المسابقة (${response?.status || 500}): ${errBody.slice(0, 150)}`);
   }
+
 
   const result = await response.json();
   const rawText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
