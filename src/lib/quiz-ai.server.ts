@@ -91,13 +91,16 @@ export async function generateQuiz(input: QuizInput): Promise<QuizDraft> {
     parts.push({ inlineData: { mimeType: input.videoMime || "video/mp4", data: input.videoBase64 } });
     userText = "المصدر: فيديو مرفوع لخادم مدارس الأحد. حلل الأحداث والمعلومات الواردة فيه بدقة وولّد الأسئلة منها.";
   }
+parts.push({ text: `${userText}\n\nالمطلوب: أنشئ بالضبط ${input.count} سؤالًا بالعدد والمواصفات المحددة، واجعل درجة كل سؤال ${pts}.` });
 
-  parts.push({ text: `${userText}\n\nالمطلوب: أنشئ بالضبط ${input.count} سؤالًا بالعدد والمواصفات المحددة.` });
+const pts = input.pointsPerQuestion || 3;
+
 
   const payload = {
     systemInstruction: {
-      parts: [{ text: `${SYSTEM_INSTRUCTION}\nعدد الأسئلة المطلوب بالضبط: ${input.count}.` }],
-    },
+  parts: [{ text: `${SYSTEM_INSTRUCTION}\nعدد الأسئلة المطلوب بالضبط: ${input.count}.\nدرجة كل سؤال: ${pts}.` }],
+},
+
     contents: [
       {
         role: "user",
@@ -188,7 +191,8 @@ export async function generateQuiz(input: QuizInput): Promise<QuizDraft> {
       kind,
       options,
       correct,
-      points: Math.max(1, Math.min(20, Number(question.points) || 5)),
+points: Math.max(1, Math.min(50, Number(question.points) || pts)),
+
     };
   }).filter((q) => q.question && q.options.length >= 2);
 
