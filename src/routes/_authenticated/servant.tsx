@@ -7,6 +7,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
+import { MyMentees } from "@/components/MyMentees";
+
 import { MonthlyProgram } from "@/components/MonthlyProgram";
 import { ACADEMIC_YEARS, cairoDate, fileToDataUrl, fridayOf, useMe } from "@/lib/app";
 import { uploadServantMedia } from "@/lib/media";
@@ -94,6 +96,8 @@ function ServantPage() {
                 ["ai_quiz", "🤖 توليد المسابقات"],
                 ["preparch", "📚 أرشيف التحضيرات"],
 ["monthly", "🗓️ برنامج الشهر"],
+["mentees", "👥 مخدوميني"],
+
 
                 ["visitarch", "🗂️ أرشيف الافتقاد"],
                 ["read", "📖 القراءات اليومية"]
@@ -107,7 +111,9 @@ function ServantPage() {
             {tab === "attendance" && <DailyAttendanceSection />}
             {tab === "suggest" && <ServantSuggestionsTab userId={me.user.id} />}
             {tab === "ai_quiz" && <AiQuizGeneratorSection />}
-            {tab === "preparch" && <PrepArchive userId={me.user.id} />}
+
+   {tab === "mentees" && <MyMentees userId={me.user.id} isAdmin={me.isAdmin} />}
+         {tab === "preparch" && <PrepArchive userId={me.user.id} />}
             {tab === "visitarch" && <VisitArchive />}
             {tab === "read" && <ReadingPlanner />}
 {tab === "monthly" && <MonthlyProgram userId={me.user.id} isAdmin={me.isAdmin} />}
