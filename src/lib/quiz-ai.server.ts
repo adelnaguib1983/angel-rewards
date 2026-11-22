@@ -92,6 +92,23 @@ export async function generateQuiz(input: QuizInput): Promise<QuizDraft> {
   }
 
   parts.push({ text: `${userText}\n\nالمطلوب: أنشئ بالضبط ${input.count} سؤالًا بالعدد والمواصفات المحددة.` });
+  const payload = {
+    systemInstruction: {
+      parts: [{ text: `${SYSTEM_INSTRUCTION}\nعدد الأسئلة المطلوب بالضبط: ${input.count}.` }],
+    },
+    contents: [
+      {
+        role: "user",
+        parts,
+      },
+    ],
+    generationConfig: {
+      temperature: 0.3,
+      responseMimeType: "application/json",
+      responseSchema: QUIZ_SCHEMA,
+    },
+  };
+
 
     let response: Response | null = null;
   for (const model of GEMINI_MODELS) {
