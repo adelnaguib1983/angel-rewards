@@ -320,7 +320,9 @@ function AiQuizGeneratorSection() {
   const [chapter, setChapter] = useState("1");
   const [chapterTo, setChapterTo] = useState("");
   const [verses, setVerses] = useState("");
-  const [count, setCount] = useState<15 | 20>(15);
+  const [count, setCount] = useState<number>(10);
+const [pointsPerQuestion, setPointsPerQuestion] = useState<number>(3);
+
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [title, setTitle] = useState("مسابقة أبطال الملاك الأسبوعية");
@@ -381,7 +383,8 @@ function AiQuizGeneratorSection() {
   const handleGenerate = async () => {
     try {
       setLoading(true);
-      const data: any = { sourceType, count };
+      const data: any = { sourceType, count, pointsPerQuestion };
+
       if (sourceType === "text") {
         if (!textContent.trim()) { toast.error("اكتب نص المسابقة أولاً"); return; }
         data.text = textContent.trim();
