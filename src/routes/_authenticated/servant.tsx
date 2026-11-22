@@ -94,6 +94,8 @@ function ServantPage() {
                 ["suggest", "💡 الاقتراحات"],
                 ["ai_quiz", "🤖 توليد المسابقات"],
                 ["preparch", "📚 أرشيف التحضيرات"],
+["monthly", "🗓️ برنامج الشهر"],
+
                 ["visitarch", "🗂️ أرشيف الافتقاد"],
                 ["read", "📖 القراءات اليومية"]
               ] as const).map(([k, l]) => (
