@@ -123,12 +123,12 @@ export function MonthlyProgram({ userId, isAdmin }: { userId: string; isAdmin: b
               <span className="rounded-full bg-sky/20 px-3 py-1 text-sm font-bold">📅 {dateLabel}</span>
             </header>
 
-            <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2.5">
               {weekItems.map((item) => (
-                <div key={item.item_id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-muted/50 p-3">
+                <div key={item.item_id} className="flex flex-col justify-between gap-2.5 rounded-2xl bg-muted/50 p-3">
                   <div>
-                    <div className="font-extrabold">{item.title}</div>
-                    <div className="mt-1 text-sm text-muted-foreground">
+                    <div className="font-extrabold text-sm sm:text-base">{item.title}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
                       {item.assigned_servant_id
                         ? `المسؤول: ${item.servant_name || "خادم"}`
                         : "لم يتم اختيار مسؤول بعد"}
@@ -140,7 +140,7 @@ export function MonthlyProgram({ userId, isAdmin }: { userId: string; isAdmin: b
                       type="button"
                       disabled={claim.isPending}
                       onClick={() => claim.mutate({ itemId: item.item_id, servantId: userId })}
-                      className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground disabled:opacity-50"
+                      className="w-full rounded-xl bg-primary px-3 py-1.5 text-xs sm:text-sm font-bold text-primary-foreground disabled:opacity-50"
                     >
                       أختار تقديمها 🙋
                     </button>
@@ -155,7 +155,7 @@ export function MonthlyProgram({ userId, isAdmin }: { userId: string; isAdmin: b
                           claim.mutate({ itemId: item.item_id, servantId: event.target.value });
                         }
                       }}
-                      className="rounded-xl border-2 border-border bg-background px-3 py-2 text-sm font-bold"
+                      className="w-full rounded-xl border-2 border-border bg-background px-2 py-1.5 text-xs sm:text-sm font-bold"
                     >
                       <option value="">تعيين خادم…</option>
                       {servants.map((servant) => (
@@ -165,8 +165,9 @@ export function MonthlyProgram({ userId, isAdmin }: { userId: string; isAdmin: b
                   )}
                 </div>
               ))}
-              {!weekItems.length && <p className="text-sm text-muted-foreground">لا توجد فقرات لهذا الأسبوع بعد.</p>}
+              {!weekItems.length && <p className="col-span-2 text-sm text-muted-foreground">لا توجد فقرات لهذا الأسبوع بعد.</p>}
             </div>
+
 
             {isAdmin && (
               <form
