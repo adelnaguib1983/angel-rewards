@@ -70,7 +70,8 @@ useEffect(() => {
 }
 
 
-  const icon = { quiz: "🧠", suggestion: "💡", absence: "🚫", announcement: "📣" };
+ const icon = { quiz: "🧠", suggestion: "💡", absence: "🚫", announcement: "📣", service_month: "🗓️" };
+
 
   return (
     <>
