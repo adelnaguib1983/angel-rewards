@@ -22,7 +22,7 @@ function formatWhatsAppLink(phone?: string | null) {
 
 export function MyMentees({ userId, isAdmin }: { userId: string; isAdmin: boolean }) {
   const qc = useQueryClient();
-  const currentFriday = useMemo(() => fridayOf(cairoDate()), []);
+  const currentFriday = useMemo(() => fridayOf(cairoDate(new Date())), []);
 
   const [recordVisitMember, setRecordVisitMember] = useState<any | null>(null);
   const [historyMember, setHistoryMember] = useState<any | null>(null);
