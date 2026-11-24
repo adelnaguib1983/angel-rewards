@@ -275,7 +275,10 @@ function Tracker({ userId }: { userId: string }) {
         <div className="mb-2 flex justify-between text-sm font-bold"><span>إنجاز الشهر</span><span>{done}/{total} · {pct}%</span></div>
         <Progress value={pct} className="h-3 transition-all" />
         <p className="mt-2 text-center font-extrabold text-primary">{cheer || (pct >= 100 ? "أكملت كل الأنشطة! 👑" : "كل نشاط يقرّبك من الهدية الجاية 🎁")}</p>
-      </div>
+
+  <DailySpiritualTracker userId={userId} year={ym.y} month={ym.m} />
+
+    </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {settings?.map((s, i) => (
           <div key={s.key} className="float-in overflow-hidden rounded-3xl border-2 border-border bg-card shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
