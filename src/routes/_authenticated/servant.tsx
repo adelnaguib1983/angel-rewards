@@ -118,7 +118,7 @@ function ServantPage() {
                 <button key={k} onClick={() => setTab(k)} className={`rounded-2xl border-2 px-4 py-2 font-bold transition ${tab === k ? "border-sky bg-sky text-primary-foreground pop" : "border-border bg-card"}`}>{l}</button>
               ))}
               <BirthdaysButton />
-              <div className="mr-auto"><NotificationsBell /></div>
+              <div 
             </nav>
             {tab === "prep" && <Prep userId={me.user.id} />}
             {tab === "attendance" && <DailyAttendanceSection />}
@@ -137,7 +137,7 @@ function ServantPage() {
 
          {tab === "preparch" && <PrepArchive userId={me.user.id} />}
             {tab === "visitarch" && <VisitArchive />}
-            {tab === "read" && <ReadingPlanner />}
+            
 {tab === "monthly" && <MonthlyProgram userId={me.user.id} isAdmin={me.isAdmin} />}
 
           </>
