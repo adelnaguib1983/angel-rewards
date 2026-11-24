@@ -91,6 +91,8 @@ function ServantPage() {
           <>
             <div className="rounded-3xl bg-gradient-to-l from-sky/40 via-card to-card p-5 pop float-in">
               <div className="text-sm font-bold text-sky">أهلا يا خادم 🙏</div>
+            <AnnouncementsBoard userId={me.user.id} />
+
               <h1 className="text-3xl font-extrabold">{p?.full_name}</h1>
               <p className="text-sm text-muted-foreground">متابعة التحضير، الحضور والغياب الأسبوعي، الافتقاد، والتوجيهات المشتركة.</p>
             </div>
