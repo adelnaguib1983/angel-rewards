@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
 import { MyMentees } from "@/components/MyMentees";
+import { ServantSpiritualLife } from "@/components/ServantSpiritualLife";
+
 
 import { MonthlyProgram } from "@/components/MonthlyProgram";
 import { ACADEMIC_YEARS, cairoDate, fileToDataUrl, fridayOf, useMe } from "@/lib/app";
@@ -33,6 +35,7 @@ export const Route = createFileRoute("/_authenticated/servant")({
     meta: [
       { title: "مرحلة الخدام | أبطال الملاك" },
       { name: "description", content: "تحضير الخادم الأسبوعي، الحضور والغياب الأسبوعي، وافتقاد المخدومين." },
+
     ],
   }),
   component: ServantPage,
@@ -97,6 +100,8 @@ function ServantPage() {
                 ["preparch", "📚 أرشيف التحضيرات"],
 ["monthly", "🗓️ برنامج الشهر"],
 ["mentees", "👥 مخدوميني"],
+["spiritual", "🙏 حياتي الروحية"],
+
 
 
                 ["visitarch", "🗂️ أرشيف الافتقاد"],
@@ -113,6 +118,8 @@ function ServantPage() {
             {tab === "ai_quiz" && <AiQuizGeneratorSection />}
 
    {tab === "mentees" && <MyMentees userId={me.user.id} isAdmin={me.isAdmin} />}
+{tab === "spiritual" && <ServantSpiritualLife userId={me.user.id} />}
+
          {tab === "preparch" && <PrepArchive userId={me.user.id} />}
             {tab === "visitarch" && <VisitArchive />}
             {tab === "read" && <ReadingPlanner />}
