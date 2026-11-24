@@ -25,8 +25,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { BirthdaysButton, PrepArchive, ReadingPlanner, VisitArchive, OT_BOOKS, NT_BOOKS } from "@/components/StaffMemberExtras";
-import { NotificationsBell } from "@/components/MemberExtras";
+import { BirthdaysButton, PrepArchive, import { BirthdaysButton, DailyReadings, PrepArchive, ReadingPlanner, VisitArchive, OT_BOOKS, NT_BOOKS } from "@/components/StaffMemberExtras";
+import { AnnouncementsBoard, NotificationsBell, openAnnouncement } from "@/components/MemberExtras";
+
 import { ServantSuggestionsTab } from "@/components/ServantSuggestionsTab";
 import { StageAbsenceAlerts } from "@/components/AbsenceAlertButtons";
 
@@ -91,11 +92,12 @@ function ServantPage() {
           <>
             <div className="rounded-3xl bg-gradient-to-l from-sky/40 via-card to-card p-5 pop float-in">
               <div className="text-sm font-bold text-sky">أهلا يا خادم 🙏</div>
-            <AnnouncementsBoard userId={me.user.id} />
-
+         
               <h1 className="text-3xl font-extrabold">{p?.full_name}</h1>
               <p className="text-sm text-muted-foreground">متابعة التحضير، الحضور والغياب الأسبوعي، الافتقاد، والتوجيهات المشتركة.</p>
             </div>
+   <AnnouncementsBoard userId={me.user.id} />
+
             <nav className="my-5 flex flex-wrap gap-2">
               {([
                 ["prep", "📘 تحضير الخادم"],
