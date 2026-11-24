@@ -73,7 +73,10 @@ function ServantPage() {
   
   return (
     <div className="stage-servant pb-16">
-      <AppHeader stage="servant" isAdmin={me.isAdmin} name={p?.full_name} avatar={p?.avatar} photo={p?.photo_url} />
+      <AppHeader stage="servant" isAdmin={me.isAdmin} name={p?.full_name} avatar={p?.avatar} photo={p?.photo_url}>
+  <NotificationsBell onOpen={openAnnouncement} />
+</AppHeader>
+
       <main className="mx-auto max-w-5xl px-4">
         {!allowed ? (
           <div className={`${card} mx-auto mt-10 max-w-md text-center`}>
@@ -116,6 +119,13 @@ function ServantPage() {
             {tab === "attendance" && <DailyAttendanceSection />}
             {tab === "suggest" && <ServantSuggestionsTab userId={me.user.id} />}
             {tab === "ai_quiz" && <AiQuizGeneratorSection />}
+{tab === "read" && (
+  <div className="space-y-6">
+    <DailyReadings />
+    <ReadingPlanner />
+  </div>
+)}
+
 
    {tab === "mentees" && <MyMentees userId={me.user.id} isAdmin={me.isAdmin} />}
 {tab === "spiritual" && <ServantSpiritualLife userId={me.user.id} />}
