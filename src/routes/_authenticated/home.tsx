@@ -4,7 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { AppHeader } from "@/components/AppHeader";
+import { AppHeader } from "@/components/AppHeader";import { DailySpiritualTracker } from "@/components/DailySpiritualTracker";
+
 import { ACADEMIC_YEARS, validateContact, AVATARS, MONTHS, REDEEM_STATUS, monthPeriods, currentPeriod, levelOf, useMe, useSettings } from "@/lib/app";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
