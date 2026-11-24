@@ -9,8 +9,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
 import { MyMentees } from "@/components/MyMentees";
 import { ServantSpiritualLife } from "@/components/ServantSpiritualLife";
-
-
 import { MonthlyProgram } from "@/components/MonthlyProgram";
 import { ACADEMIC_YEARS, cairoDate, fileToDataUrl, fridayOf, useMe } from "@/lib/app";
 import { uploadServantMedia } from "@/lib/media";
@@ -27,7 +25,6 @@ import {
 } from "@/components/ui/dialog";
 import { BirthdaysButton, DailyReadings, PrepArchive, ReadingPlanner, VisitArchive, OT_BOOKS, NT_BOOKS } from "@/components/StaffMemberExtras";
 import { AnnouncementsBoard, NotificationsBell, openAnnouncement } from "@/components/MemberExtras";
-
 
 import { ServantSuggestionsTab } from "@/components/ServantSuggestionsTab";
 import { StageAbsenceAlerts } from "@/components/AbsenceAlertButtons";
