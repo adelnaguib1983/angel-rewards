@@ -130,6 +130,14 @@ function RootComponent() {
     });
     return () => data.subscription.unsubscribe();
   }, [router, queryClient]);
+  useEffect(() => {
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch((err) => {
+        console.warn("فشل تسجيل ServiceWorker:", err);
+      });
+    }
+  }, []);
+
 
   return (
     <QueryClientProvider client={queryClient}>
