@@ -736,27 +736,61 @@ function DailyAttendanceSection() {
   const [statsDialogType, setStatsDialogType] = useState<"present" | "absent" | "total" | null>(null);
   
   const [loadingPersons, setLoadingPersons] = useState<Record<string, boolean>>({});
+  const [pendingCount, setPendingCount] = useState<number>(() => getPendingAttendanceList().length);
+  const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== "undefined" ? navigator.onLine : true);
+
+  // متابعة عودة الإنترنت والمزامنة التلقائية
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      syncPendingAttendanceToServer(() => {
+        setPendingCount(0);
+        qc.invalidateQueries({ queryKey: ["profiles-attendance-all-fixed"] });
+      });
+    };
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [qc]);
 
   const filterYear = selectedYear === "all" ? null : selectedYear;
 
-    const { data: profilesData, isLoading } = useQuery({
+  const { data: profilesData, isLoading } = useQuery({
     queryKey: ["profiles-attendance-all-fixed", accountType, date],
     queryFn: async () => {
-      const { data: profiles, error: profErr } = await supabase
-        .from("profiles")
-        .select("id, full_name, avatar, photo_url, academic_year, account_type, status, phone");
+      let profiles: any[] = [];
+      let attendanceRecords: any[] = [];
+      let allAttendanceRecords: any[] = [];
 
-      if (profErr) throw profErr;
+      try {
+        const { data: profs, error: profErr } = await supabase
+          .from("profiles")
+          .select("id, full_name, avatar, photo_url, academic_year, account_type, status, phone");
 
-      const { data: attendanceRecords } = await supabase
-        .from("daily_attendance")
-        .select("*")
-        .eq("attendance_date", date);
+        if (profErr) throw profErr;
+        profiles = profs || [];
+        cacheProfilesLocally(profiles); // حفظ نسخة للعمل بدون نت
 
-      const { data: sy } = await supabase.from("service_years").select("start_date, end_date").eq("is_current", true).maybeSingle();
-      let qAll = supabase.from("daily_attendance").select("person_id, status, attendance_date");
-      if (sy) qAll = qAll.gte("attendance_date", sy.start_date).lte("attendance_date", sy.end_date);
-      const { data: allAttendanceRecords } = await qAll;
+        const { data: attRecs } = await supabase
+          .from("daily_attendance")
+          .select("*")
+          .eq("attendance_date", date);
+        attendanceRecords = attRecs || [];
+
+        const { data: sy } = await supabase.from("service_years").select("start_date, end_date").eq("is_current", true).maybeSingle();
+        let qAll = supabase.from("daily_attendance").select("person_id, status, attendance_date");
+        if (sy) qAll = qAll.gte("attendance_date", sy.start_date).lte("attendance_date", sy.end_date);
+        const { data: allAtt } = await qAll;
+        allAttendanceRecords = allAtt || [];
+      } catch (err) {
+        console.warn("تعذر الاتصال بالخادم، جاري استخدام النسخة المحلية المحفوظة:", err);
+        profiles = getCachedProfilesLocally();
+      }
 
       const countsMap: Record<string, { present: number, absent: number, absence_dates: string[] }> = {};
       (allAttendanceRecords || []).forEach((rec: any) => {
@@ -770,39 +804,46 @@ function DailyAttendanceSection() {
         }
       });
 
-        const allProfiles = profiles || [];
+      const allProfiles = profiles || [];
       const filtered = allProfiles.filter((m: any) => {
         const type = (m.account_type || "").toLowerCase();
         const hasYear = Boolean(m.academic_year && m.academic_year.trim() !== "");
 
         if (accountType === "servant") {
-          // السماح بالخدام، المشرفين، أو من ليس لديه سنة دراسية، مع دعم العربية والإنجليزية
           return type.includes("servant") || type.includes("admin") || type.includes("خادم") || !hasYear;
         } else {
-          // السماح للمخدومين الذين لديهم سنة دراسية أو تصنيف مخدوم
           return hasYear || type.includes("student") || type.includes("member") || type.includes("مخدوم") || type === "";
         }
       });
 
-
-
       const listToUse = filtered.length > 0 ? filtered : allProfiles;
+
+      // دمج السجلات المسجلة بدون نت التي لم تُرفع بعد
+      const pendingList = getPendingAttendanceList().filter((p) => p.attendance_date === date);
 
       return listToUse.map((m: any) => {
         const personId = m.id;
         const att = (attendanceRecords || []).find((a: any) => a.person_id === personId);
+        const pendingItem = pendingList.find((p) => p.person_id === personId);
         const personCounts = countsMap[personId] || { present: 0, absent: 0, absence_dates: [] };
 
-        const phoneVal = m.phone || null;
+        const finalStatus = pendingItem
+          ? pendingItem.status
+          : att?.status === "present"
+          ? "present"
+          : att?.status === "absent"
+          ? "absent"
+          : null;
 
         return {
           person_id: personId,
           full_name: m.full_name || "بدون اسم",
           avatar: m.avatar || "👤",
           photo_url: m.photo_url,
-          phone: phoneVal,
+          phone: m.phone || null,
           academic_year: m.academic_year || "مرحلة عامة",
-          attendance_status: att?.status === "present" ? "present" : att?.status === "absent" ? "absent" : null,
+          attendance_status: finalStatus,
+          is_offline_pending: Boolean(pendingItem),
           present_count: personCounts.present,
           absent_count: personCounts.absent,
           absence_dates: personCounts.absence_dates,
@@ -811,11 +852,7 @@ function DailyAttendanceSection() {
     },
   });
 
-
   const people = profilesData || [];
-
-console.log({ accountType, date, count: people.length, isLoading });
-
   const filteredPeople = filterYear 
     ? people.filter((p: any) => p.academic_year === filterYear) 
     : people;
@@ -823,8 +860,27 @@ console.log({ accountType, date, count: people.length, isLoading });
   const handleStatusChange = async (personId: string, status: "present" | "absent", currentStatus: string | null) => {
     if (loadingPersons[personId] || currentStatus === status) return;
 
-    setLoadingPersons((prev) => ({ ...prev, [personId]: true }));
+    // في حالة انقطاع الإنترنت: حفظ محلياً وتحديث الواجهة مباشرة
+    if (!navigator.onLine) {
+      savePendingAttendanceLocally({
+        person_id: personId,
+        attendance_date: date,
+        status: status,
+      });
+      setPendingCount(getPendingAttendanceList().length);
+      toast.success(status === "present" ? "تم الحفظ محلياً (بدون نت) ✅" : "تم رصد الغياب محلياً (بدون نت) ✕");
+      qc.setQueryData(["profiles-attendance-all-fixed", accountType, date], (old: any) => {
+        if (!old) return old;
+        return old.map((p: any) =>
+          p.person_id === personId
+            ? { ...p, attendance_status: status, is_offline_pending: true }
+            : p
+        );
+      });
+      return;
+    }
 
+    setLoadingPersons((prev) => ({ ...prev, [personId]: true }));
     try {
       const { error } = await supabase.from("daily_attendance").upsert({
         person_id: personId,
@@ -847,8 +903,24 @@ console.log({ accountType, date, count: people.length, isLoading });
 
   const handleClearAttendance = async (personId: string) => {
     if (loadingPersons[personId]) return;
-    setLoadingPersons((prev) => ({ ...prev, [personId]: true }));
 
+    // مسح من القائمة المحلية لو بدون نت
+    if (!navigator.onLine) {
+      removePendingAttendanceLocally(personId, date);
+      setPendingCount(getPendingAttendanceList().length);
+      toast.info("تم مسح الحالة محلياً");
+      qc.setQueryData(["profiles-attendance-all-fixed", accountType, date], (old: any) => {
+        if (!old) return old;
+        return old.map((p: any) =>
+          p.person_id === personId
+            ? { ...p, attendance_status: null, is_offline_pending: false }
+            : p
+        );
+      });
+      return;
+    }
+
+    setLoadingPersons((prev) => ({ ...prev, [personId]: true }));
     try {
       const { error } = await supabase.from("daily_attendance").delete().eq("person_id", personId).eq("attendance_date", date);
       if (error) { toast.error(error.message); return; }
@@ -882,6 +954,33 @@ console.log({ accountType, date, count: people.length, isLoading });
 
   return (
     <div className="space-y-4">
+      {/* شريط حالة العمل بدون نت والمزامنة */}
+      {(!isOnline || pendingCount > 0) && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-amber-500/50 bg-amber-500/10 p-3 text-sm font-bold">
+          <div className="flex items-center gap-2">
+            <span>{!isOnline ? "📡 أنت تعمل الآن بدون إنترنت" : "⚠️ توجد سجلات محفوظة محلياً"}</span>
+            {pendingCount > 0 && (
+              <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs text-white">
+                ({pendingCount} سجل معلق)
+              </span>
+            )}
+          </div>
+          {isOnline && pendingCount > 0 && (
+            <button
+              onClick={() =>
+                syncPendingAttendanceToServer(() => {
+                  setPendingCount(0);
+                  qc.invalidateQueries({ queryKey: ["profiles-attendance-all-fixed"] });
+                })
+              }
+              className="rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-black text-white hover:opacity-90"
+            >
+              🔄 مزامنة السجلات الآن
+            </button>
+          )}
+        </div>
+      )}
+
       <StageAbsenceAlerts />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
