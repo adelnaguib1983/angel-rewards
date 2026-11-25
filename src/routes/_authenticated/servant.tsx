@@ -27,6 +27,14 @@ import { BirthdaysButton, DailyReadings, PrepArchive, ReadingPlanner, VisitArchi
 import { AnnouncementsBoard, NotificationsBell, openAnnouncement } from "@/components/MemberExtras";
 import { ServantSuggestionsTab } from "@/components/ServantSuggestionsTab";
 import { StageAbsenceAlerts } from "@/components/AbsenceAlertButtons";
+import {
+  savePendingAttendanceLocally,
+  getPendingAttendanceList,
+  removePendingAttendanceLocally,
+  cacheProfilesLocally,
+  getCachedProfilesLocally,
+  syncPendingAttendanceToServer,
+} from "@/lib/offline-attendance";
 
 export const Route = createFileRoute("/_authenticated/servant")({
   head: () => ({
