@@ -78,16 +78,29 @@ export function useMe() {
   return useQuery({
     queryKey: ["me"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) return null;
-      const [{ data: profile }, { data: roles }] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, class_name, avatar, photo_url, status, created_at, academic_year, account_type").eq("id", user.id).maybeSingle(),
-        supabase.from("user_roles").select("role").eq("user_id", user.id),
-      ]);
-      return { user, profile, isAdmin: !!roles?.some((r) => r.role === "admin") };
+
+      try {
+        const [{ data: profile }, { data: roles }] = await Promise.all([
+          supabase.from("profiles").select("id, full_name, class_name, avatar, photo_url, status, created_at, academic_year, account_type").eq("id", user.id).maybeSingle(),
+          supabase.from("user_roles").select("role").eq("user_id", user.id),
+        ]);
+        const meData = { user, profile, isAdmin: !!roles?.some((r) => r.role === "admin") };
+        try { localStorage.setItem("offline_cached_me", JSON.stringify(meData)); } catch {}
+        return meData;
+      } catch {
+        try {
+          const cached = localStorage.getItem("offline_cached_me");
+          if (cached) return JSON.parse(cached);
+        } catch {}
+        return { user, profile: null, isAdmin: false };
+      }
     },
   });
 }
+
 
 export function useSettings() {
   return useQuery({
