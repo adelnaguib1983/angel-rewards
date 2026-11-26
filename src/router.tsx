@@ -5,7 +5,16 @@ import { persistQueryClient } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 
 export const getRouter = () => {
-  const queryClient = new QueryClient();
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        gcTime: 1000 * 60 * 60 * 24 * 7,
+        staleTime: 1000 * 60 * 60 * 24,
+        networkMode: "offlineFirst",
+        retry: false,
+      },
+    },
+  });
 
   if (typeof window !== "undefined") {
     const localStoragePersister = createSyncStoragePersister({
