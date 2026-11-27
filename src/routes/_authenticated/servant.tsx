@@ -25,7 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { BirthdaysButton, DailyReadings, PrepArchive, ReadingPlanner, VisitArchive, OT_BOOKS, NT_BOOKS } from "@/components/StaffMemberExtras";
+import { BirthdaysButton, DailyReadings, PrepArchive, ReadingPlanner, VisitArchive, OT_BOOKS, NT_BOOKS, TodayReadingCard } from "@/components/StaffMemberExtras";
 import { AnnouncementsBoard, NotificationsBell, openAnnouncement } from "@/components/MemberExtras";
 import { ServantSuggestionsTab } from "@/components/ServantSuggestionsTab";
 import { StageAbsenceAlerts } from "@/components/AbsenceAlertButtons";
@@ -104,6 +104,17 @@ function ServantPage() {
               <p className="text-sm text-muted-foreground">متابعة التحضير، الحضور والغياب الأسبوعي، الافتقاد، والتوجيهات المشتركة.</p>
             </div>
    <AnnouncementsBoard userId={me.user.id} />
+<main className="mx-auto max-w-5xl px-4">
+  ...
+  <div className="rounded-3xl bg-gradient-to-l ...">
+    <div className="text-sm font-bold text-sky">أهلا يا خادم 🙏</div>
+  </div>
+
+  {/* يظهر الإصحاح كاملًا هنا للخدام أيضًا في أول الصفحة */}
+  <div className="mt-4">
+    <TodayReadingCard />
+  </div>
+
 
             <nav className="my-5 flex flex-wrap gap-2">
               {([
