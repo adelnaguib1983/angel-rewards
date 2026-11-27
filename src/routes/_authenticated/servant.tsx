@@ -1066,29 +1066,60 @@ function DailyAttendanceSection() {
                         <button type="button" title="مسح الرصد" disabled={loadingPersons[item.person_id]} onClick={() => handleClearAttendance(item.person_id)} className="rounded-lg p-1.5 text-xs text-muted-foreground hover:bg-muted">↺</button>
                       )}
                     </div>
-                    {/* أزرار الاتصال والواتساب السريعة أسفل حاضر وغائب */}
-                    <div className="flex items-center justify-end gap-2 w-full pt-1">
+                                        {/* أزرار الاتصال وقوالب الواتساب السريعة بجوار كل اسم */}
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
                       <a
                         href={item.phone ? `tel:${item.phone}` : undefined}
                         title={item.phone ? `اتصال: ${item.phone}` : "لا يوجد رقم مسجل"}
-                        className={`flex h-8 w-8 items-center justify-center rounded-full text-white shadow transition text-sm ${
+                        className={`flex h-7 w-7 items-center justify-center rounded-xl text-white transition ${
                           item.phone ? "bg-sky hover:opacity-90 active:scale-95" : "bg-muted text-muted-foreground opacity-30 pointer-events-none"
                         }`}
                       >
                         📞
                       </a>
-                      <a
-                        href={formatWhatsAppLink(item.phone) || undefined}
-                        target="_blank"
-                        rel="noreferrer"
-                        title={item.phone ? `واتساب: ${item.phone}` : "لا يوجد رقم مسجل"}
-                        className={`flex h-8 w-8 items-center justify-center rounded-full text-white shadow transition text-sm ${
-                          item.phone ? "bg-emerald-600 hover:opacity-90 active:scale-95" : "bg-muted text-muted-foreground opacity-30 pointer-events-none"
-                        }`}
-                      >
-                        💬
-                      </a>
+
+                      {item.phone && (
+                        <>
+                          {/* 1. قالب تذكير الخدمة (الخميس) */}
+                          <a
+                            href={buildWhatsAppUrl(item.phone, WHATSAPP_TEMPLATES.serviceReminder(item.full_name)) || "#"}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white px-2 py-1 text-xs font-bold transition flex items-center gap-1 shadow-sm"
+                            title="إرسال تذكير ميعاد الخدمة"
+                          >
+                            🔔 تذكير
+                          </a>
+
+                          {/* 2. قالب افتقاد الغياب (يتحول لبرتقالي نابض إذا كان مسجلاً غائباً) */}
+                          <a
+                            href={buildWhatsAppUrl(item.phone, WHATSAPP_TEMPLATES.absence(item.full_name)) || "#"}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`rounded-xl px-2 py-1 text-xs font-bold transition flex items-center gap-1 shadow-sm ${
+                              item.attendance_status === "absent"
+                                ? "bg-amber-600 hover:bg-amber-700 text-white animate-pulse"
+                                : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                            }`}
+                            title="إرسال رسالة افتقاد الغياب"
+                          >
+                            💬 افتقاد
+                          </a>
+
+                          {/* 3. قالب عيد الميلاد */}
+                          <a
+                            href={buildWhatsAppUrl(item.phone, WHATSAPP_TEMPLATES.birthday(item.full_name)) || "#"}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-xl bg-pink-600 hover:bg-pink-700 text-white px-2 py-1 text-xs font-bold transition flex items-center gap-1 shadow-sm"
+                            title="إرسال تهنئة عيد الميلاد"
+                          >
+                            🎂 عيد ميلاد
+                          </a>
+                        </>
+                      )}
                     </div>
+
                   </div>
 
                 </div>
