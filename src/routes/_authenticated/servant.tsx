@@ -16,6 +16,8 @@ import { MediaView } from "@/components/MediaPlayers";
 import { ImageLightbox } from "@/components/ImageLightbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { buildWhatsAppUrl, WHATSAPP_TEMPLATES } from "@/lib/whatsapp";
+
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
