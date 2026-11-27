@@ -330,6 +330,78 @@ function ChapterText({ book, chapter, onEnd }: { book: number; chapter: number; 
   );
 }
 
+export function TodayReadingCard() {
+  const qc = useQueryClient();
+  const today = cairoDate(new Date());
+  const [reachedEnd, setReachedEnd] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+
+  const { data: reading } = useQuery({
+    queryKey: ["today-reading", today],
+    queryFn: async () => (await supabase.from("daily_readings").select("*").eq("reading_date", today).maybeSingle()).data,
+  });
+
+  const { data: done } = useQuery({
+    queryKey: ["reading-done", reading?.id],
+    enabled: !!reading,
+    queryFn: async () => !!(await supabase.from("reading_completions").select("id").eq("reading_id", reading.id).maybeSingle()).data,
+  });
+
+  const { data: verses } = useChapter(reading?.book_nr ?? 40, reading?.chapter ?? 1);
+  const minSec = Math.min(120, Math.max(20, (verses?.length ?? 10) * 3));
+
+  useEffect(() => {
+    if (!reading || done) return;
+    const t = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [reading?.id, done]);
+
+  if (!reading) return null;
+
+  const finish = async () => {
+    const { data, error } = await supabase.rpc("complete_reading", { _reading: reading.id });
+    if (error) return toast.error(error.message);
+    toast.success(`أحسنت! +${data} نقطة 📖`);
+    qc.invalidateQueries({ queryKey: ["reading-done"] });
+    qc.invalidateQueries({ queryKey: ["stats"] });
+  };
+
+  const ready = reachedEnd && elapsed >= minSec;
+
+  return (
+    <section className="pop mb-6 rounded-3xl border-2 border-primary/40 bg-gradient-to-b from-primary/10 via-card to-card p-5 shadow-lg">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">📖</span>
+          <div>
+            <span className="block text-xs font-bold text-primary">قراءة اليوم المقررة</span>
+            <b className="text-xl">{reading.book_name} — الإصحاح {reading.chapter}</b>
+          </div>
+        </div>
+        <span className="rounded-full bg-primary px-3 py-1 text-sm font-extrabold text-primary-foreground">
+          +{reading.points} نقطة
+        </span>
+      </div>
+
+      <ChapterText book={reading.book_nr} chapter={reading.chapter} onEnd={() => setReachedEnd(true)} />
+
+      {done ? (
+        <div className="mt-3 rounded-2xl bg-accent p-3 text-center font-extrabold text-accent-foreground">
+          ✓ أحسنت! تم احتساب قراءة اليوم في نقاطك
+        </div>
+      ) : (
+        <button
+          disabled={!ready}
+          onClick={finish}
+          className="pop mt-3 w-full rounded-2xl bg-primary py-3 font-extrabold text-primary-foreground disabled:opacity-50"
+        >
+          {ready ? "✅ أنهيت قراءة الإصحاح بالكامل" : !reachedEnd ? "اقرأ الإصحاح حتى آخره لتفعيل الزر" : `استمر في القراءة... (${minSec - elapsed} ث)`}
+        </button>
+      )}
+    </section>
+  );
+}
+
 export function DailyReadings() {
   const qc = useQueryClient();
   const today = cairoDate(new Date());
