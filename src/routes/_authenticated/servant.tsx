@@ -103,7 +103,7 @@ function ServantPage() {
               <h1 className="text-3xl font-extrabold">{p?.full_name}</h1>
               <p className="text-sm text-muted-foreground">متابعة التحضير، الحضور والغياب الأسبوعي، الافتقاد، والتوجيهات المشتركة.</p>
             </div>
-  <AnnouncementsBoard userId={me.user.id} />
+ <AnnouncementsBoard userId={me.user.id} />
 <main className="mx-auto max-w-5xl px-4">
   <div className="rounded-3xl bg-gradient-to-l">
     <div className="text-sm font-bold text-sky">أهلا يا خادم 🙏</div>
@@ -114,37 +114,47 @@ function ServantPage() {
     <TodayReadingCard />
   </div>
 
+  <nav className="my-5 flex flex-wrap gap-2">
+    {(
+      [
+        ["prep", "📘 تحضير الخادم"],
+        ["attendance", "📋 الحضور والغياب الأسبوعي"],
+        ["suggest", "💡 الاقتراحات"],
+        ["ai_quiz", "🤖 توليد المسابقات"],
+        ["preparch", "📚 أرشيف التحضيرات"],
+        ["monthly", "🗓️ برنامج الشهر"],
+        ["mentees", "👥 مخدوميني"],
+        ["spiritual", "🙏 حياتي الروحية"],
+        ["visitarch", "🗂️ أرشيف الافتقاد"],
+        ["read", "📖 القراءات اليومية"],
+      ] as const
+    ).map(([k, l]) => (
+      <button
+        key={k}
+        type="button"
+        onClick={() => setTab(k)}
+        className={`rounded-2xl border-2 px-4 py-2 font-bold transition ${
+          tab === k
+            ? "border-sky bg-sky text-primary-foreground pop"
+            : "border-border bg-card"
+        }`}
+      >
+        {l}
+      </button>
+    ))}
+    <BirthdaysButton />
+  </nav>
 
-            <nav className="my-5 flex flex-wrap gap-2">
-              {([
-                ["prep", "📘 تحضير الخادم"],
-                ["attendance", "📋 الحضور والغياب الأسبوعي"],
-                ["suggest", "💡 الاقتراحات"],
-                ["ai_quiz", "🤖 توليد المسابقات"],
-                ["preparch", "📚 أرشيف التحضيرات"],
-["monthly", "🗓️ برنامج الشهر"],
-["mentees", "👥 مخدوميني"],
-["spiritual", "🙏 حياتي الروحية"],
-
-
-
-                ["visitarch", "🗂️ أرشيف الافتقاد"],
-                ["read", "📖 القراءات اليومية"]
-              ] as const).map(([k, l]) => (
-                <button key={k} onClick={() => setTab(k)} className={`rounded-2xl border-2 px-4 py-2 font-bold transition ${tab === k ? "border-sky bg-sky text-primary-foreground pop" : "border-border bg-card"}`}>{l}</button>
-              ))}
-              <BirthdaysButton />
-            </nav>
-            {tab === "prep" && <Prep userId={me.user.id} />}
-            {tab === "attendance" && <DailyAttendanceSection />}
-            {tab === "suggest" && <ServantSuggestionsTab userId={me.user.id} />}
-            {tab === "ai_quiz" && <AiQuizGeneratorSection />}
-{tab === "read" && (
-  <div className="space-y-6">
-    <DailyReadings />
-    <ReadingPlanner />
-  </div>
-)}
+  {tab === "prep" && <Prep userId={me.user.id} />}
+  {tab === "attendance" && <DailyAttendanceSection />}
+  {tab === "suggest" && <ServantSuggestionsTab userId={me.user.id} />}
+  {tab === "ai_quiz" && <AiQuizGeneratorSection />}
+  {tab === "read" && (
+    <div className="space-y-6">
+      <DailyReadings />
+      <ReadingPlanner />
+    </div>
+  )}
 
 
    {tab === "mentees" && <MyMentees userId={me.user.id} isAdmin={me.isAdmin} />}
