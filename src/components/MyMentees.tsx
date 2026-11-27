@@ -340,16 +340,47 @@ export function MyMentees({ userId, isAdmin }: { userId: string; isAdmin: boolea
                       >
                         📞 اتصال
                       </a>
-                      {wa && (
-                        <a
-                          href={wa}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="rounded-xl bg-emerald-600 text-white px-3 py-1.5 text-xs font-bold hover:bg-emerald-700"
-                        >
-                          💬 واتساب
-                        </a>
+                                          {m.phone && (
+                        <div className="flex flex-wrap gap-1.5 items-center">
+                          {/* 1. قالب تذكير الخدمة (الخميس) */}
+                          <a
+                            href={buildWhatsAppUrl(m.phone, WHATSAPP_TEMPLATES.serviceReminder(m.full_name)) || "#"}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white px-2.5 py-1.5 text-xs font-bold transition flex items-center gap-1 shadow-sm"
+                            title="إرسال تذكير الخدمة لميعاد بكرة"
+                          >
+                            🔔 تذكير الخدمة
+                          </a>
+
+                          {/* 2. قالب افتقاد الغياب (يبرز بلون مميز إذا كان غائباً الجمعة) */}
+                          <a
+                            href={buildWhatsAppUrl(m.phone, WHATSAPP_TEMPLATES.absence(m.full_name)) || "#"}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`rounded-xl px-2.5 py-1.5 text-xs font-bold transition flex items-center gap-1 shadow-sm ${
+                              att === "absent"
+                                ? "bg-amber-600 hover:bg-amber-700 text-white animate-pulse"
+                                : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                            }`}
+                            title="إرسال رسالة افتقاد لغياب الجمعة"
+                          >
+                            💬 افتقاد غياب
+                          </a>
+
+                          {/* 3. قالب تهنئة عيد الميلاد */}
+                          <a
+                            href={buildWhatsAppUrl(m.phone, WHATSAPP_TEMPLATES.birthday(m.full_name)) || "#"}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-xl bg-pink-600 hover:bg-pink-700 text-white px-2.5 py-1.5 text-xs font-bold transition flex items-center gap-1 shadow-sm"
+                            title="إرسال تهنئة عيد الميلاد"
+                          >
+                            🎂 عيد ميلاد
+                          </a>
+                        </div>
                       )}
+
                     </>
                   )}
                   <Button
