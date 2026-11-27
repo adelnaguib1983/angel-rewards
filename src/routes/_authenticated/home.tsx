@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { LuckyWheel } from "@/components/LuckyWheel";
 
 import { AnnouncementsBoard, NotificationsBell, Quizzes, openAnnouncement } from "@/components/MemberExtras";
-import { Birthdays, DailyReadings, QuizLeague, SuggestionForm } from "@/components/StaffMemberExtras";
+import { Birthdays, DailyReadings, QuizLeague, SuggestionForm, TodayReadingCard } from "@/components/StaffMemberExtras";
 import { fileToDataUrl, OT_BOOKS, NT_BOOK_NAMES } from "@/lib/app";
 import { CalendarView, StreakBadges, StreakCard, WeeklyCoach } from "@/components/HomeExtras";
 
@@ -81,8 +81,16 @@ const isServantPreview = p?.account_type === "servant";
     <div className="stage-member pb-28 md:pb-16">
       <AppHeader stage="member" isAdmin={me.isAdmin} name={p?.full_name} avatar={p?.avatar} photo={p?.photo_url}><NotificationsBell onOpen={openAnnouncement} onQuiz={openQuiz} /></AppHeader>
       <main className="mx-auto max-w-6xl px-4">
-        <StatsHero name={p?.full_name ?? ""} avatar={p?.avatar ?? "🦁"} photo={p?.photo_url} />
-        <section id="member-quizzes" className="scroll-mt-4 py-6" aria-labelledby="member-quizzes-heading">
+       
+
+ <main className="mx-auto max-w-6xl px-4">
+  <StatsHero name={p?.full_name ?? ""} avatar={p?.avatar ?? "🦁"} photo={p?.photo_url} />
+
+  {/* قراءة اليوم تظهر هنا في قمة الصفحة كاملة إذا اختارها الخادم */}
+  <TodayReadingCard />
+
+  <section id="member-quizzes" ...>
+       <section id="member-quizzes" className="scroll-mt-4 py-6" aria-labelledby="member-quizzes-heading">
           <h2 id="member-quizzes-heading" className="mb-3 text-2xl font-extrabold">🧠 المسابقات</h2>
           <Quizzes />
           <div className="mt-4"><QuizLeague myId={me.user.id} /></div>
