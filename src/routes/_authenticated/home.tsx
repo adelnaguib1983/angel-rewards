@@ -80,8 +80,7 @@ const isServantPreview = p?.account_type === "servant";
   return (
     <div className="stage-member pb-28 md:pb-16">
       <AppHeader stage="member" isAdmin={me.isAdmin} name={p?.full_name} avatar={p?.avatar} photo={p?.photo_url}><NotificationsBell onOpen={openAnnouncement} onQuiz={openQuiz} /></AppHeader>
-      <main className="mx-auto max-w-6xl px-4">
-       
+    
 
  <main className="mx-auto max-w-6xl px-4">
   <StatsHero name={p?.full_name ?? ""} avatar={p?.avatar ?? "🦁"} photo={p?.photo_url} />
