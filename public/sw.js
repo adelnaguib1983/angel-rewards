@@ -1,4 +1,4 @@
-const CACHE_NAME = "angel-rewards-cache-v1";
+const CACHE_NAME = "angel-rewards-cache-v2";
 
 // الملفات الأساسية لتشغيل واجهة التطبيق
 const PRECACHE_ASSETS = [
@@ -73,7 +73,7 @@ self.addEventListener("fetch", (event) => {
     caches.match(request).then((cachedResponse) => {
       const fetchPromise = fetch(request)
         .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200 && networkResponse.type === "basic") {
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === "basic" || networkResponse.type === "cors")) {
             const copy = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
           }
