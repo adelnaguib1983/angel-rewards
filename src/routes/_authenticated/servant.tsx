@@ -103,13 +103,13 @@ function ServantPage() {
               <h1 className="text-3xl font-extrabold">{p?.full_name}</h1>
               <p className="text-sm text-muted-foreground">متابعة التحضير، الحضور والغياب الأسبوعي، الافتقاد، والتوجيهات المشتركة.</p>
             </div>
- <AnnouncementsBoard userId={me.user.id} />
+ {/* يظهر الإصحاح كاملًا هنا للخدام أيضًا في أول الصفحة */}
+<div className="mt-4">
+  <TodayReadingCard />
+</div>
 
+<AnnouncementsBoard userId={me.user.id} />
 
-  {/* يظهر الإصحاح كاملًا هنا للخدام أيضًا في أول الصفحة */}
-  <div className="mt-4">
-    <TodayReadingCard />
-  </div>
 
   <nav className="my-5 flex flex-wrap gap-2">
     {(
