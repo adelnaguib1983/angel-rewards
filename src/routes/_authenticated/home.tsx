@@ -89,7 +89,7 @@ const isServantPreview = p?.account_type === "servant";
   {/* قراءة اليوم تظهر هنا في قمة الصفحة كاملة إذا اختارها الخادم */}
   <TodayReadingCard />
 
-  <section id="member-quizzes" ...>
+  
        <section id="member-quizzes" className="scroll-mt-4 py-6" aria-labelledby="member-quizzes-heading">
           <h2 id="member-quizzes-heading" className="mb-3 text-2xl font-extrabold">🧠 المسابقات</h2>
           <Quizzes />
